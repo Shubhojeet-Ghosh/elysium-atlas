@@ -19,10 +19,10 @@ export default function Home() {
           <button className="text-[14px] cursor-pointer font-bold mt-[6px] bg-deep-onyx text-white px-4 py-3 rounded-md">
             deep-onyx
           </button>
-          <button className="text-[14px] cursor-pointer font-bold mt-[6px] bg-[#2a777c] text-white px-4 py-3 rounded-md">
+          <button className="text-[14px] cursor-pointer font-bold mt-[6px] bg-teal-green text-white px-4 py-3 rounded-md">
             teal-green
           </button>
-          <button className="text-[14px] cursor-pointer font-medium mt-[6px] border border-[#2a777c] text-[#2a777c] px-4 py-3 rounded-md">
+          <button className="text-[14px] cursor-pointer font-medium mt-[6px] border border-teal-green text-teal-green px-4 py-3 rounded-md">
             teal-green-border
           </button>
         </div>
