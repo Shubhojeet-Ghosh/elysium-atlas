@@ -1,4 +1,5 @@
 import Image from "next/image";
+import MiniLogo from "@/components/ElysiumAtlas/MiniLogo";
 
 export default function Home() {
   return (
@@ -27,6 +28,8 @@ export default function Home() {
           </button>
         </div>
       </div>
+
+      {/* <MiniLogo /> */}
     </div>
   );
 }
