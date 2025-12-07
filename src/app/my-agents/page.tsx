@@ -1,14 +1,15 @@
-import ThemeToggle from "@/components/ElysiumAtlas/ThemeToggle";
-import Image from "next/image";
-import Logo from "@/components/ElysiumAtlas/LogoComponent";
+import LeftNav from "@/components/ElysiumAtlas/LeftNav";
+import TopNav from "@/components/ElysiumAtlas/TopNav";
 
 export default function MyAgentsPage() {
   return (
     <>
-      <div className="flex flex-col w-full h-[100dvh] bg-pure-mist dark:bg-deep-onyx">
-        <div className="flex flex-row items-center justify-between w-full px-[18px] py-[10px]">
-          <Logo />
-          <ThemeToggle showIcon={false} />
+      <div className="flex flex-row w-full h-dvh bg-pure-mist dark:bg-deep-onyx">
+        <div className="flex flex-col h-full z-20">
+          <LeftNav />
+        </div>
+        <div className="flex flex-col flex-1 h-full z-10">
+          <TopNav />
         </div>
       </div>
     </>

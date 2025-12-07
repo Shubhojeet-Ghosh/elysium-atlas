@@ -13,6 +13,8 @@ import {
   setProfilePicture,
   setIsProfileComplete,
   resetUserProfile,
+  setUserID,
+  setUserEmail,
 } from "@/store/reducers/userProfileSlice";
 
 import {
@@ -22,9 +24,7 @@ import {
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 const REDIRECT_URI =
-  typeof window !== "undefined"
-    ? window.location.origin + "/elysium-atlas/auth/login"
-    : "";
+  typeof window !== "undefined" ? window.location.origin + "/auth/login" : "";
 
 export default function LoginBox() {
   const [email, setEmail] = useState("");
@@ -70,6 +70,8 @@ export default function LoginBox() {
           dispatch(
             setProfilePicture(response_data?.user?.profile_image_url || "")
           );
+          dispatch(setUserID(response_data?.user?.user_id || ""));
+          dispatch(setUserEmail(response_data?.user?.email || ""));
           dispatch(setFirstName(response_data?.user?.first_name || ""));
           dispatch(setLastName(response_data?.user?.last_name || ""));
           dispatch(
@@ -81,7 +83,7 @@ export default function LoginBox() {
           });
 
           setTimeout(() => {
-            window.location.href = "/elysium-atlas/my-agents";
+            window.location.href = "/my-agents";
           }, 150);
         } else {
           toast.success("Magic link sent to your email", {
@@ -133,6 +135,8 @@ export default function LoginBox() {
             dispatch(
               setProfilePicture(response_data?.user?.profile_image_url || "")
             );
+            dispatch(setUserID(response_data?.user?.user_id || ""));
+            dispatch(setUserEmail(response_data?.user?.email || ""));
             dispatch(setFirstName(response_data?.user?.first_name || ""));
             dispatch(setLastName(response_data?.user?.last_name || ""));
             dispatch(
@@ -142,7 +146,7 @@ export default function LoginBox() {
               position: "top-center",
             });
             setTimeout(() => {
-              window.location.href = "/elysium-atlas/my-agents";
+              window.location.href = "/my-agents";
             }, 150);
           } else {
             toast.error(response_data.message, {

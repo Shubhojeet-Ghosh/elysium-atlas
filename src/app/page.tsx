@@ -1,35 +1,36 @@
-import Image from "next/image";
-import MiniLogo from "@/components/ElysiumAtlas/MiniLogo";
+import ElysiumImageComp from "@/components/ElysiumImageComp";
+import StickyHeader from "@/components/StickyHeader";
+import HeroSection from "@/components/HeroSection";
+import StructuredData from "@/components/SEO/StructuredData";
+import { homePageMetadata } from "@/components/SEO/metadata";
+import { homePageStructuredData } from "@/components/SEO/structuredDataConfig";
+
+// Export metadata for Next.js
+export const metadata = homePageMetadata;
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-pure-mist text-deep-onyx font-sans flex-col">
-      <div>Hello, From Shubh,</div>
-      <div className="flex gap-2 flex-col">
-        <p className="mt-[16px]">Color Palettes...</p>
-        <div className="flex gap-2">
-          <button className="text-[14px] cursor-pointer mt-[6px] bg-serene-purple text-pure-mist px-4 py-3 rounded-md">
-            serene-purple
-          </button>
-          <button className="text-[14px] cursor-pointer font-medium mt-[6px] border border-serene-purple text-serene-purple px-4 py-3 rounded-md">
-            serene-purple-border
-          </button>
-          <button className="text-[14px] cursor-pointer font-bold mt-[6px] bg-pure-mist text-deep-onyx px-4 py-3 rounded-md">
-            pure-mist
-          </button>
-          <button className="text-[14px] cursor-pointer font-bold mt-[6px] bg-deep-onyx text-white px-4 py-3 rounded-md">
-            deep-onyx
-          </button>
-          <button className="text-[14px] cursor-pointer font-bold mt-[6px] bg-teal-green text-white px-4 py-3 rounded-md">
-            teal-green
-          </button>
-          <button className="text-[14px] cursor-pointer font-medium mt-[6px] border border-teal-green text-teal-green px-4 py-3 rounded-md">
-            teal-green-border
-          </button>
-        </div>
-      </div>
+    <>
+      {/* Structured Data for SEO */}
+      <StructuredData data={homePageStructuredData} />
 
-      {/* <MiniLogo /> */}
-    </div>
+      <div className="text-deep-onyx">
+        {/* Sticky header - stays at top throughout scroll */}
+        <StickyHeader />
+
+        {/* Main content area */}
+        <main>
+          {/* Hero section with image background */}
+          <section aria-label="Hero section">
+            <ElysiumImageComp>
+              <HeroSection />
+            </ElysiumImageComp>
+          </section>
+
+          {/* Additional content sections can be added here */}
+          <div className="relative z-20 bg-transparent text-deep-onyx"></div>
+        </main>
+      </div>
+    </>
   );
 }

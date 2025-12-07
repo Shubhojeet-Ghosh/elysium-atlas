@@ -13,6 +13,8 @@ import {
   setLastName,
   setProfilePicture,
   setIsProfileComplete,
+  setUserID,
+  setUserEmail,
 } from "@/store/reducers/userProfileSlice";
 export default function VerifyPage() {
   const searchParams = useSearchParams();
@@ -40,6 +42,8 @@ export default function VerifyPage() {
           toast.success("Account verified! Redirecting you to your account...");
           setVerificationSuccess(true);
           dispatch(setProfilePicture(res.data?.user?.profile_image_url || ""));
+          dispatch(setUserID(res.data?.user?.user_id || ""));
+          dispatch(setUserEmail(res.data?.user?.email || ""));
           dispatch(setFirstName(res.data?.user?.first_name || ""));
           dispatch(setLastName(res.data?.user?.last_name || ""));
           dispatch(setIsProfileComplete(res.data?.is_profile_complete ?? true));
@@ -49,7 +53,7 @@ export default function VerifyPage() {
           });
 
           setTimeout(() => {
-            window.location.href = "/elysium-atlas/my-agents";
+            window.location.href = "/my-agents";
           }, 150);
         } else {
           setMessage("Verification failed...");

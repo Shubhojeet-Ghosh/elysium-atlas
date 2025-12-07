@@ -2,8 +2,10 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { UserProfileState } from "../types/UserProfileTypes";
 
 const initialState: UserProfileState = {
+  userID: "",
   firstName: "",
   lastName: "",
+  userEmail: "",
   profilePicture: "",
   isProfileComplete: false,
 };
@@ -12,6 +14,12 @@ const userProfileSlice = createSlice({
   name: "userProfile",
   initialState,
   reducers: {
+    setUserID: (state, action: PayloadAction<string>) => {
+      state.userID = action.payload;
+    },
+    setUserEmail: (state, action: PayloadAction<string>) => {
+      state.userEmail = action.payload;
+    },
     setFirstName: (state, action: PayloadAction<string>) => {
       state.firstName = action.payload;
     },
@@ -39,7 +47,8 @@ export const {
   setProfilePicture,
   setIsProfileComplete,
   resetUserProfile,
+  setUserID,
+  setUserEmail,
 } = userProfileSlice.actions;
 
-export const userProfileReducer =
-  userProfileSlice.reducer;
+export const userProfileReducer = userProfileSlice.reducer;

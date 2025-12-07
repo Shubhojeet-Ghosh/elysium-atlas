@@ -15,6 +15,8 @@ import {
   setLastName,
   setProfilePicture,
   setIsProfileComplete,
+  setUserID,
+  setUserEmail,
 } from "@/store/reducers/userProfileSlice";
 export default function ProfileCompletionPrompt() {
   const inputRef = useRef();
@@ -125,6 +127,8 @@ export default function ProfileCompletionPrompt() {
 
         setShowPrompt(false);
         dispatch(setProfilePicture(profileImageUrlToUse));
+        dispatch(setUserID(response_data?.user?.user_id || ""));
+        dispatch(setUserEmail(response_data?.user?.email || ""));
         dispatch(setFirstName(firstName));
         dispatch(setLastName(lastName));
         dispatch(setIsProfileComplete(true));

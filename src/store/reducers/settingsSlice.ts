@@ -9,7 +9,7 @@ const settingsSlice = createSlice({
   name: "settings",
   initialState,
   reducers: {
-    setTheme: (state, action: PayloadAction<"light" | "dark">) => {
+    setTheme: (state, action: PayloadAction<"light" | "dark" | "system">) => {
       state.theme = action.payload;
     },
   },

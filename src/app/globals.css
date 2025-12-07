@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "nprogress/nprogress.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -10,6 +11,7 @@
   --color-deep-onyx: #1e1e1e;
   --color-serene-purple: #6c5f8d;
   --color-teal-green: #2a777c;
+  --color-danger-red: #da6c6c;
   --font-sans: var(--font-manrope);
   --font-mono: var(--font-space-grotesk);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -123,4 +125,14 @@
   body {
     @apply bg-background text-foreground font-sans;
   }
+}
+
+/* NProgress customization */
+#nprogress .bar {
+  background: #6c5f8d !important; /* serene-purple */
+  height: 3px !important;
+}
+
+#nprogress .peg {
+  box-shadow: 0 0 10px #6c5f8d, 0 0 5px #6c5f8d !important; /* serene-purple */
 }

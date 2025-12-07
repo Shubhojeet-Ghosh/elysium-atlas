@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Get base path from environment variable
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-
 // Define public routes that don't require authentication
 const publicRoutes = [
   "/auth/login",
@@ -41,13 +38,10 @@ export function middleware(request: NextRequest) {
   const origin = new URL(request.url).origin;
 
   // Check if user has valid token and is trying to access public routes
-  if (hasValidToken && isPublicRoute(pathname)) {
+  // Exception: Allow authenticated users to access root "/" route
+  if (hasValidToken && isPublicRoute(pathname) && pathname !== "/") {
     // Redirect authenticated users away from public pages to my-agents
-    const myAgentsPath = basePath
-      ? `${basePath}/my-agents`.replace(/\/+/g, "/")
-      : "/my-agents";
-
-    const myAgentsUrl = new URL(myAgentsPath, origin);
+    const myAgentsUrl = new URL("/my-agents", origin);
     return NextResponse.redirect(myAgentsUrl);
   }
 
@@ -55,13 +49,8 @@ export function middleware(request: NextRequest) {
   if (isPrivateRoute(pathname)) {
     // If no valid session token, redirect to login
     if (!hasValidToken) {
-      // Construct the login path with base path
-      const loginPath = basePath
-        ? `${basePath}/auth/login`.replace(/\/+/g, "/")
-        : "/auth/login";
-
-      // Construct the full login URL with base path
-      const loginUrl = new URL(loginPath, origin);
+      // Construct the full login URL
+      const loginUrl = new URL("/auth/login", origin);
 
       // Preserve the original URL as a redirect parameter if needed
       loginUrl.searchParams.set("redirect", pathname);

@@ -1,3 +1,3 @@
 export interface SettingsState {
-  theme: "light" | "dark";
+  theme: "light" | "dark" | "system";
 }
