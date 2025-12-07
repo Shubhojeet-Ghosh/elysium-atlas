@@ -29,7 +29,7 @@ export default function TopNav() {
   }, [isDropdownOpen]);
 
   return (
-    <div className="flex items-center justify-end w-full h-16 px-6 border-b border-gray-200 dark:border-gray-200 transition-all duration-300 bg-pure-mist dark:bg-deep-onyx">
+    <div className=" flex  items-center justify-end w-auto h-16 px-6 transition-all duration-300 bg-pure-mist dark:bg-deep-onyx">
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setIsDropdownOpen(!isDropdownOpen)}

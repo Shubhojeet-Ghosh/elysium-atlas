@@ -8,7 +8,7 @@ export default function MyAgentsPage() {
         <div className="flex flex-col h-full z-20">
           <LeftNav />
         </div>
-        <div className="flex flex-col flex-1 h-full z-10">
+        <div className="flex-1 flex justify-end z-30">
           <TopNav />
         </div>
       </div>

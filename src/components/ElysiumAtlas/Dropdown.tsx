@@ -29,7 +29,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/store";
 import { setTheme } from "@/store/reducers/settingsSlice";
 import Logout from "@/components/ElysiumAtlas/Logout";
-
+import Link from "next/link";
 interface DropdownProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -94,10 +94,12 @@ export default function Dropdown({ open, onOpenChange }: DropdownProps) {
 
           {/* Menu Items Section */}
           <div className="px-2 py-2">
-            <DropdownMenuItem className="text-deep-onyx dark:text-pure-mist hover:bg-serene-purple dark:hover:bg-serene-purple hover:text-pure-mist">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              <span>Dashboard</span>
-            </DropdownMenuItem>
+            <Link href="/my-agents">
+              <DropdownMenuItem className="text-deep-onyx dark:text-pure-mist hover:bg-serene-purple dark:hover:bg-serene-purple hover:text-pure-mist">
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                <span>Dashboard</span>
+              </DropdownMenuItem>
+            </Link>
             <DropdownMenuItem className="text-deep-onyx dark:text-pure-mist hover:text-pure-mist hover:bg-serene-purple dark:hover:bg-serene-purple ">
               <Settings className="mr-2 h-4 w-4" />
               <span>Account Settings</span>

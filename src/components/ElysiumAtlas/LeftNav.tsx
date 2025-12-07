@@ -30,7 +30,7 @@ export default function LeftNav() {
         onClick={toggleNav}
         onMouseEnter={() => setIsButtonHovered(true)}
         onMouseLeave={() => setIsButtonHovered(false)}
-        className="text-serene-purple absolute top-[50px] -right-[13px] z-10 rounded-full bg-pure-mist dark:bg-deep-onyx border-[2px] border-serene-purple p-1 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer hover:bg-serene-purple hover:text-white dark:hover:bg-serene-purple dark:hover:text-white"
+        className="text-serene-purple absolute top-[50px] -right-[13px] z-10 rounded-full bg-pure-mist dark:bg-deep-onyx border-[2px] border-serene-purple p-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all duration-200 cursor-pointer hover:bg-serene-purple hover:text-white dark:hover:bg-serene-purple dark:hover:text-white"
         aria-label={isOpen ? "Close navigation" : "Open navigation"}
       >
         {isOpen ? (

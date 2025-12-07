@@ -5,7 +5,7 @@ import MiniLogo from "@/components/ElysiumAtlas/MiniLogo";
 export default function Logo({ showMiniature = false }) {
   if (showMiniature) {
     return (
-      <Link href={"/"}>
+      <Link href={"/my-agents"}>
         <p className="font-mono text-[24px] font-semibold text-serene-purple align-super">
           a<span className="text-deep-onyx dark:text-pure-mist ">.</span>
         </p>
@@ -14,7 +14,7 @@ export default function Logo({ showMiniature = false }) {
   }
 
   return (
-    <Link href={"/"} className="flex items-baseline font-mono">
+    <Link href={"/my-agents"} className="flex items-baseline font-mono">
       {/* You can add an icon here if you want */}
       <span className=" text-[24px] font-[500] text-deep-onyx dark:text-pure-mist tracking-tight">
         Elysium.
