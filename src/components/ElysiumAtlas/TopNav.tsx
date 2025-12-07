@@ -29,15 +29,17 @@ export default function TopNav() {
   }, [isDropdownOpen]);
 
   return (
-    <div className=" flex  items-center justify-end w-auto h-16 px-6 transition-all duration-300 bg-pure-mist dark:bg-deep-onyx">
-      <div className="relative" ref={dropdownRef}>
-        <button
-          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          aria-label="User menu"
-        >
-          <UserAvatar />
-        </button>
-        <Dropdown open={isDropdownOpen} onOpenChange={setIsDropdownOpen} />
+    <div className="fixed top-0 right-0 z-30">
+      <div className=" flex  items-center justify-end w-auto h-16 px-6 transition-all duration-300 bg-pure-mist dark:bg-deep-onyx">
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            aria-label="User menu"
+          >
+            <UserAvatar />
+          </button>
+          <Dropdown open={isDropdownOpen} onOpenChange={setIsDropdownOpen} />
+        </div>
       </div>
     </div>
   );
