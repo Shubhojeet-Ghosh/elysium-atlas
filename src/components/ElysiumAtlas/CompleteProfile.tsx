@@ -162,7 +162,7 @@ export default function CompleteProfile() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[1px]">
-      <div className="relative w-full max-w-md mx-4 bg-pure-mist dark:bg-deep-onyx rounded-lg  shadow-lg">
+      <div className="relative w-full max-w-md mx-4 bg-pure-mist dark:bg-black rounded-lg  shadow-lg">
         <div className="p-6">
           <div className="mb-4 flex items-center justify-center">
             <h2 className="text-[16px] font-semibold text-deep-onyx dark:text-pure-mist">

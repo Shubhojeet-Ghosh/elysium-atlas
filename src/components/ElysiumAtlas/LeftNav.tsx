@@ -3,7 +3,6 @@ import { useState } from "react";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import Logo from "@/components/ElysiumAtlas/LogoComponent";
 import ThemeToggle from "@/components/ElysiumAtlas/ThemeToggle";
-import CompleteProfile from "@/components/ElysiumAtlas/CompleteProfile";
 
 export default function LeftNav() {
   const [isOpen, setIsOpen] = useState(true);
@@ -42,7 +41,6 @@ export default function LeftNav() {
         )}
       </button>
       <ThemeToggle showIcon={false} />
-      <CompleteProfile />
     </div>
   );
 }
