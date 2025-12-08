@@ -19,7 +19,7 @@ export default function LeftNav() {
         className={`flex flex-col items-center justify-between h-dvh px-[18px] py-[10px] border-r-2 border-gray-300 dark:border-gray-300 hover:border-serene-purple dark:hover:border-serene-purple transition-all duration-300 ${
           isOpen
             ? "w-[220px] min-[1080px]:w-[220px]"
-            : "w-[60px] overflow-hidden min-[1080px]:w-[220px] min-[1080px]:overflow-visible"
+            : "w-[60px] overflow-hidden min-[1080px]:w-[60px] min-[1080px]:overflow-hidden"
         } ${
           isButtonHovered
             ? "border-serene-purple dark:border-serene-purple"

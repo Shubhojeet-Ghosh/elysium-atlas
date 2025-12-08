@@ -5,7 +5,7 @@ const config: Config = {
     screens: {
       sm: "640px",
       md: "768px",
-      lg: "1280px", // Changed from default 1024px to 1280px
+      lg: "1280px",
     },
   },
 };
