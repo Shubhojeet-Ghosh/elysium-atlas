@@ -27,11 +27,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAppDispatch, useAppSelector } from "@/store";
-import { setTheme, toggleLeftNav } from "@/store/reducers/settingsSlice";
+import { setTheme } from "@/store/reducers/settingsSlice";
 import Logout from "@/components/ElysiumAtlas/Logout";
 import Link from "next/link";
-import { useEffect } from "react";
-
 interface DropdownProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -40,19 +38,9 @@ interface DropdownProps {
 export default function Dropdown({ open, onOpenChange }: DropdownProps) {
   const dispatch = useAppDispatch();
   const currentTheme = useAppSelector((state: any) => state.settings.theme);
-  const isLeftNavOpen = useAppSelector(
-    (state: any) => state.settings.isLeftNavOpen
-  );
   const firstName = useAppSelector((state: any) => state.userProfile.firstName);
   const lastName = useAppSelector((state: any) => state.userProfile.lastName);
   const userEmail = useAppSelector((state: any) => state.userProfile.userEmail);
-
-  // Close left nav when dropdown opens
-  useEffect(() => {
-    if (open && isLeftNavOpen) {
-      dispatch(toggleLeftNav());
-    }
-  }, [open, isLeftNavOpen, dispatch]);
 
   // Generate username for display
   const userName =
