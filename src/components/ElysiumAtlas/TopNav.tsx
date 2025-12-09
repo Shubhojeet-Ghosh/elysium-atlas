@@ -31,8 +31,8 @@ export default function TopNav() {
 
   return (
     <>
-      <div className="fixed top-0 right-0 z-30">
-        <div className=" flex  items-center justify-end w-auto h-16 px-6 transition-all duration-300 bg-pure-mist dark:bg-deep-onyx">
+      <div className="fixed top-0 right-0 z-90 w-full">
+        <div className=" flex  items-center justify-end w-auto h-16 px-6 transition-all duration-300">
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
