@@ -16,10 +16,10 @@ export default function Logo({ showMiniature = false }) {
   return (
     <Link href={"/my-agents"} className="flex items-baseline font-mono">
       {/* You can add an icon here if you want */}
-      <span className=" text-[24px] font-[500] text-deep-onyx dark:text-pure-mist tracking-tight">
+      <span className=" lg:text-[24px] text-[20px] font-[500] text-deep-onyx dark:text-pure-mist tracking-tight">
         Elysium.
       </span>
-      <sup className=" text-[18px] font-[600] text-serene-purple align-super">
+      <sup className=" lg:text-[18px] text-[16px] font-[600] text-serene-purple align-super">
         atlas
       </sup>
     </Link>

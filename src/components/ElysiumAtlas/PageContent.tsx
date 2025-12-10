@@ -26,7 +26,7 @@ export default function PageContent({
         ${className}
       `}
     >
-      {/* <div className="w-full h-full">{children}</div> */}
+      <div className="w-full h-full">{children}</div>
     </div>
   );
 }

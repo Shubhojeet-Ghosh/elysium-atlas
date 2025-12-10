@@ -2,6 +2,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bot, Home, Settings, Users, FileText, BarChart3 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 
 interface NavItem {
   name: string;
@@ -53,11 +58,12 @@ export default function NavItems({ isCollapsed }: NavItemsProps) {
     <nav className="flex flex-col gap-2 w-full mt-6">
       {navItems.map((item) => {
         const Icon = item.icon;
-        const isActive = pathname === item.href;
+        const isActive =
+          pathname === item.href ||
+          (item.href === "/my-agents" && pathname.startsWith("/my-agents"));
 
-        return (
+        const linkContent = (
           <Link
-            key={item.name}
             href={item.href}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group
               ${
@@ -67,7 +73,6 @@ export default function NavItems({ isCollapsed }: NavItemsProps) {
               }
               ${isCollapsed ? "justify-center" : ""}
             `}
-            title={isCollapsed ? item.name : undefined}
           >
             <Icon
               className={`w-5 h-5 flex-shrink-0 ${
@@ -79,8 +84,18 @@ export default function NavItems({ isCollapsed }: NavItemsProps) {
             )}
           </Link>
         );
+
+        if (isCollapsed) {
+          return (
+            <Tooltip key={item.name}>
+              <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+              <TooltipContent side="right">{item.name}</TooltipContent>
+            </Tooltip>
+          );
+        }
+
+        return <div key={item.name}>{linkContent}</div>;
       })}
     </nav>
   );
 }
-

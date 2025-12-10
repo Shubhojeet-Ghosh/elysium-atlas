@@ -6,6 +6,7 @@ import { useDispatch, TypedUseSelectorHook, useSelector } from "react-redux";
 // Import Reducers
 import { settingsReducer } from "./reducers/settingsSlice";
 import { userProfileReducer } from "./reducers/userProfileSlice";
+import { agentBuilderReducer } from "./reducers/agentBuilderSlice";
 
 // Noop storage logic to handle SSR issues
 const createNoopStorage = () => {
@@ -37,6 +38,10 @@ const userProfilePersistConfig = {
   key: "userProfile",
   storage: storage,
 };
+const agentBuilderPersistConfig = {
+  key: "agentBuilder",
+  storage: storage,
+};
 const elysiumAtlasNavigationPersistConfig = {
   key: "elysiumAtlasNavigation",
   storage: storage,
@@ -50,11 +55,16 @@ const persistedUserProfileReducer = persistReducer(
   userProfilePersistConfig,
   userProfileReducer
 );
+const persistedAgentBuilderReducer = persistReducer(
+  agentBuilderPersistConfig,
+  agentBuilderReducer
+);
 // Configure Redux Store
 export const store = configureStore({
   reducer: {
     settings: persistedSettingsReducer, // Persisted settings state
     userProfile: persistedUserProfileReducer,
+    agentBuilder: persistedAgentBuilderReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

@@ -77,7 +77,7 @@ export default function VerifyPage() {
         <Logo />
       </div>
       {/* middle of the screen */}
-      <div className="flex items-center justify-center bg-red-100 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+      <div className="flex items-center justify-center absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
         <div className="bg-white p-8 min-w-[320px] flex flex-col items-center">
           {loading ? (
             <p className="text-[14px] font-bold">Verifying your account...</p>
