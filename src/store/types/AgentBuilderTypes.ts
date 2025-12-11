@@ -9,8 +9,9 @@ export interface AgentBuilderState {
   agentName: string;
   knowledgeBase: string;
   knowledgeBaseSitemap: string;
-  knowledgeBaseLinks: string;
+  knowledgeBaseLinks: string[];
   knowledgeBaseFiles: FileMetadata[];
   knowledgeBaseText: string;
+  baseURL: string;
 }
 
