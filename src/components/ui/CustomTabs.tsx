@@ -109,9 +109,12 @@ const CustomTabsList = React.forwardRef<HTMLDivElement, CustomTabsListProps>(
 
     React.useImperativeHandle(ref, () => listRef.current as HTMLDivElement);
 
+    // Track previous selected value to detect actual tab changes
+    const prevSelectedValueRef = React.useRef<string | undefined>(undefined);
+
     // Update indicator position when selected tab changes
     React.useEffect(() => {
-      const updateIndicator = () => {
+      const updateIndicator = (shouldScrollIntoView: boolean = false) => {
         if (!listRef.current || !selectedValue) return;
 
         const activeTab = listRef.current.querySelector(
@@ -122,63 +125,97 @@ const CustomTabsList = React.forwardRef<HTMLDivElement, CustomTabsListProps>(
           const listRect = listRef.current.getBoundingClientRect();
           const tabRect = activeTab.getBoundingClientRect();
 
-          // Check if tab is outside viewport
-          const isOutOfView =
-            tabRect.right > listRect.right || tabRect.left < listRect.left;
+          // Only scroll into view if explicitly requested (tab change) and tab is out of view
+          if (shouldScrollIntoView) {
+            const isOutOfView =
+              tabRect.right > listRect.right || tabRect.left < listRect.left;
 
-          if (isOutOfView) {
-            // Scroll the active tab into view if needed
-            activeTab.scrollIntoView({
-              behavior: "smooth",
-              block: "nearest",
-              inline: "center",
-            });
+            if (isOutOfView) {
+              // Scroll the active tab into view if needed (only on tab change)
+              activeTab.scrollIntoView({
+                behavior: "smooth",
+                block: "nearest",
+                inline: "center",
+              });
+
+              // Wait for scroll animation to complete before updating position
+              setTimeout(() => {
+                updateIndicatorPosition(activeTab);
+              }, 300);
+              return;
+            }
           }
 
-          // Update indicator position
-          const updatePosition = () => {
-            if (!listRef.current || !activeTab) return;
-            const updatedTabRect = activeTab.getBoundingClientRect();
-            const updatedListRect = listRef.current.getBoundingClientRect();
-
-            // Calculate position relative to the scrollable container
-            const left = updatedTabRect.left - updatedListRect.left;
-            const width = updatedTabRect.width;
-
-            // Ensure indicator doesn't overflow the container
-            const containerWidth = listRef.current.clientWidth;
-            const maxLeft = containerWidth - width;
-            const clampedLeft = Math.max(0, Math.min(left, maxLeft));
-
-            setIndicatorStyle({
-              left: clampedLeft,
-              width: Math.min(width, containerWidth - clampedLeft),
-            });
-          };
-
-          // If we scrolled, wait for scroll to complete, otherwise update immediately
-          if (isOutOfView) {
-            setTimeout(updatePosition, 300); // Wait for smooth scroll animation
-          } else {
-            updatePosition();
-          }
+          // Update indicator position immediately (for resize/scroll events or if not scrolling)
+          updateIndicatorPosition(activeTab);
         }
       };
 
-      // Initial update
-      updateIndicator();
+      const updateIndicatorPosition = (activeTab: HTMLButtonElement) => {
+        if (!listRef.current) return;
+        const tabRect = activeTab.getBoundingClientRect();
+        const listRect = listRef.current.getBoundingClientRect();
 
-      // Update on resize and scroll
-      const resizeObserver = new ResizeObserver(updateIndicator);
+        // Calculate position relative to the scrollable container
+        const left = tabRect.left - listRect.left;
+        const width = tabRect.width;
+
+        // Calculate how much of the tab is visible
+        const visibleLeft = Math.max(0, left);
+        const visibleRight = Math.min(
+          left + width,
+          listRef.current.clientWidth
+        );
+        const visibleWidth = Math.max(0, visibleRight - visibleLeft);
+
+        // Only show indicator if tab is at least partially visible
+        if (visibleWidth > 0) {
+          setIndicatorStyle({
+            left: visibleLeft,
+            width: visibleWidth,
+          });
+        } else {
+          // Hide indicator if tab is completely out of view
+          setIndicatorStyle({
+            left: 0,
+            width: 0,
+          });
+        }
+      };
+
+      // Check if this is a tab change (not just a re-render)
+      const isTabChange = prevSelectedValueRef.current !== selectedValue;
+
+      // Initial update - scroll into view only if tab actually changed
+      if (isTabChange) {
+        updateIndicator(true);
+        prevSelectedValueRef.current = selectedValue;
+      } else {
+        updateIndicator(false);
+      }
+
+      // Update on resize (without scrolling into view)
+      const handleResize = () => {
+        updateIndicator(false);
+      };
+
+      // Update on scroll (without scrolling into view, just update indicator position)
+      const handleScroll = () => {
+        updateIndicator(false);
+      };
+
+      const resizeObserver = new ResizeObserver(handleResize);
       if (listRef.current) {
         resizeObserver.observe(listRef.current);
-        listRef.current.addEventListener("scroll", updateIndicator);
+        listRef.current.addEventListener("scroll", handleScroll, {
+          passive: true,
+        });
       }
 
       return () => {
         resizeObserver.disconnect();
         if (listRef.current) {
-          listRef.current.removeEventListener("scroll", updateIndicator);
+          listRef.current.removeEventListener("scroll", handleScroll);
         }
       };
     }, [selectedValue]);
