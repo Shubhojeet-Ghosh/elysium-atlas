@@ -6,9 +6,10 @@ const initialState: AgentBuilderState = {
   agentName: "",
   knowledgeBase: "",
   knowledgeBaseSitemap: "",
-  knowledgeBaseLinks: "",
+  knowledgeBaseLinks: [],
   knowledgeBaseFiles: [],
   knowledgeBaseText: "",
+  baseURL: "",
 };
 
 const agentBuilderSlice = createSlice({
@@ -27,7 +28,7 @@ const agentBuilderSlice = createSlice({
     setKnowledgeBaseSitemap: (state, action: PayloadAction<string>) => {
       state.knowledgeBaseSitemap = action.payload;
     },
-    setKnowledgeBaseLinks: (state, action: PayloadAction<string>) => {
+    setKnowledgeBaseLinks: (state, action: PayloadAction<string[]>) => {
       state.knowledgeBaseLinks = action.payload;
     },
     setKnowledgeBaseFiles: (state, action: PayloadAction<FileMetadata[]>) => {
@@ -36,14 +37,18 @@ const agentBuilderSlice = createSlice({
     setKnowledgeBaseText: (state, action: PayloadAction<string>) => {
       state.knowledgeBaseText = action.payload;
     },
+    setBaseURL: (state, action: PayloadAction<string>) => {
+      state.baseURL = action.payload;
+    },
     resetAgentBuilder: (state) => {
       state.currentStep = 0;
       state.agentName = "";
       state.knowledgeBase = "";
       state.knowledgeBaseSitemap = "";
-      state.knowledgeBaseLinks = "";
+      state.knowledgeBaseLinks = [];
       state.knowledgeBaseFiles = [];
       state.knowledgeBaseText = "";
+      state.baseURL = "";
     },
   },
 });
@@ -56,6 +61,7 @@ export const {
   setKnowledgeBaseLinks,
   setKnowledgeBaseFiles,
   setKnowledgeBaseText,
+  setBaseURL,
   resetAgentBuilder,
 } = agentBuilderSlice.actions;
 

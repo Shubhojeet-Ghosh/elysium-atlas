@@ -33,10 +33,11 @@ const userProfileSlice = createSlice({
       state.isProfileComplete = action.payload;
     },
     resetUserProfile: (state) => {
+      state.userID = "";
       state.firstName = "";
       state.lastName = "";
+      state.userEmail = "";
       state.profilePicture = "";
-      state.isProfileComplete = false;
     },
   },
 });

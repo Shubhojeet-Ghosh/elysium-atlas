@@ -4,12 +4,17 @@ import { useEffect } from "react";
 import { LogOut } from "lucide-react";
 import Cookies from "js-cookie";
 import NProgress from "nprogress";
+import { useAppDispatch } from "@/store";
+import { resetAgentBuilder } from "@/store/reducers/agentBuilderSlice";
+import { resetUserProfile } from "@/store/reducers/userProfileSlice";
 
 interface LogoutProps {
   onClick?: () => void;
 }
 
 export default function Logout({ onClick }: LogoutProps) {
+  const dispatch = useAppDispatch();
+
   // Configure nprogress on mount
   useEffect(() => {
     NProgress.configure({
@@ -21,6 +26,10 @@ export default function Logout({ onClick }: LogoutProps) {
   const handleLogout = () => {
     // Start progress bar
     NProgress.start();
+
+    // Reset all Redux state
+    dispatch(resetAgentBuilder());
+    dispatch(resetUserProfile());
 
     // Clear the session token cookie
     Cookies.remove("elysium_atlas_session_token");
