@@ -4,6 +4,7 @@ import { SettingsState } from "../types/SettingsTypes";
 const initialState: SettingsState = {
   theme: "light",
   isLeftNavOpen: true,
+  appVersion: "0.0.0",
 };
 
 const settingsSlice = createSlice({
@@ -19,10 +20,13 @@ const settingsSlice = createSlice({
     toggleLeftNav: (state) => {
       state.isLeftNavOpen = !state.isLeftNavOpen;
     },
+    setAppVersion: (state, action: PayloadAction<string>) => {
+      state.appVersion = action.payload;
+    },
   },
 });
 
-export const { setTheme, setLeftNavOpen, toggleLeftNav } =
+export const { setTheme, setLeftNavOpen, toggleLeftNav, setAppVersion } =
   settingsSlice.actions;
 
 export const settingsReducer = settingsSlice.reducer;

@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useAppDispatch } from "@/store";
+import { setAppVersion } from "@/store/reducers/settingsSlice";
+import packageJson from "../../../package.json";
 import Dropdown from "@/components/ElysiumAtlas/Dropdown";
 import UserAvatar from "@/components/ElysiumAtlas/UserAvatar";
 import CompleteProfile from "@/components/ElysiumAtlas/CompleteProfile";
@@ -8,6 +11,15 @@ import CompleteProfile from "@/components/ElysiumAtlas/CompleteProfile";
 export default function TopNav() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const dispatch = useAppDispatch();
+
+  // Update app version from package.json
+  useEffect(() => {
+    const version = packageJson.version;
+    if (version) {
+      dispatch(setAppVersion(version));
+    }
+  }, [dispatch]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
