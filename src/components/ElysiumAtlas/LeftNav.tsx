@@ -23,8 +23,12 @@ export default function LeftNav() {
   };
 
   return (
-    <div className="fixed top-0 left-0 z-[100]">
-      <div className="relative group">
+    <div
+      className={`fixed top-0 left-0 z-[100] transition-all duration-300 ${
+        !isOpen ? "w-0 lg:w-20" : "w-[280px]"
+      }`}
+    >
+      <div className="relative group h-full">
         <div
           className={`bg-white dark:bg-black flex flex-col items-center justify-between h-dvh transition-all duration-300 
             px-4 py-2.5 border-r-2 border-gray-300 dark:border-gray-300 hover:border-serene-purple dark:hover:border-serene-purple

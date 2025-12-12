@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
 import {
   setBaseURL,
-  setKnowledgeBaseLinks,
+  addKnowledgeBaseLinks,
 } from "@/store/reducers/agentBuilderSlice";
 import CustomInput from "@/components/inputs/CustomInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
@@ -61,16 +61,18 @@ export default function KnowledgeBaseLinks() {
         // Clean and deduplicate links from response
         const cleanedLinks = cleanAndDeduplicateLinks(responseLinks);
 
-        // Filter out links that already exist in Redux
-        const existingLinksSet = new Set(knowledgeBaseLinks);
+        // Get existing links set
+        const existingLinksSet = new Set(
+          knowledgeBaseLinks.map((item) => item.link)
+        );
         const uniqueNewLinks = cleanedLinks.filter(
           (link) => !existingLinksSet.has(link)
         );
 
         if (uniqueNewLinks.length > 0) {
-          // Append unique links to existing ones
+          // Add new links with checked: true by default
           dispatch(
-            setKnowledgeBaseLinks([...knowledgeBaseLinks, ...uniqueNewLinks])
+            addKnowledgeBaseLinks({ links: uniqueNewLinks, checked: true })
           );
           toast.success(
             response.data.message ||
@@ -99,12 +101,7 @@ export default function KnowledgeBaseLinks() {
 
   return (
     <div className="flex flex-col">
-      <div className="w-full flex items-center justify-end">
-        <div className="flex justify-end mt-[4px]">
-          <AddSitemapDialog />
-        </div>
-      </div>
-      <div className="lg:text-[14px] text-[12px] font-bold mt-4">
+      <div className="lg:text-[14px] text-[12px] font-bold mt-[4px]">
         Base Website Link
       </div>
       <div className="flex items-center gap-3 mt-[4px]">
@@ -126,6 +123,7 @@ export default function KnowledgeBaseLinks() {
             <span>Extract Links</span>
           )}
         </PrimaryButton>
+        <AddSitemapDialog />
       </div>
       <div className="mt-[2px]">
         <KnowledgeBaseLinksList />

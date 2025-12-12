@@ -33,5 +33,5 @@ export default function BuildNewAgent() {
     }
   };
 
-  return <div className="w-full">{renderStep()}</div>;
+  return <>{renderStep()}</>;
 }

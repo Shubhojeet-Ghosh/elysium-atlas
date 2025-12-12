@@ -21,7 +21,7 @@ export default function PageContent({
       className={`
         w-full
         transition-all duration-300
-        mt-16
+        mt-[65px]
         ${isLeftNavOpen ? "lg:pl-[280px]" : "lg:pl-20"}
         ${className}
       `}
