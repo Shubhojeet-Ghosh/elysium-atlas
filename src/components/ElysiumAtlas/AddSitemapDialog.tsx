@@ -155,7 +155,7 @@ export default function AddSitemapDialog() {
             onClick={handleFetchSitemap}
             disabled={isLoading}
           >
-            {false ? (
+            {isLoading ? (
               <Spinner className="border-white dark:border-deep-onyx" />
             ) : (
               <span>Fetch Links</span>
