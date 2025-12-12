@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
 import {
   setKnowledgeBaseSitemap,
-  setKnowledgeBaseLinks,
+  addKnowledgeBaseLinks,
 } from "@/store/reducers/agentBuilderSlice";
 import CustomInput from "@/components/inputs/CustomInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
@@ -76,16 +76,18 @@ export default function AddSitemapDialog() {
         // Clean and deduplicate links from response
         const cleanedLinks = cleanAndDeduplicateLinks(responseLinks);
 
-        // Filter out links that already exist in Redux
-        const existingLinksSet = new Set(knowledgeBaseLinks);
+        // Get existing links set
+        const existingLinksSet = new Set(
+          knowledgeBaseLinks.map((item) => item.link)
+        );
         const uniqueNewLinks = cleanedLinks.filter(
           (link) => !existingLinksSet.has(link)
         );
 
         if (uniqueNewLinks.length > 0) {
-          // Append unique links to existing ones
+          // Add new links with checked: true by default
           dispatch(
-            setKnowledgeBaseLinks([...knowledgeBaseLinks, ...uniqueNewLinks])
+            addKnowledgeBaseLinks({ links: uniqueNewLinks, checked: true })
           );
           toast.success(
             response.data.message ||
@@ -116,9 +118,9 @@ export default function AddSitemapDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <PrimaryButton className="bg-deep-onyx text-white flex items-center justify-center text-[12px] font-semibold">
-          <Network className="mr-2" size={14} />
-          Add Sitemap
+        <PrimaryButton className="bg-deep-onyx text-white flex items-center justify-center text-[12px] font-semibold min-h-[41px]">
+          <Network className="mr-0 md:mr-2" size={14} />
+          <span className="hidden md:inline">Add Sitemap</span>
         </PrimaryButton>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
@@ -144,7 +146,7 @@ export default function AddSitemapDialog() {
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <PrimaryButton className="bg-transparent border border-gray-300 text-gray-700 text-[12px]">
+            <PrimaryButton className="bg-transparent border border-gray-300 dark:border-white text-gray-700 dark:text-white text-[12px] hover:bg-white dark:hover:bg-pure-mist dark:hover:text-deep-onyx">
               Cancel
             </PrimaryButton>
           </DialogClose>

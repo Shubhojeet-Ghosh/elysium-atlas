@@ -38,7 +38,7 @@ export default function KnowledgeBaseFiles({
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col mt-[4px]">
       <div className="lg:text-[14px] text-[12px] font-bold">
         Files <span className="text-danger-red ml-[2px]">*</span>
       </div>
@@ -53,10 +53,7 @@ export default function KnowledgeBaseFiles({
           <div className="flex flex-col gap-2">
             <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
               {knowledgeBaseFiles.map((file, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between"
-                >
+                <div key={index} className="flex items-center justify-between">
                   <span>{file.name}</span>
                   <span className="text-xs text-gray-500 dark:text-gray-500">
                     {(file.size / 1024).toFixed(2)} KB •{" "}
@@ -78,4 +75,3 @@ export default function KnowledgeBaseFiles({
     </div>
   );
 }
-

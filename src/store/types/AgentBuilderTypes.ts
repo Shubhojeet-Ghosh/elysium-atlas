@@ -4,12 +4,17 @@ export interface FileMetadata {
   type: string;
 }
 
+export interface KnowledgeBaseLink {
+  link: string;
+  checked: boolean;
+}
+
 export interface AgentBuilderState {
   currentStep: number;
   agentName: string;
   knowledgeBase: string;
   knowledgeBaseSitemap: string;
-  knowledgeBaseLinks: string[];
+  knowledgeBaseLinks: KnowledgeBaseLink[];
   knowledgeBaseFiles: FileMetadata[];
   knowledgeBaseText: string;
   baseURL: string;

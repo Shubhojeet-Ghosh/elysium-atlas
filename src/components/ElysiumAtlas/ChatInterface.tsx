@@ -68,7 +68,7 @@ export default function ChatInterface({ onCTAClick }: ChatInterfaceProps) {
             <div className="bg-serene-purple/10 dark:bg-black rounded-[12px] px-4 py-3">
               <p className=" text-gray-800 dark:text-gray-200">
                 We offer three plans Starter, Pro and Enterprise. Want a quick
-                breakdown, or should I help you get pick the best fit?
+                breakdown, or should I help you pick the best fit?
               </p>
             </div>
           </div>
