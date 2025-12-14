@@ -48,27 +48,35 @@ export default function SetKnowledgeBase({
   const hasContent =
     knowledgeBaseLinks.length > 0 ||
     knowledgeBaseFiles.length > 0 ||
-    knowledgeBaseText.trim();
+    knowledgeBaseText.length > 0;
 
   return (
-    <div className="flex flex-col justify-between h-full lg:pb-[40px] pb-[20px]">
-      <div className="overflow-y-auto ">
+    <div className="flex flex-col h-full lg:pb-[40px] pb-[20px]">
+      {/* Fixed Header Section */}
+      <div className="shrink-0">
         <div className="lg:text-[22px] text-[18px] font-bold flex flex-wrap items-center gap-1 md:gap-2 text-deep-onyx dark:text-pure-mist">
           Add knowledge base
         </div>
-        <div className="lg:text-[16px] text-[14px] font-[600] mt-[2px] text-gray-500 dark:text-pure-mist">
+        <div className="lg:text-[16px] text-[14px] font-semibold mt-[2px] text-gray-500 dark:text-pure-mist">
           Provide relevant information or documents for your agent's knowledge
         </div>
         <div className="flex flex-col gap-[8px] mt-[14px] md:mt-8 lg:mt-[25px]">
           <div className="lg:text-[14px] text-[12px] font-bold">
             Knowledge Base <span className="text-danger-red ml-[2px]">*</span>
           </div>
-          <CustomTabs
-            defaultValue="links"
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="w-full"
-          >
+        </div>
+      </div>
+
+      {/* Tabs with fixed list and scrollable content */}
+      <div className="flex flex-col flex-1 min-h-0">
+        <CustomTabs
+          defaultValue="links"
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="w-full flex flex-col flex-1 min-h-0"
+        >
+          {/* Fixed Tabs List */}
+          <div className="shrink-0 mt-[8px]">
             <CustomTabsList className="lg:w-full">
               <CustomTabsTrigger
                 value="links"
@@ -92,6 +100,10 @@ export default function SetKnowledgeBase({
                 Text
               </CustomTabsTrigger>
             </CustomTabsList>
+          </div>
+
+          {/* Scrollable Tab Content */}
+          <div className="flex-1 min-h-0 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <CustomTabsContent value="links">
               <KnowledgeBaseLinks />
             </CustomTabsContent>
@@ -104,15 +116,18 @@ export default function SetKnowledgeBase({
             <CustomTabsContent value="text">
               <KnowledgeBaseText />
             </CustomTabsContent>
-          </CustomTabs>
-        </div>
+          </div>
+        </CustomTabs>
       </div>
 
-      <KnowledgeBaseNavigation
-        onBack={handleBack}
-        onContinue={handleContinue}
-        disabled={!hasContent}
-      />
+      {/* Fixed Navigation */}
+      <div className="shrink-0">
+        <KnowledgeBaseNavigation
+          onBack={handleBack}
+          onContinue={handleContinue}
+          disabled={!hasContent}
+        />
+      </div>
     </div>
   );
 }

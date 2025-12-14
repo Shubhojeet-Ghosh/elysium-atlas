@@ -49,7 +49,7 @@ export default function VerifyPage() {
           dispatch(setIsProfileComplete(res.data?.is_profile_complete ?? true));
           Cookies.set("elysium_atlas_session_token", res.data?.sessionToken, {
             path: "/",
-            expires: 30,
+            expires: 1,
           });
 
           setTimeout(() => {

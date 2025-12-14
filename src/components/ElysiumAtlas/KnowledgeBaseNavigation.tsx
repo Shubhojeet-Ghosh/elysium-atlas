@@ -16,7 +16,11 @@ export default function KnowledgeBaseNavigation({
   return (
     <div className="flex items-center justify-between">
       <BackButton onClick={onBack}>Back</BackButton>
-      <PrimaryButton onClick={onContinue} disabled={disabled}>
+      <PrimaryButton
+        onClick={onContinue}
+        disabled={disabled}
+        className="font-[600]"
+      >
         Continue
       </PrimaryButton>
     </div>

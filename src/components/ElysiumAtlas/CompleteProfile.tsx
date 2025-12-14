@@ -21,6 +21,7 @@ export default function CompleteProfile() {
   const isProfileComplete = useAppSelector(
     (state: any) => state.userProfile.isProfileComplete
   );
+  const userID = useAppSelector((state: any) => state.userProfile.userID);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
@@ -32,8 +33,8 @@ export default function CompleteProfile() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Don't render if profile is complete
-  if (isProfileComplete) {
+  // Don't render if profile is complete or userID is not set
+  if (isProfileComplete || !userID) {
     return null;
   }
 
@@ -120,7 +121,7 @@ export default function CompleteProfile() {
         // Update cookie with new sessionToken
         Cookies.set("elysium_atlas_session_token", response_data.sessionToken, {
           path: "/",
-          expires: 30,
+          expires: 1,
         });
 
         // Update Redux state with user data
@@ -161,7 +162,7 @@ export default function CompleteProfile() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[1px]">
+    <div className="fixed inset-0 z-110 flex items-center justify-center bg-black/50 backdrop-blur-[1px]">
       <div className="relative w-full max-w-md mx-4 bg-pure-mist dark:bg-black rounded-lg  shadow-lg">
         <div className="p-6">
           <div className="mb-4 flex items-center justify-center">
