@@ -4,6 +4,7 @@ import {
   FileMetadata,
   KnowledgeBaseLink,
   CustomText,
+  QnA,
 } from "../types/AgentBuilderTypes";
 
 const initialState: AgentBuilderState = {
@@ -14,6 +15,7 @@ const initialState: AgentBuilderState = {
   knowledgeBaseLinks: [],
   knowledgeBaseFiles: [],
   knowledgeBaseText: [],
+  knowledgeBaseQnA: [],
   baseURL: "",
 };
 
@@ -116,6 +118,32 @@ const agentBuilderSlice = createSlice({
         (_, index) => index !== action.payload
       );
     },
+    setKnowledgeBaseQnA: (state, action: PayloadAction<QnA[]>) => {
+      state.knowledgeBaseQnA = action.payload;
+    },
+    addKnowledgeBaseQnA: (state, action: PayloadAction<QnA>) => {
+      const newItem: QnA = {
+        ...action.payload,
+        lastUpdated: action.payload.lastUpdated || new Date().toISOString(),
+      };
+      state.knowledgeBaseQnA.push(newItem);
+    },
+    updateKnowledgeBaseQnA: (
+      state,
+      action: PayloadAction<{ index: number; qna: QnA }>
+    ) => {
+      if (state.knowledgeBaseQnA[action.payload.index]) {
+        state.knowledgeBaseQnA[action.payload.index] = {
+          ...action.payload.qna,
+          lastUpdated: new Date().toISOString(),
+        };
+      }
+    },
+    removeKnowledgeBaseQnA: (state, action: PayloadAction<number>) => {
+      state.knowledgeBaseQnA = state.knowledgeBaseQnA.filter(
+        (_, index) => index !== action.payload
+      );
+    },
     setBaseURL: (state, action: PayloadAction<string>) => {
       state.baseURL = action.payload;
     },
@@ -127,6 +155,7 @@ const agentBuilderSlice = createSlice({
       state.knowledgeBaseLinks = [];
       state.knowledgeBaseFiles = [];
       state.knowledgeBaseText = [];
+      state.knowledgeBaseQnA = [];
       state.baseURL = "";
     },
   },
@@ -150,6 +179,10 @@ export const {
   addKnowledgeBaseText,
   updateKnowledgeBaseText,
   removeKnowledgeBaseText,
+  setKnowledgeBaseQnA,
+  addKnowledgeBaseQnA,
+  updateKnowledgeBaseQnA,
+  removeKnowledgeBaseQnA,
   setBaseURL,
   resetAgentBuilder,
 } = agentBuilderSlice.actions;

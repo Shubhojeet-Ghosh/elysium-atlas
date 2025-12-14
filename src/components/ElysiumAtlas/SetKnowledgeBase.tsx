@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Globe, FileText, Type } from "lucide-react";
+import { Globe, FileText, Type, MessagesSquare } from "lucide-react";
 import {
   CustomTabs,
   CustomTabsContent,
@@ -13,6 +13,7 @@ import { setCurrentStep } from "@/store/reducers/agentBuilderSlice";
 import KnowledgeBaseLinks from "./KnowledgeBaseLinks";
 import KnowledgeBaseFiles from "./KnowledgeBaseFiles";
 import KnowledgeBaseText from "./KnowledgeBaseText";
+import KnowledgeBaseQnA from "./KnowledgeBaseQnA";
 import KnowledgeBaseNavigation from "./KnowledgeBaseNavigation";
 
 interface SetKnowledgeBaseProps {
@@ -34,6 +35,9 @@ export default function SetKnowledgeBase({
   const knowledgeBaseText = useSelector(
     (state: RootState) => state.agentBuilder.knowledgeBaseText
   );
+  const knowledgeBaseQnA = useSelector(
+    (state: RootState) => state.agentBuilder.knowledgeBaseQnA
+  );
 
   const [activeTab, setActiveTab] = useState("links");
 
@@ -48,7 +52,8 @@ export default function SetKnowledgeBase({
   const hasContent =
     knowledgeBaseLinks.length > 0 ||
     knowledgeBaseFiles.length > 0 ||
-    knowledgeBaseText.length > 0;
+    knowledgeBaseText.length > 0 ||
+    knowledgeBaseQnA.length > 0;
 
   return (
     <div className="flex flex-col h-full lg:pb-[40px] pb-[20px]">
@@ -99,6 +104,13 @@ export default function SetKnowledgeBase({
                 <Type size={16} />
                 Text
               </CustomTabsTrigger>
+              <CustomTabsTrigger
+                value="qna"
+                className="flex items-center gap-2"
+              >
+                <MessagesSquare size={16} />
+                QnA
+              </CustomTabsTrigger>
             </CustomTabsList>
           </div>
 
@@ -115,6 +127,9 @@ export default function SetKnowledgeBase({
             </CustomTabsContent>
             <CustomTabsContent value="text">
               <KnowledgeBaseText />
+            </CustomTabsContent>
+            <CustomTabsContent value="qna">
+              <KnowledgeBaseQnA />
             </CustomTabsContent>
           </div>
         </CustomTabs>

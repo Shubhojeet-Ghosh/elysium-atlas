@@ -76,7 +76,7 @@ export default function ChatInterface({ onCTAClick }: ChatInterfaceProps) {
       </div>
 
       {/* Typing indicator or CTA */}
-      <div className="flex items-center justify-center border-t border-gray-200 dark:border-gray-700 py-4 text-[14px] font-semibold">
+      <div className="flex items-center justify-center border-t border-gray-200 dark:border-white py-4 text-[14px] font-semibold">
         <div
           className="w-full flex items-center justify-center gap-2 text-deep-onyx dark:text-pure-mist"
           onClick={(e) => {

@@ -3,39 +3,41 @@ import { useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
 import {
-  addKnowledgeBaseText,
-  updateKnowledgeBaseText,
-  removeKnowledgeBaseText,
+  addKnowledgeBaseQnA,
+  updateKnowledgeBaseQnA,
+  removeKnowledgeBaseQnA,
 } from "@/store/reducers/agentBuilderSlice";
 import CustomInput from "@/components/inputs/CustomInput";
 import CustomTextareaPrimary from "@/components/inputs/CustomTextareaPrimary";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import InfoIcon from "@/components/ui/InfoIcon";
 import CancelButton from "../ui/CancelButton";
-import KnowledgeBaseTextList from "./KnowledgeBaseTextList";
+import KnowledgeBaseQnAList from "./KnowledgeBaseQnAList";
 import { toast } from "sonner";
 
-export default function KnowledgeBaseText() {
+export default function KnowledgeBaseQnA() {
   const dispatch = useDispatch();
-  const knowledgeBaseText = useSelector(
-    (state: RootState) => state.agentBuilder.knowledgeBaseText
+  const knowledgeBaseQnA = useSelector(
+    (state: RootState) => state.agentBuilder.knowledgeBaseQnA
   );
 
   const [alias, setAlias] = useState("");
-  const [text, setText] = useState("");
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const handleAdd = () => {
-    if (!text.trim()) {
+    if (!question.trim() || !answer.trim()) {
       return;
     }
     if (editingIndex !== null) {
       dispatch(
-        updateKnowledgeBaseText({
+        updateKnowledgeBaseQnA({
           index: editingIndex,
-          customText: {
-            custom_text_alias: alias.trim(),
-            custom_text: text.trim(),
+          qna: {
+            qna_alias: alias.trim(),
+            question: question.trim(),
+            answer: answer.trim(),
             lastUpdated: new Date().toISOString(),
           },
         })
@@ -44,9 +46,9 @@ export default function KnowledgeBaseText() {
     } else {
       // Check for duplicate alias when adding new entry
       const trimmedAlias = alias.trim();
-      const duplicateExists = knowledgeBaseText.some(
+      const duplicateExists = knowledgeBaseQnA.some(
         (item, index) =>
-          item.custom_text_alias.toLowerCase() === trimmedAlias.toLowerCase()
+          item.qna_alias.toLowerCase() === trimmedAlias.toLowerCase()
       );
 
       if (duplicateExists) {
@@ -57,20 +59,23 @@ export default function KnowledgeBaseText() {
       }
 
       dispatch(
-        addKnowledgeBaseText({
-          custom_text_alias: trimmedAlias,
-          custom_text: text.trim(),
+        addKnowledgeBaseQnA({
+          qna_alias: trimmedAlias,
+          question: question.trim(),
+          answer: answer.trim(),
           lastUpdated: new Date().toISOString(),
         })
       );
     }
     setAlias("");
-    setText("");
+    setQuestion("");
+    setAnswer("");
   };
 
   const handleCancel = () => {
     setAlias("");
-    setText("");
+    setQuestion("");
+    setAnswer("");
     setEditingIndex(null);
   };
 
@@ -81,39 +86,53 @@ export default function KnowledgeBaseText() {
         <div className="flex flex-col gap-[4px]">
           <div className="lg:text-[14px] text-[12px] font-bold mt-[4px] flex items-center gap-1.5">
             <span>
-              Text alias <span className="text-danger-red">*</span>
+              QnA alias <span className="text-danger-red">*</span>
             </span>
             <InfoIcon
               className="text-[12px]"
-              text="A text alias is a short name or identifier for your custom text entry. It helps you organize and identify different text entries easily."
+              text="A QnA alias is a short name or identifier for your question and answer pair. It helps you organize and identify different QnA entries easily."
             />
           </div>
           <CustomInput
             type="text"
-            placeholder="Enter text alias"
+            placeholder="Enter QnA alias"
             value={alias}
             onChange={(e) => setAlias(e.target.value)}
             className="w-full px-[12px] py-[10px]"
           />
         </div>
-        <div className="flex flex-col gap-[4px]">
-          <div className="lg:text-[14px] text-[12px] font-bold mt-[4px]">
-            Text <span className="text-danger-red">*</span>
+        <div className="flex flex-col md:flex-row gap-[16px] md:gap-4">
+          <div className="flex flex-col gap-[4px] flex-1">
+            <div className="lg:text-[14px] text-[12px] font-bold mt-[4px]">
+              Question <span className="text-danger-red">*</span>
+            </div>
+            <CustomTextareaPrimary
+              placeholder="Enter your question here..."
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              className="w-full"
+              rows={4}
+            />
           </div>
-          <CustomTextareaPrimary
-            placeholder="Enter your custom text here..."
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            className="w-full"
-            rows={6}
-          />
+          <div className="flex flex-col gap-[4px] flex-1">
+            <div className="lg:text-[14px] text-[12px] font-bold mt-[4px]">
+              Answer <span className="text-danger-red">*</span>
+            </div>
+            <CustomTextareaPrimary
+              placeholder="Enter your answer here..."
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              className="w-full"
+              rows={4}
+            />
+          </div>
         </div>
 
         <div className="flex items-center gap-2 justify-end">
           <PrimaryButton
             className="text-[12px] font-semibold flex items-center justify-center gap-2 min-w-[80px] min-h-[36px]"
             onClick={handleAdd}
-            disabled={!alias.trim() || !text.trim()}
+            disabled={!alias.trim() || !question.trim() || !answer.trim()}
           >
             {editingIndex !== null ? "Update" : "Add"}
           </PrimaryButton>
@@ -128,8 +147,8 @@ export default function KnowledgeBaseText() {
         </div>
       </div>
 
-      {/* List of Text Entries */}
-      <KnowledgeBaseTextList />
+      {/* List of QnA Entries */}
+      <KnowledgeBaseQnAList />
     </div>
   );
 }

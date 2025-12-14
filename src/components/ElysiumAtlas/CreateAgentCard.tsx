@@ -26,7 +26,7 @@ export default function CreateAgentCard() {
         className={`
           relative cursor-pointer
           bg-white dark:bg-deep-onyx
-          border-[1px] border-gray-200 hover:border-deep-onyx dark:border-gray-700 dark:hover:border-pure-mist
+          border-[1px] border-gray-200 hover:border-deep-onyx dark:border-white dark:hover:border-serene-purple
           rounded-xl
           transition-all duration-300 ease-in-out
           ${
