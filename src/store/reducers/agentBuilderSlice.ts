@@ -3,6 +3,7 @@ import {
   AgentBuilderState,
   FileMetadata,
   KnowledgeBaseLink,
+  CustomText,
 } from "../types/AgentBuilderTypes";
 
 const initialState: AgentBuilderState = {
@@ -12,7 +13,7 @@ const initialState: AgentBuilderState = {
   knowledgeBaseSitemap: "",
   knowledgeBaseLinks: [],
   knowledgeBaseFiles: [],
-  knowledgeBaseText: "",
+  knowledgeBaseText: [],
   baseURL: "",
 };
 
@@ -72,8 +73,48 @@ const agentBuilderSlice = createSlice({
     setKnowledgeBaseFiles: (state, action: PayloadAction<FileMetadata[]>) => {
       state.knowledgeBaseFiles = action.payload;
     },
-    setKnowledgeBaseText: (state, action: PayloadAction<string>) => {
+    toggleKnowledgeBaseFile: (state, action: PayloadAction<number>) => {
+      if (state.knowledgeBaseFiles[action.payload]) {
+        state.knowledgeBaseFiles[action.payload].checked = !(
+          state.knowledgeBaseFiles[action.payload].checked ?? true
+        );
+      }
+    },
+    toggleAllKnowledgeBaseFiles: (state, action: PayloadAction<boolean>) => {
+      state.knowledgeBaseFiles.forEach((item) => {
+        item.checked = action.payload;
+      });
+    },
+    removeKnowledgeBaseFile: (state, action: PayloadAction<string>) => {
+      state.knowledgeBaseFiles = state.knowledgeBaseFiles.filter(
+        (item) => item.name !== action.payload
+      );
+    },
+    setKnowledgeBaseText: (state, action: PayloadAction<CustomText[]>) => {
       state.knowledgeBaseText = action.payload;
+    },
+    addKnowledgeBaseText: (state, action: PayloadAction<CustomText>) => {
+      const newItem: CustomText = {
+        ...action.payload,
+        lastUpdated: action.payload.lastUpdated || new Date().toISOString(),
+      };
+      state.knowledgeBaseText.push(newItem);
+    },
+    updateKnowledgeBaseText: (
+      state,
+      action: PayloadAction<{ index: number; customText: CustomText }>
+    ) => {
+      if (state.knowledgeBaseText[action.payload.index]) {
+        state.knowledgeBaseText[action.payload.index] = {
+          ...action.payload.customText,
+          lastUpdated: new Date().toISOString(),
+        };
+      }
+    },
+    removeKnowledgeBaseText: (state, action: PayloadAction<number>) => {
+      state.knowledgeBaseText = state.knowledgeBaseText.filter(
+        (_, index) => index !== action.payload
+      );
     },
     setBaseURL: (state, action: PayloadAction<string>) => {
       state.baseURL = action.payload;
@@ -85,7 +126,7 @@ const agentBuilderSlice = createSlice({
       state.knowledgeBaseSitemap = "";
       state.knowledgeBaseLinks = [];
       state.knowledgeBaseFiles = [];
-      state.knowledgeBaseText = "";
+      state.knowledgeBaseText = [];
       state.baseURL = "";
     },
   },
@@ -102,7 +143,13 @@ export const {
   toggleAllKnowledgeBaseLinks,
   removeKnowledgeBaseLink,
   setKnowledgeBaseFiles,
+  toggleKnowledgeBaseFile,
+  toggleAllKnowledgeBaseFiles,
+  removeKnowledgeBaseFile,
   setKnowledgeBaseText,
+  addKnowledgeBaseText,
+  updateKnowledgeBaseText,
+  removeKnowledgeBaseText,
   setBaseURL,
   resetAgentBuilder,
 } = agentBuilderSlice.actions;

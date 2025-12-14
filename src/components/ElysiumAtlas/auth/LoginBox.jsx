@@ -63,7 +63,7 @@ export default function LoginBox() {
             response_data.sessionToken,
             {
               path: "/",
-              expires: 30,
+              expires: 1,
             }
           );
 
@@ -128,7 +128,7 @@ export default function LoginBox() {
               response_data.sessionToken,
               {
                 path: "/",
-                expires: 30,
+                expires: 1,
               }
             );
 
