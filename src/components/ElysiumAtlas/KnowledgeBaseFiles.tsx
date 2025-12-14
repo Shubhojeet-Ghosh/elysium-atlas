@@ -31,7 +31,7 @@ export default function KnowledgeBaseFiles({
   }, [documentFiles, dispatch]);
 
   return (
-    <div className="flex flex-col mt-[12px]">
+    <div className="flex flex-col mt-[24px]">
       <FileDropzone files={documentFiles} setFiles={setDocumentFiles} />
     </div>
   );
