@@ -16,6 +16,13 @@ export interface CustomText {
   lastUpdated: string;
 }
 
+export interface QnA {
+  qna_alias: string;
+  question: string;
+  answer: string;
+  lastUpdated: string;
+}
+
 export interface AgentBuilderState {
   currentStep: number;
   agentName: string;
@@ -24,6 +31,6 @@ export interface AgentBuilderState {
   knowledgeBaseLinks: KnowledgeBaseLink[];
   knowledgeBaseFiles: FileMetadata[];
   knowledgeBaseText: CustomText[];
+  knowledgeBaseQnA: QnA[];
   baseURL: string;
 }
-

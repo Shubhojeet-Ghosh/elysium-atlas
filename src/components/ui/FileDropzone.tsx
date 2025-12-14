@@ -296,8 +296,8 @@ export default function FileDropzone({
         {...getRootProps()}
         className={cn(
           "border-[2px] border-dashed rounded-[12px] p-8 text-center cursor-pointer transition-all duration-300 ease-in-out",
-          "border-gray-300 dark:border-serene-purple",
-          "hover:border-serene-purple dark:hover:border-white",
+          "border-gray-300 dark:border-white",
+          "hover:border-serene-purple dark:hover:border-serene-purple",
           isDragActive &&
             "border-serene-purple dark:border-teal-green bg-serene-purple/5 dark:bg-teal-green/10",
           "bg-white dark:bg-deep-onyx"
