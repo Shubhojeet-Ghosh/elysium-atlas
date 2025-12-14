@@ -229,7 +229,7 @@ export default function KnowledgeBaseTextList({
     <>
       <div className="w-full mt-[12px] overflow-hidden">
         {/* Search Bar */}
-        <div className="flex items-center justify-between mb-4 lg:px-4 px-0">
+        <div className="flex items-center justify-between mb-4 px-0">
           <div className="lg:text-[14px] text-[12px] font-bold text-deep-onyx dark:text-pure-mist">
             Text Entries ({knowledgeBaseText.length})
             {searchTerm && (
@@ -331,13 +331,13 @@ export default function KnowledgeBaseTextList({
                 <Table className="min-w-[600px] lg:min-w-full">
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] font-[600] py-2 whitespace-nowrap">
+                      <TableHead className="min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] font-[600] py-2 lg:px-4 px-0 whitespace-nowrap">
                         Text alias
                       </TableHead>
-                      <TableHead className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 font-[600] py-2 whitespace-nowrap">
+                      <TableHead className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 font-[600] py-2 lg:px-4 px-0 whitespace-nowrap">
                         Last updated
                       </TableHead>
-                      <TableHead className="w-[60px] md:w-[80px] text-right font-[600] py-2 whitespace-nowrap"></TableHead>
+                      <TableHead className="w-[60px] md:w-[80px] text-right font-[600] py-2 lg:px-4 px-0 whitespace-nowrap"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -361,17 +361,17 @@ export default function KnowledgeBaseTextList({
                             }
                             className="cursor-pointer hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 hover:text-serene-purple dark:hover:text-serene-purple transition-all duration-200"
                           >
-                            <TableCell className="font-medium min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] py-2 text-[12px] whitespace-nowrap">
+                            <TableCell className="font-medium min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] py-2 lg:px-4 px-0 text-[12px] whitespace-nowrap">
                               <div className="truncate">
                                 {matchesAlias
                                   ? highlightMatch(alias, searchTerm)
                                   : alias}
                               </div>
                             </TableCell>
-                            <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-2 text-[12px] whitespace-nowrap">
+                            <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-2 lg:px-4 px-0 text-[12px] whitespace-nowrap">
                               {formatDate(item.lastUpdated)}
                             </TableCell>
-                            <TableCell className="w-[60px] md:w-[80px] text-right py-2 whitespace-nowrap">
+                            <TableCell className="w-[60px] md:w-[80px] text-right py-2 lg:px-4 px-0 whitespace-nowrap">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -409,7 +409,7 @@ export default function KnowledgeBaseTextList({
           }
         }}
       >
-        <SheetContent className="sm:max-w-[400px] z-[110] px-[4px]">
+        <SheetContent className="min-w-full lg:min-w-[480px] md:min-w-full z-[110] px-[4px]">
           <SheetHeader>
             <SheetTitle>Edit Text Entry</SheetTitle>
             <SheetDescription className="font-medium">
