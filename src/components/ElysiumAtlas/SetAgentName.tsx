@@ -1,7 +1,9 @@
 "use client";
+import { useState } from "react";
 import CustomInput from "@/components/inputs/CustomInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import BackButton from "@/components/ui/BackButton";
+import Spinner from "@/components/ui/Spinner";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
 import {
@@ -9,6 +11,9 @@ import {
   setCurrentStep,
 } from "@/store/reducers/agentBuilderSlice";
 import { useRouter } from "next/navigation";
+import fastApiAxios from "@/utils/fastapi_axios";
+import Cookies from "js-cookie";
+import { toast } from "sonner";
 
 export default function SetAgentName() {
   const dispatch = useDispatch();
@@ -16,8 +21,43 @@ export default function SetAgentName() {
     (state: RootState) => state.agentBuilder.agentName
   );
   const router = useRouter();
-  const handleContinue = () => {
-    dispatch(setCurrentStep(2));
+  const [isLoading, setIsLoading] = useState(false);
+  const handleContinue = async () => {
+    if (!agentName || agentName.trim() === "") {
+      toast.error("Please enter an agent name");
+      return;
+    }
+
+    setIsLoading(true);
+    const token = Cookies.get("elysium_atlas_session_token");
+
+    try {
+      const response = await fastApiAxios.post(
+        "/elysium-agents/elysium-atlas/agent/v1/pre-build-agent-operations",
+        {
+          agent_name: agentName.trim(),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success === true) {
+        dispatch(setCurrentStep(2));
+      } else {
+        toast.error(response.data.message || "Failed to validate agent name");
+      }
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to validate agent name. Please try again.";
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -53,10 +93,14 @@ export default function SetAgentName() {
         <BackButton onClick={handleBack}>Back</BackButton>
         <PrimaryButton
           onClick={handleContinue}
-          disabled={!agentName}
-          className="font-[600]"
+          disabled={!agentName || isLoading}
+          className="font-[600] flex items-center justify-center gap-2 min-w-[100px] min-h-[40px]"
         >
-          Continue
+          {isLoading ? (
+            <Spinner className="border-white dark:border-deep-onyx" />
+          ) : (
+            <span>Continue</span>
+          )}
         </PrimaryButton>
       </div>
     </div>
