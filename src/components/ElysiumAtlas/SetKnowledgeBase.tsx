@@ -15,6 +15,7 @@ import KnowledgeBaseFiles from "./KnowledgeBaseFiles";
 import KnowledgeBaseText from "./KnowledgeBaseText";
 import KnowledgeBaseQnA from "./KnowledgeBaseQnA";
 import KnowledgeBaseNavigation from "./KnowledgeBaseNavigation";
+import { useRouter } from "next/navigation";
 
 interface SetKnowledgeBaseProps {
   documentFiles: File[];
@@ -26,6 +27,7 @@ export default function SetKnowledgeBase({
   setDocumentFiles,
 }: SetKnowledgeBaseProps) {
   const dispatch = useDispatch();
+  const router = useRouter();
   const knowledgeBaseLinks = useSelector(
     (state: RootState) => state.agentBuilder.knowledgeBaseLinks
   );
@@ -46,7 +48,7 @@ export default function SetKnowledgeBase({
   };
 
   const handleBack = () => {
-    dispatch(setCurrentStep(1));
+    router.push("/my-agents");
   };
 
   const hasContent =
