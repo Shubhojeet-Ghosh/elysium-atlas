@@ -26,6 +26,7 @@ export interface QnA {
 export interface AgentBuilderState {
   currentStep: number;
   agentName: string;
+  agentID: string;
   knowledgeBase: string;
   knowledgeBaseSitemap: string;
   knowledgeBaseLinks: KnowledgeBaseLink[];

@@ -10,6 +10,7 @@ import {
 const initialState: AgentBuilderState = {
   currentStep: 0,
   agentName: "",
+  agentID: "",
   knowledgeBase: "",
   knowledgeBaseSitemap: "",
   knowledgeBaseLinks: [],
@@ -28,6 +29,9 @@ const agentBuilderSlice = createSlice({
     },
     setAgentName: (state, action: PayloadAction<string>) => {
       state.agentName = action.payload;
+    },
+    setAgentID: (state, action: PayloadAction<string>) => {
+      state.agentID = action.payload;
     },
     setKnowledgeBase: (state, action: PayloadAction<string>) => {
       state.knowledgeBase = action.payload;
@@ -150,6 +154,7 @@ const agentBuilderSlice = createSlice({
     resetAgentBuilder: (state) => {
       state.currentStep = 0;
       state.agentName = "";
+      state.agentID = "";
       state.knowledgeBase = "";
       state.knowledgeBaseSitemap = "";
       state.knowledgeBaseLinks = [];
@@ -164,6 +169,7 @@ const agentBuilderSlice = createSlice({
 export const {
   setCurrentStep,
   setAgentName,
+  setAgentID,
   setKnowledgeBase,
   setKnowledgeBaseSitemap,
   setKnowledgeBaseLinks,

@@ -11,7 +11,7 @@ const fastApiAxios = axios.create({
 
 // Request Interceptor
 fastApiAxios.interceptors.request.use(
-  (config: any) => {
+  (config) => {
     // Remove Authorization for public routes
     if (
       config.url &&
