@@ -1,8 +1,14 @@
 "use client";
 import CreateAgentCard from "@/components/ElysiumAtlas/CreateAgentCard";
 import LogoComponent from "./LogoComponent";
+import { useAppSelector } from "@/store";
 
 export default function BuildAgent() {
+  const agents = useAppSelector((state) => state.userAgents.myAgents);
+
+  if (agents.length > 0) {
+    return null;
+  }
   return (
     <div className="w-full h-full">
       <div className=" flex flex-col">

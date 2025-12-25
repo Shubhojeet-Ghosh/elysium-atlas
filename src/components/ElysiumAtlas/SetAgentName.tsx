@@ -8,6 +8,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
 import {
   setAgentName,
+  setAgentID,
   setCurrentStep,
 } from "@/store/reducers/agentBuilderSlice";
 import { useRouter } from "next/navigation";
@@ -45,6 +46,7 @@ export default function SetAgentName() {
       );
 
       if (response.data.success === true) {
+        dispatch(setAgentID(response.data.agent_id));
         dispatch(setCurrentStep(2));
       } else {
         toast.error(response.data.message || "Failed to validate agent name");

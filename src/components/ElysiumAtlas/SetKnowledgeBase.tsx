@@ -9,13 +9,16 @@ import {
 } from "@/components/ui/CustomTabs";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
-import { setCurrentStep } from "@/store/reducers/agentBuilderSlice";
+import { resetAgentBuilder } from "@/store/reducers/agentBuilderSlice";
 import KnowledgeBaseLinks from "./KnowledgeBaseLinks";
 import KnowledgeBaseFiles from "./KnowledgeBaseFiles";
 import KnowledgeBaseText from "./KnowledgeBaseText";
 import KnowledgeBaseQnA from "./KnowledgeBaseQnA";
 import KnowledgeBaseNavigation from "./KnowledgeBaseNavigation";
 import { useRouter } from "next/navigation";
+import fastApiAxios from "@/utils/fastapi_axios";
+import Cookies from "js-cookie";
+import { toast } from "sonner";
 
 interface SetKnowledgeBaseProps {
   documentFiles: File[];
@@ -28,6 +31,10 @@ export default function SetKnowledgeBase({
 }: SetKnowledgeBaseProps) {
   const dispatch = useDispatch();
   const router = useRouter();
+  const agentName = useSelector(
+    (state: RootState) => state.agentBuilder.agentName
+  );
+  const agentID = useSelector((state: RootState) => state.agentBuilder.agentID);
   const knowledgeBaseLinks = useSelector(
     (state: RootState) => state.agentBuilder.knowledgeBaseLinks
   );
@@ -42,9 +49,80 @@ export default function SetKnowledgeBase({
   );
 
   const [activeTab, setActiveTab] = useState("links");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleContinue = () => {
-    dispatch(setCurrentStep(3));
+  const handleContinue = async () => {
+    setIsLoading(true);
+    const token = Cookies.get("elysium_atlas_session_token");
+
+    const checkedLinks = knowledgeBaseLinks
+      .filter((link) => link.checked)
+      .map((link) => link.link);
+
+    const checkedFiles = knowledgeBaseFiles
+      .filter((file) => file.checked)
+      .map((file) => ({ file_key: file.name }));
+
+    const customTexts = knowledgeBaseText.map((text) => ({
+      custom_text_alias: text.custom_text_alias,
+      custom_text: text.custom_text,
+    }));
+
+    const qaPairs = knowledgeBaseQnA.map((qna) => ({
+      qna_alias: qna.qna_alias,
+      question: qna.question,
+      answer: qna.answer,
+    }));
+
+    const requestBody = {
+      agent_id: agentID,
+      agent_name: agentName,
+      links: checkedLinks,
+      files: checkedFiles,
+      custom_texts: customTexts,
+      qa_pairs: qaPairs,
+      agent_aliases: [],
+      base_url: "",
+      collaborators: [],
+      organization_name: "",
+      agent_icon: "",
+      llm_model: "",
+      placeholder_text: "",
+      primary_color: "",
+      secondary_color: "",
+      quick_prompts: [],
+      text_color: "",
+      welcome_message: "",
+      footer: "",
+      agent_personality: {},
+    };
+
+    try {
+      const response = await fastApiAxios.post(
+        "/elysium-agents/elysium-atlas/agent/v1/build-update-agent",
+        requestBody,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success === true) {
+        dispatch(resetAgentBuilder());
+        router.push("/my-agents");
+      } else {
+        toast.error(response.data.message || "Failed to build agent");
+      }
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to build agent. Please try again.";
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -143,6 +221,7 @@ export default function SetKnowledgeBase({
           onBack={handleBack}
           onContinue={handleContinue}
           disabled={!hasContent}
+          isLoading={isLoading}
         />
       </div>
     </div>

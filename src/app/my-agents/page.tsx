@@ -2,7 +2,9 @@ import LeftNav from "@/components/ElysiumAtlas/LeftNav";
 import TopNav from "@/components/ElysiumAtlas/TopNav";
 import AiSocketListener from "@/components/AiSocketListener";
 import PageContent from "@/components/ElysiumAtlas/PageContent";
+
 import BuildAgent from "@/components/ElysiumAtlas/BuildAgent";
+import MyAgents from "@/components/ElysiumAtlas/MyAgents";
 
 export default function MyAgentsPage() {
   return (
@@ -12,8 +14,11 @@ export default function MyAgentsPage() {
 
       <LeftNav />
 
-      <PageContent className="mt-[100px] md:mt-16 lg:mt-[120px]">
-        <div className="px-4 md:px-8 lg:px-[300px]">
+      <PageContent className="">
+        <div className="px-[50px] mt-[80px]">
+          <MyAgents />
+        </div>
+        <div className="px-4 md:px-8 lg:px-[300px] mt-[100px] md:mt-16 lg:mt-[120px]">
           <div className="mt-[100px] md:mt-16 lg:mt-[120px]">
             <BuildAgent />
           </div>
