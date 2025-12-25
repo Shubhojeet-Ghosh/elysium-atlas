@@ -45,9 +45,9 @@ export default function Logout({ onClick }: LogoutProps) {
   return (
     <button
       onClick={handleLogout}
-      className="w-full flex items-center justify-between px-2 py-1.5 text-[14px] text-deep-onyx dark:text-pure-mist hover:text-pure-mist hover:bg-serene-purple rounded-sm transition-colors cursor-pointer"
+      className="w-full flex items-center justify-between px-2 py-1.5 text-[13px] text-deep-onyx dark:text-pure-mist hover:text-pure-mist hover:bg-serene-purple rounded-sm transition-colors cursor-pointer"
     >
-      <span>Log Out</span>
+      <span>Logout</span>
       <LogOut className="h-4 w-4" />
     </button>
   );
