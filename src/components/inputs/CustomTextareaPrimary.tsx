@@ -4,6 +4,7 @@ import { forwardRef } from "react";
 interface CustomTextareaPrimaryProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   inputClassName?: string;
+  rows?: number;
 }
 
 const CustomTextareaPrimary = forwardRef<
@@ -18,6 +19,7 @@ const CustomTextareaPrimary = forwardRef<
       onChange,
       className = "",
       inputClassName = "",
+      rows,
       ...props
     },
     ref
@@ -28,10 +30,11 @@ const CustomTextareaPrimary = forwardRef<
       placeholder={placeholder}
       value={value}
       onChange={onChange}
+      rows={rows}
       className={`border-gray-300 dark:border-deep-onyx font-[600] border-[2px] rounded-[10px] px-[12px] py-[12px]
         placeholder-gray-400 focus:outline-none focus:border-serene-purple dark:focus:border-serene-purple
         transition duration-300 ease-in-out block w-full text-[12px] bg-white dark:bg-deep-onyx  
-        ${inputClassName} ${className}
+        ${rows ? "resize-none" : ""} ${inputClassName} ${className}
       `}
       {...props}
     />

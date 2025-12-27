@@ -45,6 +45,7 @@ interface FileDropzoneProps {
   };
   maxFiles?: number;
   className?: string;
+  onCheckedChange?: (id: string, checked: boolean) => void;
 }
 
 const FILES_PER_PAGE = 6; // 3 rows × 2 columns
@@ -62,6 +63,7 @@ export default function FileDropzone({
   },
   maxFiles,
   className,
+  onCheckedChange,
 }: FileDropzoneProps) {
   // Convert files to FileWithChecked structure
   const [filesWithChecked, setFilesWithChecked] = useState<FileWithChecked[]>(
@@ -189,26 +191,30 @@ export default function FileDropzone({
   };
 
   const handleToggleCheckbox = (id: string) => {
+    let newChecked: boolean;
     setFilesWithChecked((prev) =>
       prev.map((item) => {
         if (item.id === id) {
-          const newChecked = !item.checked;
+          newChecked = !item.checked;
           checkedStateRef.current.set(id, newChecked);
           return { ...item, checked: newChecked };
         }
         return item;
       })
     );
+    onCheckedChange?.(id, newChecked!);
   };
 
   const handleToggleAll = () => {
     const newCheckedState = !allChecked;
-    setFilesWithChecked((prev) =>
-      prev.map((item) => {
+    setFilesWithChecked((prev) => {
+      const updated = prev.map((item) => {
         checkedStateRef.current.set(item.id, newCheckedState);
         return { ...item, checked: newCheckedState };
-      })
-    );
+      });
+      updated.forEach((item) => onCheckedChange?.(item.id, newCheckedState));
+      return updated;
+    });
   };
 
   const handleClearSelected = () => {

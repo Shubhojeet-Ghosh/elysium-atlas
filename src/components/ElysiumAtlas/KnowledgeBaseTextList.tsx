@@ -206,6 +206,7 @@ export default function KnowledgeBaseTextList({
             custom_text_alias: alias.trim(),
             custom_text: text.trim(),
             lastUpdated: new Date().toISOString(),
+            status: "new",
           },
         })
       );

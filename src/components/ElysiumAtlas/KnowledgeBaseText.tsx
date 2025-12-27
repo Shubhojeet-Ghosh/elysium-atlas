@@ -37,6 +37,7 @@ export default function KnowledgeBaseText() {
             custom_text_alias: alias.trim(),
             custom_text: text.trim(),
             lastUpdated: new Date().toISOString(),
+            status: "new",
           },
         })
       );
@@ -61,6 +62,7 @@ export default function KnowledgeBaseText() {
           custom_text_alias: trimmedAlias,
           custom_text: text.trim(),
           lastUpdated: new Date().toISOString(),
+          status: "new",
         })
       );
     }

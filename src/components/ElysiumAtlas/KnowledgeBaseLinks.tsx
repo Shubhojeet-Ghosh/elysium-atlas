@@ -58,6 +58,9 @@ export default function KnowledgeBaseLinks() {
       if (response.data.success === true) {
         const responseLinks = response.data.links || [];
 
+        const normalized_base_url = response.data.base_url || baseURL;
+        dispatch(setBaseURL(normalized_base_url));
+
         // Clean and deduplicate links from response
         const cleanedLinks = cleanAndDeduplicateLinks(responseLinks);
 

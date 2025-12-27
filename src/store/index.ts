@@ -8,6 +8,7 @@ import { settingsReducer } from "./reducers/settingsSlice";
 import { userProfileReducer } from "./reducers/userProfileSlice";
 import { agentBuilderReducer } from "./reducers/agentBuilderSlice";
 import { userAgentsReducer } from "./reducers/userAgentsSlice";
+import { agentReducer } from "./reducers/agentSlice";
 
 // Noop storage logic to handle SSR issues
 const createNoopStorage = () => {
@@ -49,6 +50,11 @@ const userAgentsPersistConfig = {
   storage: storage,
 };
 
+const agentPersistConfig = {
+  key: "agent",
+  storage: storage,
+};
+
 // Apply persistReducer to settings and userAgents
 const persistedSettingsReducer = persistReducer(
   settingsPersistConfig,
@@ -67,6 +73,8 @@ const persistedUserAgentsReducer = persistReducer(
   userAgentsReducer
 );
 
+const persistedAgentReducer = persistReducer(agentPersistConfig, agentReducer);
+
 // Configure Redux Store
 export const store = configureStore({
   reducer: {
@@ -74,6 +82,7 @@ export const store = configureStore({
     userProfile: persistedUserProfileReducer,
     agentBuilder: persistedAgentBuilderReducer,
     userAgents: persistedUserAgentsReducer,
+    agent: persistedAgentReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

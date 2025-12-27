@@ -3,17 +3,22 @@ export interface FileMetadata {
   size: number;
   type: string;
   checked?: boolean;
+  s3_key?: string | null;
+  cdn_url?: string | null;
+  status: string;
 }
 
 export interface KnowledgeBaseLink {
   link: string;
   checked: boolean;
+  status: string;
 }
 
 export interface CustomText {
   custom_text_alias: string;
   custom_text: string;
   lastUpdated: string;
+  status: string;
 }
 
 export interface QnA {
@@ -21,13 +26,13 @@ export interface QnA {
   question: string;
   answer: string;
   lastUpdated: string;
+  status: string;
 }
 
 export interface AgentBuilderState {
   currentStep: number;
   agentName: string;
   agentID: string;
-  knowledgeBase: string;
   knowledgeBaseSitemap: string;
   knowledgeBaseLinks: KnowledgeBaseLink[];
   knowledgeBaseFiles: FileMetadata[];

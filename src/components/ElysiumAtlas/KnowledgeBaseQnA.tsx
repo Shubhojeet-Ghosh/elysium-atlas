@@ -39,6 +39,7 @@ export default function KnowledgeBaseQnA() {
             question: question.trim(),
             answer: answer.trim(),
             lastUpdated: new Date().toISOString(),
+            status: "new",
           },
         })
       );
@@ -64,6 +65,7 @@ export default function KnowledgeBaseQnA() {
           question: question.trim(),
           answer: answer.trim(),
           lastUpdated: new Date().toISOString(),
+          status: "new",
         })
       );
     }
