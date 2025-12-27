@@ -15,7 +15,7 @@ export default function MyAgentsPage() {
       <LeftNav />
 
       <PageContent className="">
-        <div className="px-[50px] mt-[80px]">
+        <div className="lg:px-[50px] px-4 mt-[80px]">
           <MyAgents />
         </div>
         <div className="px-4 md:px-8 lg:px-[300px] mt-[100px] md:mt-16 lg:mt-[120px]">

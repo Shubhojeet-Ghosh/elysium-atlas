@@ -5,6 +5,7 @@ import { RootState } from "@/store";
 import {
   setKnowledgeBaseSitemap,
   addKnowledgeBaseLinks,
+  setBaseURL,
 } from "@/store/reducers/agentBuilderSlice";
 import CustomInput from "@/components/inputs/CustomInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
@@ -72,6 +73,9 @@ export default function AddSitemapDialog() {
 
       if (response.data.success === true) {
         const responseLinks = response.data.links || [];
+
+        const normalized_base_url = response.data.base_url || null;
+        dispatch(setBaseURL(normalized_base_url));
 
         // Clean and deduplicate links from response
         const cleanedLinks = cleanAndDeduplicateLinks(responseLinks);

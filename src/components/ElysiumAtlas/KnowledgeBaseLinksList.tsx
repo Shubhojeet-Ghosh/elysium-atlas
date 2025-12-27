@@ -33,8 +33,13 @@ import {
   removeKnowledgeBaseLink,
   setKnowledgeBaseLinks,
 } from "@/store/reducers/agentBuilderSlice";
+import { KnowledgeBaseLink } from "@/store/types/AgentBuilderTypes";
 import CustomInput from "@/components/inputs/CustomInput";
+import { toast } from "sonner";
+import OutlineButton from "@/components/ui/OutlineButton";
 import PrimaryButton from "@/components/ui/PrimaryButton";
+import Spinner from "@/components/ui/Spinner";
+import fastApiAxios from "@/utils/fastapi_axios";
 
 const LINKS_PER_PAGE = 6; // 3 rows × 2 columns
 
@@ -46,6 +51,9 @@ export default function KnowledgeBaseLinksList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [manualLinkDialogOpen, setManualLinkDialogOpen] = useState(false);
+  const [manualLink, setManualLink] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   // Filter links based on search term
   const filteredLinks = useMemo(() => {
@@ -118,6 +126,55 @@ export default function KnowledgeBaseLinksList() {
     setClearDialogOpen(false);
   };
 
+  const handleAddManualLink = async () => {
+    if (manualLink.trim()) {
+      setIsLoading(true);
+      try {
+        // Ping the URL to validate and normalize it
+        const pingResponse = await fastApiAxios.post(
+          "/elysium-agents/elysium-atlas/v1/ping-url",
+          { url: manualLink.trim() }
+        );
+
+        if (pingResponse.data.success && pingResponse.data.data.reachable) {
+          const normalizedUrl = pingResponse.data.data.normalized_url;
+
+          // Check if the normalized URL already exists
+          const exists = knowledgeBaseLinks.some(
+            (item) => item.link === normalizedUrl
+          );
+
+          if (!exists) {
+            const newLink: KnowledgeBaseLink = {
+              link: normalizedUrl,
+              checked: true,
+              status: "new",
+            };
+            dispatch(setKnowledgeBaseLinks([newLink, ...knowledgeBaseLinks]));
+            setManualLink("");
+            toast.success("Link added successfully");
+          } else {
+            toast.error("Link already exists in the list.");
+          }
+        } else {
+          toast.error(
+            "URL is not reachable. Please check the URL and try again."
+          );
+        }
+      } catch (error: any) {
+        const errorMessage =
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to validate URL. Please try again.";
+        toast.error(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      toast.error("Please enter a valid link");
+    }
+  };
+
   const handlePreviousPage = () => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
@@ -179,15 +236,23 @@ export default function KnowledgeBaseLinksList() {
           )}
         </div>
         {knowledgeBaseLinks.length > 0 && (
-          <div className="relative w-[200px]">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-            <CustomInput
-              type="text"
-              placeholder="Search links..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-[11px] h-8"
-            />
+          <div className="flex items-center gap-2">
+            <OutlineButton
+              className="text-[12px] font-bold px-3 py-1 h-8"
+              onClick={() => setManualLinkDialogOpen(true)}
+            >
+              <span className="text-[18px] mr-[4px]">+</span> Add More
+            </OutlineButton>
+            <div className="relative w-[200px]">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+              <CustomInput
+                type="text"
+                placeholder="Search links..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-[11px] h-8"
+              />
+            </div>
           </div>
         )}
       </div>
@@ -246,6 +311,48 @@ export default function KnowledgeBaseLinksList() {
             </>
           )}
         </div>
+        {/* Manual Link Dialog */}
+        <Dialog
+          open={manualLinkDialogOpen}
+          onOpenChange={setManualLinkDialogOpen}
+        >
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Add Manual Link</DialogTitle>
+              <DialogDescription>
+                Add a single link to your knowledge base manually.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-[4px] py-4">
+              <p className="font-bold text-[13px]">Link URL</p>
+              <div className="grid gap-3">
+                <CustomInput
+                  type="url"
+                  placeholder="Enter link URL (e.g., https://example.com/page)"
+                  value={manualLink}
+                  onChange={(e) => setManualLink(e.target.value)}
+                  className="w-full px-[12px] py-[10px]"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <OutlineButton className="text-[12px]">Back</OutlineButton>
+              </DialogClose>
+              <PrimaryButton
+                className="min-w-[80px] text-[12px] font-semibold flex items-center justify-center gap-2"
+                onClick={handleAddManualLink}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <Spinner className="border-white dark:border-deep-onyx" />
+                ) : (
+                  <span>Add</span>
+                )}
+              </PrimaryButton>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         {totalPages > 1 && (
           <div className="w-full md:w-auto flex justify-end md:justify-start">
             <div className="flex items-center gap-2">

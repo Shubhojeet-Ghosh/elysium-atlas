@@ -210,6 +210,7 @@ export default function KnowledgeBaseQnAList({
             question: question.trim(),
             answer: answer.trim(),
             lastUpdated: new Date().toISOString(),
+            status: "new",
           },
         })
       );

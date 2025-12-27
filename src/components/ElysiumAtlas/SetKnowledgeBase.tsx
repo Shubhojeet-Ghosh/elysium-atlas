@@ -9,16 +9,20 @@ import {
 } from "@/components/ui/CustomTabs";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
-import { resetAgentBuilder } from "@/store/reducers/agentBuilderSlice";
+import {
+  resetAgentBuilder,
+  setKnowledgeBaseFiles,
+} from "@/store/reducers/agentBuilderSlice";
 import KnowledgeBaseLinks from "./KnowledgeBaseLinks";
 import KnowledgeBaseFiles from "./KnowledgeBaseFiles";
 import KnowledgeBaseText from "./KnowledgeBaseText";
 import KnowledgeBaseQnA from "./KnowledgeBaseQnA";
 import KnowledgeBaseNavigation from "./KnowledgeBaseNavigation";
-import { useRouter } from "next/navigation";
 import fastApiAxios from "@/utils/fastapi_axios";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
+import axios from "axios";
+import { useRouter } from "next/navigation";
 
 interface SetKnowledgeBaseProps {
   documentFiles: File[];
@@ -35,6 +39,7 @@ export default function SetKnowledgeBase({
     (state: RootState) => state.agentBuilder.agentName
   );
   const agentID = useSelector((state: RootState) => state.agentBuilder.agentID);
+  const baseURL = useSelector((state: RootState) => state.agentBuilder.baseURL);
   const knowledgeBaseLinks = useSelector(
     (state: RootState) => state.agentBuilder.knowledgeBaseLinks
   );
@@ -61,7 +66,102 @@ export default function SetKnowledgeBase({
 
     const checkedFiles = knowledgeBaseFiles
       .filter((file) => file.checked)
-      .map((file) => ({ file_key: file.name }));
+      .map((file) => ({ name: file.name, cdn_url: file.cdn_url || null }));
+
+    let finalCheckedFiles: any[] = [];
+
+    // Generate presigned URLs and upload files if any checked files
+    if (checkedFiles.length > 0 && agentID) {
+      const filesPayload = checkedFiles.map((file) => {
+        const docFile = documentFiles.find((df) => df.name === file.name);
+        return {
+          folder_path: `/agents/${agentID}/knowledgebase_files`,
+          filename: file.name,
+          filetype: docFile ? docFile.type : "application/octet-stream",
+          visibility: "private",
+        };
+      });
+
+      try {
+        const presignedResponse = await fastApiAxios.post(
+          "/elysium-agents/elysium-atlas/agent/v1/generate-presigned-urls",
+          { files: filesPayload },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!presignedResponse.data.success) {
+          toast.error(
+            presignedResponse.data.message ||
+              "Failed to generate presigned URLs"
+          );
+          setIsLoading(false);
+        }
+
+        // Assume presignedResponse.data.presigned_urls.files is an array of { filename, upload_url, s3_key, cdn_url, ... }
+        const uploadPromises = presignedResponse.data.presigned_urls.files.map(
+          async (urlObj: {
+            filename: string;
+            upload_url: string;
+            s3_key: string;
+            cdn_url?: string;
+          }) => {
+            const file = documentFiles.find(
+              (df) => df.name === urlObj.filename
+            );
+            if (file) {
+              await axios.put(urlObj.upload_url, file, {
+                headers: {
+                  "Content-Type": file.type,
+                },
+              });
+            }
+          }
+        );
+
+        await Promise.all(uploadPromises);
+
+        // Update knowledgeBaseFiles with s3_key and cdn_url
+        const updatedFiles = knowledgeBaseFiles.map((file) => {
+          const presignedFile =
+            presignedResponse.data.presigned_urls.files.find(
+              (f: any) => f.filename === file.name
+            );
+          if (presignedFile) {
+            return {
+              ...file,
+              s3_key: presignedFile.s3_key,
+              cdn_url: presignedFile.cdn_url || null,
+            };
+          }
+          return file;
+        });
+        dispatch(setKnowledgeBaseFiles(updatedFiles));
+
+        // Use updatedFiles to create finalCheckedFiles
+        finalCheckedFiles = updatedFiles
+          .filter((file) => file.checked)
+          .map((file) => ({
+            file_name: file.name,
+            cdn_url: file.cdn_url || null,
+            file_key: file.s3_key,
+            file_source: "local",
+          }));
+      } catch (error: any) {
+        const uploadErrorMessage =
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to upload files. Please try again.";
+        toast.error(uploadErrorMessage);
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    // If no files were uploaded, finalCheckedFiles remains empty
 
     const customTexts = knowledgeBaseText.map((text) => ({
       custom_text_alias: text.custom_text_alias,
@@ -78,11 +178,11 @@ export default function SetKnowledgeBase({
       agent_id: agentID,
       agent_name: agentName,
       links: checkedLinks,
-      files: checkedFiles,
+      files: finalCheckedFiles,
       custom_texts: customTexts,
       qa_pairs: qaPairs,
       agent_aliases: [],
-      base_url: "",
+      base_url: baseURL,
       collaborators: [],
       organization_name: "",
       agent_icon: "",
@@ -97,9 +197,12 @@ export default function SetKnowledgeBase({
       agent_personality: {},
     };
 
+    // console.log("Request Body:", requestBody);
+    // return;
+
     try {
       const response = await fastApiAxios.post(
-        "/elysium-agents/elysium-atlas/agent/v1/build-update-agent",
+        "/elysium-agents/elysium-atlas/agent/v1/build-agent",
         requestBody,
         {
           headers: {
@@ -110,7 +213,7 @@ export default function SetKnowledgeBase({
 
       if (response.data.success === true) {
         dispatch(resetAgentBuilder());
-        router.push("/my-agents");
+        router.push(`/my-agents/${response.data.agent_id}`);
       } else {
         toast.error(response.data.message || "Failed to build agent");
       }

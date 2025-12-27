@@ -1,36 +1,60 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import {
-  AgentBuilderState,
   FileMetadata,
   KnowledgeBaseLink,
   CustomText,
   QnA,
 } from "../types/AgentBuilderTypes";
 
-const initialState: AgentBuilderState = {
-  currentStep: 0,
+interface UserAgentState {
+  agentName: string;
+  agentID: string;
+  baseURL: string;
+  knowledgeBaseSitemap: string;
+  knowledgeBaseLinks: KnowledgeBaseLink[];
+  knowledgeBaseFiles: FileMetadata[];
+  knowledgeBaseText: CustomText[];
+  knowledgeBaseQnA: QnA[];
+  agent_status: string;
+  agent_current_task: string;
+  progress: number;
+}
+
+const initialState: UserAgentState = {
   agentName: "",
   agentID: "",
+  baseURL: "",
   knowledgeBaseSitemap: "",
   knowledgeBaseLinks: [],
   knowledgeBaseFiles: [],
   knowledgeBaseText: [],
   knowledgeBaseQnA: [],
-  baseURL: "",
+  agent_status: "",
+  agent_current_task: "",
+  progress: 0,
 };
 
-const agentBuilderSlice = createSlice({
-  name: "agentBuilder",
+const agentSlice = createSlice({
+  name: "agent",
   initialState,
   reducers: {
-    setCurrentStep: (state, action: PayloadAction<number>) => {
-      state.currentStep = action.payload;
-    },
     setAgentName: (state, action: PayloadAction<string>) => {
       state.agentName = action.payload;
     },
     setAgentID: (state, action: PayloadAction<string>) => {
       state.agentID = action.payload;
+    },
+    setBaseURL: (state, action: PayloadAction<string>) => {
+      state.baseURL = action.payload;
+    },
+    setAgentStatus: (state, action: PayloadAction<string>) => {
+      state.agent_status = action.payload;
+    },
+    setAgentCurrentTask: (state, action: PayloadAction<string>) => {
+      state.agent_current_task = action.payload;
+    },
+    setProgress: (state, action: PayloadAction<number>) => {
+      state.progress = action.payload;
     },
     setKnowledgeBaseSitemap: (state, action: PayloadAction<string>) => {
       state.knowledgeBaseSitemap = action.payload;
@@ -165,27 +189,29 @@ const agentBuilderSlice = createSlice({
         (_, index) => index !== action.payload
       );
     },
-    setBaseURL: (state, action: PayloadAction<string>) => {
-      state.baseURL = action.payload;
-    },
-    resetAgentBuilder: (state) => {
-      state.currentStep = 0;
+    resetUserAgent: (state) => {
       state.agentName = "";
       state.agentID = "";
+      state.baseURL = "";
       state.knowledgeBaseSitemap = "";
       state.knowledgeBaseLinks = [];
       state.knowledgeBaseFiles = [];
       state.knowledgeBaseText = [];
       state.knowledgeBaseQnA = [];
-      state.baseURL = "";
+      state.agent_status = "";
+      state.agent_current_task = "";
+      state.progress = 0;
     },
   },
 });
 
 export const {
-  setCurrentStep,
   setAgentName,
   setAgentID,
+  setBaseURL,
+  setAgentStatus,
+  setAgentCurrentTask,
+  setProgress,
   setKnowledgeBaseSitemap,
   setKnowledgeBaseLinks,
   addKnowledgeBaseLinks,
@@ -206,8 +232,7 @@ export const {
   addKnowledgeBaseQnA,
   updateKnowledgeBaseQnA,
   removeKnowledgeBaseQnA,
-  setBaseURL,
-  resetAgentBuilder,
-} = agentBuilderSlice.actions;
+  resetUserAgent,
+} = agentSlice.actions;
 
-export const agentBuilderReducer = agentBuilderSlice.reducer;
+export const agentReducer = agentSlice.reducer;

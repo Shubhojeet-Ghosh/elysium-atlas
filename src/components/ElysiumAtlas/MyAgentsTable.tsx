@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useAppSelector, useAppDispatch } from "@/store";
+import { useRouter } from "next/navigation";
 
 import {
   Table,
@@ -41,6 +42,7 @@ import PrimaryButton from "@/components/ui/PrimaryButton";
 export default function MyAgentsTable() {
   const agents = useAppSelector((state) => state.userAgents.myAgents);
   const dispatch = useAppDispatch();
+  const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const AGENTS_PER_PAGE = 5;
@@ -136,7 +138,7 @@ export default function MyAgentsTable() {
       {/* Search Bar */}
       {agents && agents.length > 0 && (
         <div className="flex justify-end mb-[2px]">
-          <div className="relative w-[280px]">
+          <div className="relative lg:w-[280px] w-full">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
             <CustomInput
               type="text"
@@ -177,7 +179,9 @@ export default function MyAgentsTable() {
                     <TableRow
                       key={agent.agent_id}
                       className="cursor-pointer border-b border-gray-100 dark:border-deep-onyx hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 hover:text-serene-purple dark:hover:text-serene-purple transition-all duration-200"
-                      onClick={() => console.log(agent.agent_id)}
+                      onClick={() =>
+                        router.push(`/my-agents/${agent.agent_id}`)
+                      }
                     >
                       <TableCell className="font-medium min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] py-2 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist">
                         <div className="truncate">{agent.agent_name}</div>

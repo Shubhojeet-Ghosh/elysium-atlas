@@ -9,7 +9,7 @@ import PrimaryButton from "@/components/ui/PrimaryButton";
 import { Plus } from "lucide-react";
 import MyAgentsTable from "./MyAgentsTable";
 import { useRouter } from "next/navigation";
-import { setCurrentStep } from "@/store/reducers/agentBuilderSlice";
+import { resetAgentBuilder } from "@/store/reducers/agentBuilderSlice";
 
 export default function MyAgents() {
   const router = useRouter();
@@ -22,7 +22,7 @@ export default function MyAgents() {
 
   // Placeholder handler for button
   const handleBuildNewAgent = () => {
-    dispatch(setCurrentStep(1));
+    dispatch(resetAgentBuilder());
     router.push("/my-agents/build");
   };
 
