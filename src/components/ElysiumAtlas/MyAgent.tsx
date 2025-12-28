@@ -79,6 +79,10 @@ export default function MyAgent({
       payload.llm_model = current.llmModel;
     }
 
+    if (mappedInitial.temperature !== current.temperature) {
+      payload.temperature = current.temperature;
+    }
+
     // Compare arrays for links
     if (
       JSON.stringify(mappedInitial.knowledgeBaseLinks) !==
