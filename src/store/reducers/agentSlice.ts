@@ -18,6 +18,12 @@ interface UserAgentState {
   agent_status: string;
   agent_current_task: string;
   progress: number;
+  systemPrompt: string;
+  temperature: number;
+  welcomeMessage: string;
+  llmModel: string;
+  availableModels: string[];
+  triggerGetAgentDetails: number;
 }
 
 const initialState: UserAgentState = {
@@ -32,6 +38,12 @@ const initialState: UserAgentState = {
   agent_status: "",
   agent_current_task: "",
   progress: 0,
+  systemPrompt: "",
+  temperature: 0,
+  welcomeMessage: "",
+  llmModel: "",
+  availableModels: ["gpt-4o-mini", "gpt-4.1-mini", "gpt-5-nano-2025-08-07"],
+  triggerGetAgentDetails: 0,
 };
 
 const agentSlice = createSlice({
@@ -189,6 +201,24 @@ const agentSlice = createSlice({
         (_, index) => index !== action.payload
       );
     },
+    setSystemPrompt: (state, action: PayloadAction<string>) => {
+      state.systemPrompt = action.payload;
+    },
+    setTemperature: (state, action: PayloadAction<number>) => {
+      state.temperature = action.payload;
+    },
+    setWelcomeMessage: (state, action: PayloadAction<string>) => {
+      state.welcomeMessage = action.payload;
+    },
+    setLlmModel: (state, action: PayloadAction<string>) => {
+      state.llmModel = action.payload;
+    },
+    setAvailableModels: (state, action: PayloadAction<string[]>) => {
+      state.availableModels = action.payload;
+    },
+    setTriggerGetAgentDetails: (state, action: PayloadAction<number>) => {
+      state.triggerGetAgentDetails = action.payload;
+    },
     resetUserAgent: (state) => {
       state.agentName = "";
       state.agentID = "";
@@ -201,6 +231,11 @@ const agentSlice = createSlice({
       state.agent_status = "";
       state.agent_current_task = "";
       state.progress = 0;
+      state.systemPrompt = "";
+      state.temperature = 0;
+      state.welcomeMessage = "";
+      state.llmModel = "";
+      state.triggerGetAgentDetails = 0;
     },
   },
 });
@@ -232,6 +267,12 @@ export const {
   addKnowledgeBaseQnA,
   updateKnowledgeBaseQnA,
   removeKnowledgeBaseQnA,
+  setSystemPrompt,
+  setTemperature,
+  setWelcomeMessage,
+  setLlmModel,
+  setAvailableModels,
+  setTriggerGetAgentDetails,
   resetUserAgent,
 } = agentSlice.actions;
 

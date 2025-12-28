@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import fastApiAxios from "@/utils/fastapi_axios";
 import Cookies from "js-cookie";
-import { useAppDispatch } from "@/store";
+import { useAppDispatch, useAppSelector } from "@/store";
 import {
   setAgentName,
   setAgentID,
@@ -22,12 +22,20 @@ import {
   setKnowledgeBaseFiles,
   setKnowledgeBaseText,
   setKnowledgeBaseQnA,
+  setSystemPrompt,
+  setTemperature,
+  setWelcomeMessage,
+  setLlmModel,
+  setTriggerGetAgentDetails,
 } from "@/store/reducers/agentSlice";
 
 export default function AgentPage() {
   const params = useParams();
   const agentID = params.agentID as string;
   const dispatch = useAppDispatch();
+  const triggerGetAgentDetails = useAppSelector(
+    (state) => state.agent.triggerGetAgentDetails
+  );
   const [initialAgentDetails, setInitialAgentDetails] = useState<any>(null);
 
   useEffect(() => {
@@ -49,15 +57,23 @@ export default function AgentPage() {
         );
         if (response.data.success === true) {
           const agentDetails = response.data.agent_details;
-          if (initialAgentDetails === null) {
-            setInitialAgentDetails(agentDetails);
-          }
+
+          setInitialAgentDetails(agentDetails);
+
           dispatch(setAgentName(agentDetails.agent_name));
           dispatch(setAgentID(agentDetails.agent_id));
           dispatch(setBaseURL(agentDetails.base_url || ""));
           dispatch(setAgentStatus(agentDetails.agent_status));
           dispatch(setAgentCurrentTask(agentDetails.agent_current_task));
           dispatch(setProgress(agentDetails.progress || 0));
+          dispatch(
+            setSystemPrompt(
+              agentDetails.system_prompt || "You are a helpful assistant."
+            )
+          );
+          dispatch(setTemperature(agentDetails.temperature || 0.5));
+          dispatch(setWelcomeMessage(agentDetails.welcome_message));
+          dispatch(setLlmModel(agentDetails.llm_model));
           dispatch(
             setKnowledgeBaseLinks(
               agentDetails.links.map((link: any) => ({
@@ -113,20 +129,19 @@ export default function AgentPage() {
     };
 
     if (agentID) {
+      console.log("Fetching details for agentID:", agentID);
       fetchAgentDetails();
     }
-  }, [agentID, dispatch]);
+  }, [agentID, dispatch, triggerGetAgentDetails]);
 
   return (
     <>
       <AiSocketListener />
       <TopNav />
-
       <LeftNav />
-
       <PageContent>
-        <div className="lg:px-[50px] px-4 mt-[40px]">
-          <MyAgent />
+        <div className="lg:px-[50px] px-4 mt-[40px] mb-[90px]">
+          <MyAgent initialAgentDetails={initialAgentDetails} />
         </div>
       </PageContent>
     </>
