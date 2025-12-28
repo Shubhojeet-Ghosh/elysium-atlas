@@ -1,11 +1,12 @@
 import { useState } from "react";
 import CustomTextareaPrimary from "@/components/inputs/CustomTextareaPrimary";
 import InfoIcon from "@/components/ui/InfoIcon";
+import { useAppSelector, useAppDispatch } from "@/store";
+import { setSystemPrompt } from "@/store/reducers/agentSlice";
 
 export default function SystemPrompt() {
-  const [systemPrompt, setSystemPrompt] = useState(
-    "You are a helpful assistant."
-  );
+  const systemPrompt = useAppSelector((state) => state.agent.systemPrompt);
+  const dispatch = useAppDispatch();
 
   return (
     <div className="flex flex-col gap-2">
@@ -18,7 +19,7 @@ export default function SystemPrompt() {
       <CustomTextareaPrimary
         placeholder="Enter your system prompt here..."
         value={systemPrompt}
-        onChange={(e) => setSystemPrompt(e.target.value)}
+        onChange={(e) => dispatch(setSystemPrompt(e.target.value))}
         rows={6}
       />
     </div>
