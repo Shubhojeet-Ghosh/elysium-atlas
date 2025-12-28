@@ -270,11 +270,11 @@ const CustomTabsList = React.forwardRef<HTMLDivElement, CustomTabsListProps>(
         </div>
         {/* Left fade gradient - fixed to container viewport */}
         {showLeftFade && (
-          <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white dark:from-deep-onyx to-transparent pointer-events-none z-10" />
+          <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10" />
         )}
         {/* Right fade gradient - fixed to container viewport */}
         {showRightFade && (
-          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-deep-onyx to-transparent pointer-events-none z-10" />
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10" />
         )}
       </div>
     );

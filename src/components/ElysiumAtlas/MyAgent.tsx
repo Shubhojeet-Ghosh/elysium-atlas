@@ -243,7 +243,7 @@ export default function MyAgent({
 
   return (
     <>
-      <div className="sticky top-[65px] z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+      <div className="sticky top-[65px] z-50 border-b border-gray-200 dark:border-gray-700">
         <CustomTabs value={activeTab} onValueChange={setActiveTab}>
           <AgentBuilderTabs activeTab={activeTab} onTabChange={setActiveTab} />
         </CustomTabs>

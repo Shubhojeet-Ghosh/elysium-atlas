@@ -71,7 +71,7 @@ export default function UnsavedChangesBar({
     >
       <div
         className={cn(
-          "gap-[42px] flex items-center justify-between bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg py-3 md:px-6 px-[8px] shadow-lg md:min-w-[400px] min-w-[360px]"
+          "gap-[42px] flex items-center justify-between bg-pure-mist dark:bg-black shadow-lg rounded-lg py-3 md:px-6 px-[8px] shadow-lg md:min-w-[400px] min-w-[360px]"
         )}
       >
         <div className="flex items-center gap-[8px]">
@@ -85,7 +85,7 @@ export default function UnsavedChangesBar({
         </div>
 
         <div className="flex justify-center items-center gap-3">
-          <OutlineButton className="text-[12px]" onClick={onClear}>
+          <OutlineButton className="text-[12px] font-bold" onClick={onClear}>
             Clear
           </OutlineButton>
           <PrimaryButton
