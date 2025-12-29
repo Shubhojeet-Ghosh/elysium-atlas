@@ -10,12 +10,19 @@ export default function SystemPrompt() {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-1.5">
-        <label className="text-[14px] font-[600] text-deep-onyx dark:text-pure-mist">
-          System Prompt
-        </label>
-        <InfoIcon text="The system prompt defines the AI's role, behavior, and initial instructions for generating responses." />
+      <div className="flex flex-col">
+        <div className="flex items-center gap-1.5">
+          <label className="text-[14px] font-[600] text-deep-onyx dark:text-pure-mist">
+            System Prompt
+          </label>
+          <InfoIcon text="The system prompt defines the AI's role, behavior, and initial instructions for generating responses." />
+        </div>
+        <p className="text-[14px] font-[500] text-gray-500 dark:text-gray-400 mt-[2px]">
+          The system prompt defines the AI's role, behavior, and initial
+          instructions for generating responses.
+        </p>
       </div>
+
       <CustomTextareaPrimary
         placeholder="Enter your system prompt here..."
         value={systemPrompt}
