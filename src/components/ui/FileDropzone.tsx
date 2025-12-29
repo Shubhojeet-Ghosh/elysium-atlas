@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import CustomInput from "@/components/inputs/CustomInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
+import Pill from "@/components/ui/Pill";
 import {
   Tooltip,
   TooltipTrigger,
@@ -56,7 +57,6 @@ export default function FileDropzone({
   accept = {
     "application/pdf": [".pdf"],
     "text/plain": [".txt"],
-    "application/msword": [".doc"],
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
       ".docx",
     ],
@@ -310,7 +310,7 @@ export default function FileDropzone({
         )}
       >
         <input {...getInputProps()} />
-        <div className="flex flex-col items-center justify-center gap-3">
+        <div className="flex flex-col items-center justify-center">
           <Upload
             size={26}
             className={cn(
@@ -320,24 +320,20 @@ export default function FileDropzone({
                 : "text-gray-400 dark:text-gray-500"
             )}
           />
-          <span className="text-[14px] font-[500] text-gray-400 dark:text-gray-200">
+          <span className="text-[14px] font-[500] text-deep-onyx dark:text-pure-mist mt-3">
             {isDragActive
               ? "Drop files here"
               : "Drag & drop files here, or click to select"}
           </span>
-        </div>
-      </div>
-
-      <div className="flex justify-between items-center mt-[6px]">
-        <div className="text-[12px] text-gray-500 dark:text-gray-400 flex items-center gap-1">
-          <span className="lg:block md:block hidden">
-            Accepted file types:{" "}
+          <span className="text-[13px] font-medium text-gray-500 dark:text-gray-400 mt-[2px]">
+            Up to 10 MB each file.
           </span>
-          PDF, TXT, DOC, and DOCX files
+          <div className="flex items-center gap-2 mt-[8px]">
+            <Pill item="pdf" />
+            <Pill item="txt" />
+            <Pill item="docx" />
+          </div>
         </div>
-        <span className="text-[12px] text-gray-500 dark:text-gray-400">
-          Max file size: 10 MB
-        </span>
       </div>
 
       {filesWithChecked.length > 0 && (
