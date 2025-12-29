@@ -32,12 +32,24 @@ export default function LlmModelSelector() {
   return (
     <>
       <div className="lg:w-[40%] w-full">
-        <CustomSelector
-          label="LLM Model"
-          value={llmModel}
-          className="px-[10px] py-[12px] "
-          onClick={() => setOpen(true)}
-        />
+        <div className="flex flex-col gap-2">
+          <div>
+            {" "}
+            <label className="text-[14px] font-[600] text-deep-onyx dark:text-pure-mist">
+              LLM Model
+            </label>
+            <p className="text-[14px] font-[500] text-gray-500 dark:text-gray-400 mt-[2px]">
+              Choose your preferred language model.
+            </p>
+          </div>
+
+          <CustomSelector
+            label="LLM Model"
+            value={llmModel}
+            className="px-[10px] py-[12px] "
+            onClick={() => setOpen(true)}
+          />
+        </div>
       </div>
 
       <Sheet open={open} onOpenChange={setOpen}>

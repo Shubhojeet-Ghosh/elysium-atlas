@@ -12,9 +12,15 @@ export default function AgentLeftSide() {
     <div className="lg:w-[60%] w-full">
       <div>
         <div className="flex flex-col gap-2">
-          <label className="text-[14px] font-[600] text-deep-onyx dark:text-pure-mist">
-            Agent Name
-          </label>
+          <div>
+            <label className="text-[14px] font-[600] text-deep-onyx dark:text-pure-mist">
+              Agent Name
+            </label>
+            <p className="text-[14px] font-[500] text-gray-500 dark:text-gray-400 mt-[2px]">
+              Unique name for your AI agent.
+            </p>
+          </div>
+
           <CustomInput
             className="px-[10px] py-[12px] "
             type="text"
