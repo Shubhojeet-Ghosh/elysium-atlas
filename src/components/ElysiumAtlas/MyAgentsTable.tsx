@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { useRouter } from "next/navigation";
 
@@ -49,6 +49,9 @@ export default function MyAgentsTable() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [agentToDelete, setAgentToDelete] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showLeftGradient, setShowLeftGradient] = useState(false);
+  const [showRightGradient, setShowRightGradient] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Filter agents based on search term
   const filteredAgents = useMemo(() => {
@@ -75,6 +78,32 @@ export default function MyAgentsTable() {
     () => filteredAgents.slice(startIndex, endIndex),
     [filteredAgents, startIndex, endIndex]
   );
+
+  // Handle scroll to detect gradient visibility
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainer;
+      // Show left gradient if scrolled right
+      setShowLeftGradient(scrollLeft > 0);
+      // Show right gradient if not at the end
+      setShowRightGradient(scrollLeft + clientWidth < scrollWidth - 5);
+    };
+
+    // Check initial state
+    handleScroll();
+
+    scrollContainer.addEventListener("scroll", handleScroll);
+    // Also check on resize
+    window.addEventListener("resize", handleScroll);
+
+    return () => {
+      scrollContainer.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, [currentAgents]);
 
   const handlePreviousPage = () => {
     if (currentPage > 1) setCurrentPage(currentPage - 1);
@@ -157,7 +186,10 @@ export default function MyAgentsTable() {
         </div>
       ) : (
         <div className="relative">
-          <div className="overflow-x-auto md:overflow-visible">
+          <div
+            ref={scrollContainerRef}
+            className="overflow-x-auto md:overflow-visible"
+          >
             <div className="inline-block min-w-full align-middle">
               <Table className="min-w-[600px] lg:min-w-full ">
                 <TableHeader>
@@ -332,6 +364,14 @@ export default function MyAgentsTable() {
                 </div>
               )}
             </div>
+            {/* Left gradient overlay */}
+            {showLeftGradient && (
+              <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
+            )}
+            {/* Right gradient overlay */}
+            {showRightGradient && (
+              <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
+            )}
           </div>
         </div>
       )}
