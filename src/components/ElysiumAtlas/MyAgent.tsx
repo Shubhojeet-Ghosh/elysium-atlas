@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import Cookies from "js-cookie";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CustomTabs } from "@/components/ui/CustomTabs";
 import AgentBuilderTabs from "./AgentBuilderTabs";
 import AgentMainContent from "./AgentMainContent";
@@ -24,6 +25,7 @@ import {
 } from "@/store/reducers/agentSlice";
 import { mapInitialAgentDetails } from "@/utils/mapInitialAgentDetails";
 import fastApiAxios from "@/utils/fastapi_axios";
+import { isEquivalent, normalizeValue } from "@/utils/comparisonUtils";
 import { toast } from "sonner";
 
 export default function MyAgent({
@@ -31,7 +33,12 @@ export default function MyAgent({
 }: {
   initialAgentDetails: any;
 }) {
-  const [activeTab, setActiveTab] = useState("agent");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [activeTab, setActiveTab] = useState(() => {
+    return searchParams.get("activeTab") || "agent";
+  });
 
   const mappedInitial = useMemo(
     () =>
@@ -44,6 +51,16 @@ export default function MyAgent({
     (state) => state.agent.triggerGetAgentDetails
   );
   const currentAgentDetails = useCurrentAgentDetails();
+
+  // Handle tab change and update URL
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    const current = new URLSearchParams(Array.from(searchParams.entries()));
+    current.set("activeTab", newTab);
+    const search = current.toString();
+    const query = search ? `?${search}` : "";
+    router.push(`${window.location.pathname}${query}`);
+  };
 
   const buildUpdatePayload = (
     mappedInitial: any,
@@ -59,23 +76,23 @@ export default function MyAgent({
     };
 
     // Check each field for changes and add to payload if different
-    if (mappedInitial.agentName !== current.agentName) {
+    if (!isEquivalent(mappedInitial.agentName, current.agentName)) {
       payload.agent_name = current.agentName;
     }
 
-    if (mappedInitial.baseURL !== current.baseURL) {
+    if (!isEquivalent(mappedInitial.baseURL, current.baseURL)) {
       payload.base_url = current.baseURL;
     }
 
-    if (mappedInitial.systemPrompt !== current.systemPrompt) {
+    if (!isEquivalent(mappedInitial.systemPrompt, current.systemPrompt)) {
       payload.system_prompt = current.systemPrompt;
     }
 
-    if (mappedInitial.welcomeMessage !== current.welcomeMessage) {
+    if (!isEquivalent(mappedInitial.welcomeMessage, current.welcomeMessage)) {
       payload.welcome_message = current.welcomeMessage;
     }
 
-    if (mappedInitial.llmModel !== current.llmModel) {
+    if (!isEquivalent(mappedInitial.llmModel, current.llmModel)) {
       payload.llm_model = current.llmModel;
     }
 
@@ -241,11 +258,25 @@ export default function MyAgent({
     console.log("[MyAgent] currentAgentDetails:", currentAgentDetails);
   }, [initialAgentDetails, currentAgentDetails]);
 
+  // Set default activeTab in URL if not present
+  useEffect(() => {
+    if (!searchParams.get("activeTab")) {
+      const current = new URLSearchParams(Array.from(searchParams.entries()));
+      current.set("activeTab", "agent");
+      const search = current.toString();
+      const query = search ? `?${search}` : "";
+      router.push(`${window.location.pathname}${query}`);
+    }
+  }, [searchParams, router]);
+
   return (
     <>
       <div className="sticky top-[65px] z-50 border-b border-gray-200 dark:border-gray-700">
-        <CustomTabs value={activeTab} onValueChange={setActiveTab}>
-          <AgentBuilderTabs activeTab={activeTab} onTabChange={setActiveTab} />
+        <CustomTabs value={activeTab} onValueChange={handleTabChange}>
+          <AgentBuilderTabs
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+          />
         </CustomTabs>
       </div>
       {activeTab === "agent" && (
