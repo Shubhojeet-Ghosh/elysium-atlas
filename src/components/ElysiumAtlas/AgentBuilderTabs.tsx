@@ -1,5 +1,14 @@
 "use client";
-import { User, Database, Palette, Settings } from "lucide-react";
+import {
+  User,
+  Database,
+  Palette,
+  Settings,
+  Globe,
+  FileText,
+  Type,
+  MessagesSquare,
+} from "lucide-react";
 import {
   CustomTabs,
   CustomTabsList,
@@ -26,11 +35,32 @@ export default function AgentBuilderTabs({
           Agent
         </CustomTabsTrigger>
         <CustomTabsTrigger
-          value="knowledgebase"
+          value="links"
           className="flex items-center gap-2 font-[600]"
         >
-          <Database size={16} />
-          Knowledgebase
+          <Globe size={16} />
+          Links
+        </CustomTabsTrigger>
+        <CustomTabsTrigger
+          value="files"
+          className="flex items-center gap-2 font-[600]"
+        >
+          <FileText size={16} />
+          Files
+        </CustomTabsTrigger>
+        <CustomTabsTrigger
+          value="text"
+          className="flex items-center gap-2 font-[600]"
+        >
+          <Type size={16} />
+          Text
+        </CustomTabsTrigger>
+        <CustomTabsTrigger
+          value="qna"
+          className="flex items-center gap-2 font-[600]"
+        >
+          <MessagesSquare size={16} />
+          QnA
         </CustomTabsTrigger>
         <CustomTabsTrigger
           value="personalize"

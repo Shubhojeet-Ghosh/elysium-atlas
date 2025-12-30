@@ -3,6 +3,7 @@ import { TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import OutlineButton from "@/components/ui/OutlineButton";
 import PrimaryButton from "@/components/ui/PrimaryButton";
+import { deepEqualNormalized } from "@/utils/comparisonUtils";
 
 interface UnsavedChangesBarProps {
   initial: any;
@@ -10,29 +11,6 @@ interface UnsavedChangesBarProps {
   onSave: () => void;
   onClear: () => void;
 }
-
-function deepEqual(obj1: any, obj2: any): boolean {
-  // Simple deep equality check (can be replaced with lodash.isEqual if needed)
-  if (obj1 === obj2) return true;
-  if (typeof obj1 !== typeof obj2) return false;
-  if (typeof obj1 !== "object" || obj1 === null || obj2 === null) return false;
-  if (Array.isArray(obj1) !== Array.isArray(obj2)) return false;
-  if (Array.isArray(obj1)) {
-    if (obj1.length !== obj2.length) return false;
-    for (let i = 0; i < obj1.length; i++) {
-      if (!deepEqual(obj1[i], obj2[i])) return false;
-    }
-    return true;
-  }
-  const keys1 = Object.keys(obj1);
-  const keys2 = Object.keys(obj2);
-  if (keys1.length !== keys2.length) return false;
-  for (const key of keys1) {
-    if (!deepEqual(obj1[key], obj2[key])) return false;
-  }
-  return true;
-}
-
 export default function UnsavedChangesBar({
   initial,
   current,
@@ -43,7 +21,7 @@ export default function UnsavedChangesBar({
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    const isDiff = initial && current && !deepEqual(initial, current);
+    const isDiff = initial && current && !deepEqualNormalized(initial, current);
     // Debug logs
     // console.log("[UnsavedChangesBar] initial:", initial);
     // console.log("[UnsavedChangesBar] current:", current);
