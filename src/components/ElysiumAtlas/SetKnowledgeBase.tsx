@@ -212,7 +212,6 @@ export default function SetKnowledgeBase({
       );
 
       if (response.data.success === true) {
-        dispatch(resetAgentBuilder());
         router.push(`/my-agents/${response.data.agent_id}`);
       } else {
         toast.error(response.data.message || "Failed to build agent");
