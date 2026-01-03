@@ -36,6 +36,8 @@ export default function AgentChatSpace() {
             "quick_prompts",
             "agent_status",
           ],
+          chat_session_id: chat_session_id,
+          source: "web",
         };
 
         const response = await fastApiAxios.post(
@@ -47,10 +49,12 @@ export default function AgentChatSpace() {
 
         if (agentData.success === true) {
           const agentFields = agentData.agent_fields || {};
+          const chat_session_data = agentData.chat_session_data || {};
 
           store.dispatch(
             setAgentFields({
-              agent_name: agentFields.agent_name || "",
+              agent_name:
+                chat_session_data.agent_name || agentFields.agent_name || "",
               agent_icon: agentFields.agent_icon || null,
               welcome_message: agentFields.welcome_message || "",
               placeholder_text: agentFields.placeholder_text || "",
