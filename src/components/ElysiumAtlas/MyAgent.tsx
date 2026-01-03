@@ -7,6 +7,7 @@ import AgentMainContent from "./AgentMainContent";
 import UnsavedChangesBar from "./UnsavedChangesBar";
 import { useCurrentAgentDetails } from "./useAgentDetailsCompare";
 import { useAppDispatch, useAppSelector } from "@/store";
+import PrimaryButton from "../ui/PrimaryButton";
 import {
   setAgentName,
   setBaseURL,
@@ -27,6 +28,7 @@ import { mapInitialAgentDetails } from "@/utils/mapInitialAgentDetails";
 import fastApiAxios from "@/utils/fastapi_axios";
 import { isEquivalent, normalizeValue } from "@/utils/comparisonUtils";
 import { toast } from "sonner";
+import { SquareArrowOutUpRight } from "lucide-react";
 
 export default function MyAgent({
   initialAgentDetails,
@@ -35,6 +37,8 @@ export default function MyAgent({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const agentID = useAppSelector((state) => state.agent.agentID);
 
   const [activeTab, setActiveTab] = useState(() => {
     return searchParams.get("activeTab") || "agent";
@@ -269,15 +273,33 @@ export default function MyAgent({
     }
   }, [searchParams, router]);
 
+  const handlePreview = () => {
+    const chatSessionId = "app-" + crypto.randomUUID();
+    const url = `/chat-with-agent?agent_id=${agentID}&chat_session_id=${chatSessionId}`;
+    window.open(url, "_blank");
+  };
+
   return (
     <>
-      <div className="sticky top-[65px] z-50 border-b border-gray-200 dark:border-gray-700">
-        <CustomTabs value={activeTab} onValueChange={handleTabChange}>
-          <AgentBuilderTabs
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-          />
-        </CustomTabs>
+      <div className="sticky top-[65px] z-50">
+        <div className="w-full flex flex-row items-center justify-between bg-white">
+          <div className="flex  flex-row items-center justify-center w-[85%]">
+            <CustomTabs value={activeTab} onValueChange={handleTabChange}>
+              <AgentBuilderTabs
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+              />
+            </CustomTabs>
+          </div>
+          <div className="flex items-center justify-end">
+            <PrimaryButton className="text-[13px]" onClick={handlePreview}>
+              <div className="flex items-center justify-center gap-[6px]">
+                <SquareArrowOutUpRight size={16} />{" "}
+                <p className="lg:block md:hidden hidden">Preview Agent</p>
+              </div>
+            </PrimaryButton>
+          </div>
+        </div>
       </div>
       {activeTab === "agent" && (
         <AgentMainContent
