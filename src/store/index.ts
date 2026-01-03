@@ -9,6 +9,7 @@ import { userProfileReducer } from "./reducers/userProfileSlice";
 import { agentBuilderReducer } from "./reducers/agentBuilderSlice";
 import { userAgentsReducer } from "./reducers/userAgentsSlice";
 import { agentReducer } from "./reducers/agentSlice";
+import { agentChatReducer } from "./reducers/agentChatSlice";
 
 // Noop storage logic to handle SSR issues
 const createNoopStorage = () => {
@@ -55,6 +56,11 @@ const agentPersistConfig = {
   storage: storage,
 };
 
+const agentChatPersistConfig = {
+  key: "agentChat",
+  storage: storage,
+};
+
 // Apply persistReducer to settings and userAgents
 const persistedSettingsReducer = persistReducer(
   settingsPersistConfig,
@@ -74,6 +80,10 @@ const persistedUserAgentsReducer = persistReducer(
 );
 
 const persistedAgentReducer = persistReducer(agentPersistConfig, agentReducer);
+const persistedAgentChatReducer = persistReducer(
+  agentChatPersistConfig,
+  agentChatReducer
+);
 
 // Configure Redux Store
 export const store = configureStore({
@@ -83,6 +93,7 @@ export const store = configureStore({
     agentBuilder: persistedAgentBuilderReducer,
     userAgents: persistedUserAgentsReducer,
     agent: persistedAgentReducer,
+    agentChat: persistedAgentChatReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

@@ -6,6 +6,7 @@ const publicRoutes = [
   "/auth/login",
   "/auth/verify",
   "/", // Root page - adjust if this should be private
+  "/chat-with-agent",
 ];
 
 // Define private routes that require authentication
@@ -38,8 +39,13 @@ export function middleware(request: NextRequest) {
   const origin = new URL(request.url).origin;
 
   // Check if user has valid token and is trying to access public routes
-  // Exception: Allow authenticated users to access root "/" route
-  if (hasValidToken && isPublicRoute(pathname) && pathname !== "/") {
+  // Exception: Allow authenticated users to access root "/" route and "/chat-with-agent"
+  if (
+    hasValidToken &&
+    isPublicRoute(pathname) &&
+    pathname !== "/" &&
+    pathname !== "/chat-with-agent"
+  ) {
     // Redirect authenticated users away from public pages to my-agents
     const myAgentsUrl = new URL("/my-agents", origin);
     return NextResponse.redirect(myAgentsUrl);
