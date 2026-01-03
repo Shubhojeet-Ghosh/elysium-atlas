@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "cdn.sgdevstudio.in",
-        pathname: "/elysium-atlas/**",
+        pathname: "/**",
       },
     ],
   },
