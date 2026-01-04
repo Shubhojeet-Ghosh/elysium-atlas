@@ -27,12 +27,12 @@
     let chatSessionId = w.localStorage.getItem("chat_session_id");
 
     if (chatSessionId) {
-      console.log("chat_session_id:", chatSessionId);
+      // console.log("chat_session_id:", chatSessionId);
     } else {
       const uuid = crypto.randomUUID();
       chatSessionId = "web-" + uuid;
       w.localStorage.setItem("chat_session_id", chatSessionId);
-      console.log("chat_session_id:", chatSessionId);
+      // console.log("chat_session_id:", chatSessionId);
     }
 
     return chatSessionId;
@@ -117,7 +117,7 @@
       }
     });
 
-    console.log("Chat button created");
+    // console.log("Chat button created");
   }
 
   function createChatIframe() {
@@ -214,15 +214,15 @@
       );
 
       const data = await response.json();
-      console.log("API Response:", data);
+      // console.log("API Response:", data);
 
       if (data.success && data.agent_fields?.agent_icon) {
-        console.log("agent_icon:", data.agent_fields.agent_icon);
+        // console.log("agent_icon:", data.agent_fields.agent_icon);
       }
 
       return data;
     } catch (error) {
-      console.error("API Error:", error);
+      //   console.error("API Error:", error);
       return null;
     }
   }
@@ -231,11 +231,11 @@
     const agentId = getQueryParam("agent_id");
     if (!agentId) return;
 
-    console.log("hello world");
-    console.log("agent_id:", agentId);
+    // console.log("hello world");
+    // console.log("agent_id:", agentId);
 
     const pageUrl = w.location.href;
-    console.log("page_url:", pageUrl);
+    // console.log("page_url:", pageUrl);
 
     const chatSessionId = getOrCreateSessionId();
 
