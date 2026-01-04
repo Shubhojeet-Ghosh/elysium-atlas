@@ -29,21 +29,21 @@ export const formatChatTimestamp = (dateString: string) => {
   let cleaned = dateString.replace(/\.(\d{3})\d+$/, ".$1");
   if (!cleaned.endsWith("Z")) cleaned += "Z";
   const utcDate = new Date(cleaned);
-  const localDate = new Date(utcDate.toLocaleString());
 
+  // Date object automatically converts to local time for getter methods
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const messageDate = new Date(
-    localDate.getFullYear(),
-    localDate.getMonth(),
-    localDate.getDate()
+    utcDate.getFullYear(),
+    utcDate.getMonth(),
+    utcDate.getDate()
   );
 
   const diffTime = today.getTime() - messageDate.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-  const hours = localDate.getHours().toString().padStart(2, "0");
-  const minutes = localDate.getMinutes().toString().padStart(2, "0");
+  const hours = utcDate.getHours().toString().padStart(2, "0");
+  const minutes = utcDate.getMinutes().toString().padStart(2, "0");
 
   if (diffDays === 0) {
     // Today
@@ -53,8 +53,8 @@ export const formatChatTimestamp = (dateString: string) => {
     return `Yesterday ${hours}:${minutes}`;
   } else {
     // Older dates
-    const month = localDate.toLocaleDateString(undefined, { month: "short" });
-    const day = localDate.getDate();
-    return `${month}, ${day} ${hours}:${minutes}`;
+    const month = utcDate.toLocaleDateString(undefined, { month: "short" });
+    const day = utcDate.getDate();
+    return `${month} ${day}, ${hours}:${minutes}`;
   }
 };

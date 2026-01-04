@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { useAppDispatch, useAppSelector } from "@/store";
 import {
   setAgentId,
@@ -29,7 +30,7 @@ export default function ChatWithAgent() {
       dispatch(setAgentId(agentIdParam));
     } else {
       // Generate a random UUID if agent_id is not provided or falsy
-      const generatedAgentId = crypto.randomUUID();
+      const generatedAgentId = uuidv4();
       dispatch(setAgentId(generatedAgentId));
     }
   }, [agentIdParam, dispatch]);
@@ -39,7 +40,7 @@ export default function ChatWithAgent() {
       dispatch(setChatSessionId(chatSessionIdParam));
     } else {
       // Generate a random UUID with "un-" prefix if chat_session_id is not provided or falsy
-      const generatedSessionId = `un-${crypto.randomUUID()}`;
+      const generatedSessionId = `un-${uuidv4()}`;
       dispatch(setChatSessionId(generatedSessionId));
     }
   }, [chatSessionIdParam, dispatch]);
