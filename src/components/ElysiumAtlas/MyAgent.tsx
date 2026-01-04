@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { v4 as uuidv4 } from "uuid";
 import Cookies from "js-cookie";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CustomTabs } from "@/components/ui/CustomTabs";
@@ -283,7 +284,7 @@ export default function MyAgent({
     // Reset chat state before opening preview
     dispatch(resetAgentChat());
 
-    const chatSessionId = "app-" + crypto.randomUUID();
+    const chatSessionId = "app-" + uuidv4();
     const url = `/chat-with-agent?agent_id=${agentID}&chat_session_id=${chatSessionId}`;
     window.open(url, "_blank");
   };

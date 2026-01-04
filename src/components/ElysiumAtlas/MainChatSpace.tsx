@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, memo } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { useAppSelector, useAppDispatch } from "@/store";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, ArrowDown } from "lucide-react";
 import {
   addMessage,
   setIsTyping,
@@ -15,7 +16,10 @@ import rehypeHighlight from "rehype-highlight";
 import ChatWelcomeMessage from "./ChatWelcomeMessage";
 import SkeletonMessages from "./SkeletonMessages";
 import Thinking from "./Thinking";
+import ChatMessage from "./ChatMessage";
+import MessageActions from "./MessageActions";
 import { formatChatTimestamp } from "@/utils/formatDate";
+import { markdownComponents } from "@/utils/markdownComponents";
 
 export default function MainChatSpace() {
   const {
@@ -36,8 +40,10 @@ export default function MainChatSpace() {
   const [newMessageAnimating, setNewMessageAnimating] = useState(false);
   const [socket, setSocket] = useState<any>(null);
   const [streamingMessage, setStreamingMessage] = useState("");
+  const [showScrollButton, setShowScrollButton] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Reset chat state on unmount
   useEffect(() => {
@@ -81,7 +87,7 @@ export default function MainChatSpace() {
     }) => {
       if (data.done) {
         const newMessage = {
-          message_id: data.message_id || crypto.randomUUID(),
+          message_id: data.message_id || uuidv4(),
           role: (data.role as "user" | "agent" | "human") || "agent",
           content: data.full_response || streamingMessage,
           created_at: data.created_at || new Date().toISOString(),
@@ -116,8 +122,8 @@ export default function MainChatSpace() {
     };
   }, [agent_id, chat_session_id, isFetching]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
   useEffect(() => {
@@ -138,73 +144,98 @@ export default function MainChatSpace() {
 
   // Scroll to bottom on initial mount
   useEffect(() => {
-    scrollToBottom();
-  }, []);
+    if (!isFetching) {
+      scrollToBottom("auto");
+    }
+  }, [isFetching]);
 
-  const handleSendMessage = (message?: string) => {
-    const msg = message || inputValue.trim();
-    if (msg === "") return;
+  // Handle scroll to detect if user is at bottom
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
 
-    const user_message_created_at = new Date().toISOString();
+    const { scrollTop, scrollHeight, clientHeight } =
+      scrollContainerRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+    setShowScrollButton(!isAtBottom);
+  };
 
-    const newMessage = {
-      message_id: crypto.randomUUID(),
-      role: "user" as const,
-      content: msg,
-      created_at: user_message_created_at,
-    };
+  const handleSendMessage = useCallback(
+    (message?: string) => {
+      const msg = message || inputValue.trim();
+      if (msg === "") return;
 
-    dispatch(addMessage(newMessage));
+      const user_message_created_at = new Date().toISOString();
 
-    if (socket) {
-      socket.emit("atlas-visitor-message", {
-        agent_id,
-        message: msg,
-        chat_session_id,
+      const newMessage = {
+        message_id: uuidv4(),
+        role: "user" as const,
+        content: msg,
         created_at: user_message_created_at,
-      });
+      };
 
-      if (chatMode === "ai") {
-        dispatch(setIsTyping(true));
+      dispatch(addMessage(newMessage));
+
+      if (socket) {
+        socket.emit("atlas-visitor-message", {
+          agent_id,
+          message: msg,
+          chat_session_id,
+          created_at: user_message_created_at,
+        });
+
+        if (chatMode === "ai") {
+          dispatch(setIsTyping(true));
+        }
       }
-    }
 
-    setNewMessageAnimating(true);
-    setInputValue("");
+      setNewMessageAnimating(true);
+      setInputValue("");
 
-    // Reset textarea height
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "40px";
-    }
-  };
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "40px";
+      }
+    },
+    [inputValue, socket, agent_id, chat_session_id, chatMode, dispatch]
+  );
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSendMessage();
+      }
+    },
+    [handleSendMessage]
+  );
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInputValue(e.target.value);
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setInputValue(e.target.value);
 
-    // Auto-resize textarea based on content
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      const scrollHeight = textareaRef.current.scrollHeight;
-      const lineHeight = 20; // Approximate line height in pixels
-      const maxHeight = lineHeight * 5; // Max 5 rows
+      // Auto-resize textarea based on content
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+        const scrollHeight = textareaRef.current.scrollHeight;
+        const lineHeight = 20; // Approximate line height in pixels
+        const maxHeight = lineHeight * 5; // Max 5 rows
 
-      textareaRef.current.style.height = `${Math.min(
-        scrollHeight,
-        maxHeight
-      )}px`;
-    }
-  };
+        textareaRef.current.style.height = `${Math.min(
+          scrollHeight,
+          maxHeight
+        )}px`;
+      }
+    },
+    []
+  );
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 flex flex-col min-h-0 relative">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto custom-scrollbar"
+        onScroll={handleScroll}
+      >
         <div className="flex flex-col min-h-full">
           <div className="flex-grow"></div>
           {isFetching ? (
@@ -217,54 +248,15 @@ export default function MainChatSpace() {
           ) : (
             <div className="pl-[18px] pr-[16px] font-[600] py-4 space-y-6">
               {conversation_chain.map((message, index) => (
-                <div
+                <ChatMessage
                   key={message.message_id}
-                  className={`flex gap-3 ${
-                    message.role === "user" ? "flex-row-reverse" : ""
-                  }`}
-                >
-                  <div
-                    className={`flex-1 space-y-1 ${
-                      message.role === "user" ? "text-right" : ""
-                    }`}
-                  >
-                    {message.role === "agent" || message.role === "human" ? (
-                      <div className="text-[13px] text-gray-600 leading-relaxed">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          rehypePlugins={[rehypeHighlight]}
-                        >
-                          {message.content}
-                        </ReactMarkdown>
-                      </div>
-                    ) : (
-                      <div
-                        className={`inline-block rounded-2xl px-[14px] py-[12px] text-[13px] text-white text-left shadow-sm max-w-[85%] transition-all duration-200 ${
-                          message.role === "user" &&
-                          index === conversation_chain.length - 1 &&
-                          newMessageAnimating
-                            ? "opacity-0 translate-y-2"
-                            : "opacity-100 translate-y-0"
-                        }`}
-                        style={{
-                          backgroundColor: primary_color,
-                          color: text_color,
-                          wordBreak: "break-word",
-                          overflowWrap: "anywhere",
-                        }}
-                      >
-                        {message.content}
-                      </div>
-                    )}
-                    <div
-                      className={`text-[10px] text-gray-400 mt-1 ${
-                        message.role === "user" ? "text-right" : "text-left"
-                      }`}
-                    >
-                      {formatChatTimestamp(message.created_at)}
-                    </div>
-                  </div>
-                </div>
+                  message={message}
+                  agent_id={agent_id}
+                  primary_color={primary_color}
+                  text_color={text_color}
+                  isLast={index === conversation_chain.length - 1}
+                  isAnimating={newMessageAnimating}
+                />
               ))}
 
               {isTyping && (
@@ -274,17 +266,28 @@ export default function MainChatSpace() {
               )}
               {streamingMessage && (
                 <div className="flex gap-3">
-                  <div className="flex-1 space-y-1">
-                    <div className="text-[13px] text-gray-600 leading-relaxed">
+                  <div className="flex-1 space-y-1 min-w-0">
+                    <div
+                      className="text-[13px] text-gray-600 leading-relaxed prose prose-sm"
+                      style={{ maxWidth: "650px", wordWrap: "break-word" }}
+                    >
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeHighlight]}
+                        components={markdownComponents}
                       >
                         {streamingMessage}
                       </ReactMarkdown>
                     </div>
-                    <div className="text-[10px] text-gray-400 mt-1 text-left">
-                      {formatChatTimestamp(new Date().toISOString())}
+                    <div className="flex items-center justify-between w-full mt-1">
+                      <MessageActions
+                        messageId="streaming"
+                        content={streamingMessage}
+                        agent_id={agent_id}
+                      />
+                      <div className="text-[10px] text-gray-400">
+                        {formatChatTimestamp(new Date().toISOString())}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -294,6 +297,19 @@ export default function MainChatSpace() {
           )}
         </div>
       </div>
+
+      <button
+        onClick={() => scrollToBottom()}
+        className={`absolute bottom-18 left-1/2 transform -translate-x-1/2 p-2 rounded-full shadow-lg cursor-pointer transition-all duration-300 ${
+          showScrollButton ? "opacity-100 visible" : "opacity-0 invisible"
+        }`}
+        style={{
+          backgroundColor: primary_color,
+          color: text_color,
+        }}
+      >
+        <ArrowDown size={14} />
+      </button>
 
       <div className="flex-shrink-0 pt-[6px] pb-[6px] px-[12px]">
         <div className="pr-[10px] relative flex items-end gap-2 bg-white border border-gray-200 rounded-xl shadow-sm transition-all py-2">
