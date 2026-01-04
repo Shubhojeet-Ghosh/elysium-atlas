@@ -282,7 +282,7 @@ export default function MyAgent({
   return (
     <>
       <div className="sticky top-[65px] z-50">
-        <div className="w-full flex flex-row items-center justify-between bg-white">
+        <div className="w-full flex flex-row items-center justify-between bg-white dark:bg-[#0a0a0a]">
           <div className="flex  flex-row items-center justify-center w-[85%]">
             <CustomTabs value={activeTab} onValueChange={handleTabChange}>
               <AgentBuilderTabs

@@ -1,160 +1,268 @@
 "use client";
 
-import { useState } from "react";
-import { useAppSelector } from "@/store";
-
-interface Message {
-  id: string;
-  type: "ai" | "user";
-  content: string | React.ReactNode;
-  delay?: string;
-}
-
-const dummyMessages: Message[] = [
-  {
-    id: "1",
-    type: "ai",
-    content:
-      "Hello! I'm ready to help you with your tasks. What would you like to work on today?",
-    delay: "duration-500",
-  },
-  {
-    id: "2",
-    type: "user",
-    content: "Can you help me analyze this data?",
-    delay: "duration-500 delay-150",
-  },
-  {
-    id: "3",
-    type: "ai",
-    content:
-      "Absolutely. Please share the data or describe what you're looking for, and I'll do my best to assist you.",
-    delay: "duration-500 delay-300",
-  },
-  {
-    id: "4",
-    type: "user",
-    content:
-      "Here is the dataset about customer churn. I want to understand the main factors.",
-    delay: "duration-500",
-  },
-  {
-    id: "5",
-    type: "ai",
-    content: (
-      <div>
-        I can help with that. Based on typical churn analysis, we should look
-        at:
-        <ul className="list-disc list-inside mt-2 space-y-1">
-          <li>Customer tenure</li>
-          <li>Service usage patterns</li>
-          <li>Support ticket history</li>
-          <li>Contract terms</li>
-        </ul>
-        <br />
-        Let me process the file you uploaded.
-      </div>
-    ),
-    delay: "duration-500",
-  },
-  {
-    id: "6",
-    type: "user",
-    content:
-      "That sounds like a good plan. Also check for pricing sensitivity.",
-    delay: "duration-500",
-  },
-  {
-    id: "7",
-    type: "ai",
-    content:
-      "Noted. I'll include pricing sensitivity in the analysis. I'm running a correlation matrix now to see how price changes affected retention rates over the last 12 months.\n\nIt seems there is a strong correlation between price increases 10% and churn in the \"Basic\" tier.",
-    delay: "duration-500",
-  },
-  {
-    id: "8",
-    type: "user",
-    content: 'Interesting. What about the "Pro" tier?',
-    delay: "duration-500",
-  },
-  {
-    id: "9",
-    type: "ai",
-    content:
-      'The "Pro" tier shows much higher resilience to price changes. Churn only increased slightly even with a 15% price hike. This suggests "Pro" users value the features more highly or are less price-sensitive.',
-    delay: "duration-500",
-  },
-];
+import { useState, useRef, useEffect } from "react";
+import { useAppSelector, useAppDispatch } from "@/store";
+import { ArrowUp } from "lucide-react";
+import { addMessage, setIsTyping } from "@/store/reducers/agentChatSlice";
+import { connectAiSocket, disconnectAiSocket } from "@/lib/aiSocket";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
 
 export default function MainChatSpace() {
-  const [messages] = useState<Message[]>(dummyMessages);
-  const { primary_color, secondary_color, text_color, placeholder_text } =
-    useAppSelector((state) => state.agentChat);
-  const [isHovered, setIsHovered] = useState(false);
+  const {
+    agent_id,
+    chat_session_id,
+    primary_color,
+    secondary_color,
+    text_color,
+    placeholder_text,
+    conversation_chain,
+    isFetching,
+    chatMode,
+  } = useAppSelector((state) => state.agentChat);
+
+  const dispatch = useAppDispatch();
+  const [inputValue, setInputValue] = useState("");
+  const [newMessageAnimating, setNewMessageAnimating] = useState(false);
+  const [socket, setSocket] = useState<any>(null);
+  const [streamingMessage, setStreamingMessage] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Connect socket on mount, disconnect on unmount, and handle visitor connection
+  useEffect(() => {
+    // Only connect socket after API processing is complete
+    if (isFetching) {
+      return;
+    }
+
+    // Connect the AI socket and store the instance
+    const socketInstance = connectAiSocket();
+    setSocket(socketInstance);
+
+    const handleConnect = () => {
+      // Send atlas-visitor-connected event if both agent_id and chat_session_id are truthy
+      if (agent_id && chat_session_id) {
+        socketInstance.emit("atlas-visitor-connected", {
+          agent_id,
+          chat_session_id,
+        });
+      }
+    };
+
+    // Listen for connection event
+    socketInstance.on("connect", handleConnect);
+
+    // Listen for response chunks
+    const handleResponseChunk = (data: {
+      chunk: string;
+      done: boolean;
+      full_response?: string;
+      message_id?: string;
+      created_at?: string;
+      role?: string;
+    }) => {
+      if (data.done) {
+        const newMessage = {
+          message_id: data.message_id || crypto.randomUUID(),
+          role: (data.role as "user" | "agent" | "human") || "agent",
+          content: data.full_response || streamingMessage,
+          created_at: data.created_at || new Date().toISOString(),
+        };
+        dispatch(addMessage(newMessage));
+        setStreamingMessage("");
+        dispatch(setIsTyping(false));
+      } else {
+        if (streamingMessage === "") {
+          dispatch(setIsTyping(false));
+        }
+        setStreamingMessage((prev) => prev + data.chunk);
+      }
+    };
+
+    socketInstance.on("atlas_response_chunk", handleResponseChunk);
+
+    // If socket is already connected, emit the event
+    if (socketInstance.connected && agent_id && chat_session_id) {
+      socketInstance.emit("atlas-visitor-connected", {
+        agent_id,
+        chat_session_id,
+      });
+    }
+
+    // Cleanup: disconnect socket when component unmounts
+    return () => {
+      socketInstance.off("connect", handleConnect);
+      socketInstance.off("atlas_response_chunk", handleResponseChunk);
+      disconnectAiSocket();
+      setSocket(null);
+    };
+  }, [agent_id, chat_session_id, isFetching]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    if (!conversation_chain.length) return;
+
+    const lastRole = conversation_chain[conversation_chain.length - 1]?.role;
+    if (lastRole === "user") {
+      scrollToBottom();
+    }
+  }, [conversation_chain]);
+
+  useEffect(() => {
+    if (newMessageAnimating) {
+      const timer = setTimeout(() => setNewMessageAnimating(false), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [newMessageAnimating]);
+
+  const handleSendMessage = () => {
+    if (inputValue.trim() === "") return;
+
+    if (chatMode === "ai") {
+      dispatch(setIsTyping(true));
+    }
+
+    const newMessage = {
+      message_id: crypto.randomUUID(),
+      role: "user" as const,
+      content: inputValue.trim(),
+      created_at: new Date().toISOString(),
+    };
+
+    dispatch(addMessage(newMessage));
+
+    if (socket) {
+      socket.emit("atlas-visitor-message", {
+        agent_id,
+        message: inputValue.trim(),
+      });
+    }
+
+    setNewMessageAnimating(true);
+    setInputValue("");
+
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "40px";
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputValue(e.target.value);
+
+    // Auto-resize textarea based on content
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      const scrollHeight = textareaRef.current.scrollHeight;
+      const lineHeight = 20; // Approximate line height in pixels
+      const maxHeight = lineHeight * 5; // Max 5 rows
+
+      textareaRef.current.style.height = `${Math.min(
+        scrollHeight,
+        maxHeight
+      )}px`;
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="px-[16px] flex-1 overflow-y-auto py-4 space-y-6 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent min-h-0">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex gap-3 ${
-              message.type === "user" ? "flex-row-reverse" : ""
-            }`}
-          >
-            <div
-              className={`flex-1 space-y-1 ${
-                message.type === "user" ? "text-right" : ""
-              }`}
-            >
-              {message.type === "ai" ? (
-                <div className="text-[13px] text-gray-600 leading-relaxed">
-                  {message.content}
-                </div>
-              ) : (
+      <div className="flex-1 overflow-y-auto">
+        <div className="flex flex-col min-h-full">
+          <div className="flex-grow"></div>
+          <div className="pl-[18px] pr-[16px] font-[600] py-4 space-y-6">
+            {conversation_chain.map((message, index) => (
+              <div
+                key={message.message_id}
+                className={`flex gap-3 ${
+                  message.role === "user" ? "flex-row-reverse" : ""
+                }`}
+              >
                 <div
-                  className="inline-block rounded-2xl px-[14px] py-[12px] text-[13px] text-white text-left shadow-sm font-[500]"
-                  style={{
-                    backgroundColor: primary_color,
-                    color: text_color,
-                  }}
+                  className={`flex-1 space-y-1 ${
+                    message.role === "user" ? "text-right" : ""
+                  }`}
                 >
-                  {message.content}
+                  {message.role === "agent" || message.role === "human" ? (
+                    <div className="text-[13px] text-gray-600 leading-relaxed">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeHighlight]}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div
+                      className={`inline-block rounded-2xl px-[14px] py-[12px] text-[13px] text-white text-left shadow-sm max-w-[85%] transition-all duration-200 ${
+                        message.role === "user" &&
+                        index === conversation_chain.length - 1 &&
+                        newMessageAnimating
+                          ? "opacity-0 translate-y-2"
+                          : "opacity-100 translate-y-0"
+                      }`}
+                      style={{
+                        backgroundColor: primary_color,
+                        color: text_color,
+                        wordBreak: "break-word",
+                        overflowWrap: "anywhere",
+                      }}
+                    >
+                      {message.content}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            ))}
+            {streamingMessage && (
+              <div className="flex gap-3">
+                <div className="flex-1 space-y-1">
+                  <div className="text-[13px] text-gray-600 leading-relaxed">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeHighlight]}
+                    >
+                      {streamingMessage}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
-        ))}
+        </div>
       </div>
 
       <div className="flex-shrink-0 pt-[6px] pb-[10px] px-[12px]">
-        <div className="px-[10px] relative flex items-end gap-2 bg-white border border-gray-200 rounded-xl shadow-sm transition-all py-2">
+        <div className="pr-[10px] relative flex items-end gap-2 bg-white border border-gray-200 rounded-xl shadow-sm transition-all py-2">
           <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors mb-0.5"></button>
           <textarea
+            ref={textareaRef}
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
             placeholder={placeholder_text}
-            className="w-full max-h-16 py-1.5 bg-transparent text-[13px] text-gray-800 placeholder-gray-400 focus:outline-none resize-none overflow-y-auto"
+            className="font-[500] w-full py-1.5 bg-transparent text-[13px] text-gray-800 placeholder-gray-400 focus:outline-none resize-none overflow-y-auto"
             rows={1}
-            style={{ minHeight: "24px" }}
+            style={{ minHeight: "40px", maxHeight: "100px" }}
           />
           <button
-            className="p-1.5 text-white bg-black text-white rounded-lg transition-colors shadow-sm mb-0.5 cursor-pointer"
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
+            className="p-1.5 text-white bg-black rounded-lg transition-colors shadow-sm mb-[-2px] mr-[-2px]  cursor-pointer"
+            onClick={handleSendMessage}
+            style={{ background: primary_color }}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M5 12h14" />
-              <path d="m12 5 7 7-7 7" />
-            </svg>
+            <ArrowUp size={14} style={{ color: text_color }} />
           </button>
         </div>
       </div>
