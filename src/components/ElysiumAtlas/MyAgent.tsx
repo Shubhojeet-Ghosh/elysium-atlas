@@ -24,6 +24,12 @@ import {
   setKnowledgeBaseQnA,
   setTriggerGetAgentDetails,
 } from "@/store/reducers/agentSlice";
+import {
+  setChatSessionId,
+  setAgentId,
+  setConversationChain,
+  resetAgentChat,
+} from "@/store/reducers/agentChatSlice";
 import { mapInitialAgentDetails } from "@/utils/mapInitialAgentDetails";
 import fastApiAxios from "@/utils/fastapi_axios";
 import { isEquivalent, normalizeValue } from "@/utils/comparisonUtils";
@@ -274,6 +280,9 @@ export default function MyAgent({
   }, [searchParams, router]);
 
   const handlePreview = () => {
+    // Reset chat state before opening preview
+    dispatch(resetAgentChat());
+
     const chatSessionId = "app-" + crypto.randomUUID();
     const url = `/chat-with-agent?agent_id=${agentID}&chat_session_id=${chatSessionId}`;
     window.open(url, "_blank");

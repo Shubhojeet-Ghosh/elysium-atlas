@@ -1,25 +1,24 @@
-"use client";
-
 import { useAppSelector, useAppDispatch } from "@/store";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import ChatHeader from "./ChatHeader";
 import MainChatSpace from "./MainChatSpace";
 import ChatFooter from "./ChatFooter";
 import fastApiAxios from "@/utils/fastapi_axios";
-import { store } from "@/store";
 import {
   setAgentFields,
   setIsFetching,
   setConversationChain,
   addMessage,
 } from "@/store/reducers/agentChatSlice";
+import { set } from "nprogress";
 
 export default function AgentChatSpace() {
-  const { agent_id, chat_session_id } = useAppSelector(
+  const { agent_id, chat_session_id, visitor_at } = useAppSelector(
     (state) => state.agentChat
   );
 
   const dispatch = useAppDispatch();
+  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -39,6 +38,7 @@ export default function AgentChatSpace() {
             "agent_status",
           ],
           chat_session_id: chat_session_id,
+          visitor_at: visitor_at,
           source: "web",
         };
 
@@ -52,8 +52,9 @@ export default function AgentChatSpace() {
         if (agentData.success === true) {
           const agentFields = agentData.agent_fields || {};
           const chat_session_data = agentData.chat_session_data || {};
+          const sessionMessages = chat_session_data.messages;
 
-          store.dispatch(
+          dispatch(
             setAgentFields({
               agent_name:
                 chat_session_data.agent_name || agentFields.agent_name || "",
@@ -68,21 +69,12 @@ export default function AgentChatSpace() {
             })
           );
 
-          if (chat_session_data && chat_session_data.conversation_chain) {
-            store.dispatch(
-              setConversationChain(chat_session_data.conversation_chain)
-            );
+          if (Array.isArray(sessionMessages) && sessionMessages.length > 0) {
+            dispatch(setConversationChain(sessionMessages));
           } else {
             const welcomeMessage = agentFields.welcome_message || "";
             if (welcomeMessage) {
-              store.dispatch(
-                addMessage({
-                  message_id: crypto.randomUUID(),
-                  role: "agent",
-                  content: welcomeMessage,
-                  created_at: new Date().toISOString(),
-                })
-              );
+              dispatch(setConversationChain([])); // Ensure conversation chain is empty
             }
           }
         } else {
@@ -95,10 +87,11 @@ export default function AgentChatSpace() {
       }
     };
 
-    if (agent_id) {
+    if (agent_id && chat_session_id && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
       fetchData();
     }
-  }, [agent_id, dispatch]);
+  }, [agent_id, chat_session_id, visitor_at, dispatch]);
 
   return (
     <>

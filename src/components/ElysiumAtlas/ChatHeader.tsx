@@ -33,9 +33,9 @@ export default function ChatHeader() {
           <Image
             src={agent_icon}
             alt={agent_name || "Agent"}
-            width={108}
-            height={108}
-            className="rounded-full w-[32px] h-[32px] object-cover"
+            width={32}
+            height={32}
+            className="rounded-full w-[30px] h-[30px] object-cover"
             quality={100}
           />
         ) : (

@@ -23,3 +23,38 @@ export const formatDateTime12hr = (dateString: string) => {
     hour12: true,
   });
 };
+
+// Formats timestamp for chat messages with relative dates
+export const formatChatTimestamp = (dateString: string) => {
+  let cleaned = dateString.replace(/\.(\d{3})\d+$/, ".$1");
+  if (!cleaned.endsWith("Z")) cleaned += "Z";
+  const utcDate = new Date(cleaned);
+  const localDate = new Date(utcDate.toLocaleString());
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const messageDate = new Date(
+    localDate.getFullYear(),
+    localDate.getMonth(),
+    localDate.getDate()
+  );
+
+  const diffTime = today.getTime() - messageDate.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  const hours = localDate.getHours().toString().padStart(2, "0");
+  const minutes = localDate.getMinutes().toString().padStart(2, "0");
+
+  if (diffDays === 0) {
+    // Today
+    return `Today ${hours}:${minutes}`;
+  } else if (diffDays === 1) {
+    // Yesterday
+    return `Yesterday ${hours}:${minutes}`;
+  } else {
+    // Older dates
+    const month = localDate.toLocaleDateString(undefined, { month: "short" });
+    const day = localDate.getDate();
+    return `${month}, ${day} ${hours}:${minutes}`;
+  }
+};

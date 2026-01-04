@@ -3,11 +3,19 @@
 import { useState, useRef, useEffect } from "react";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { ArrowUp } from "lucide-react";
-import { addMessage, setIsTyping } from "@/store/reducers/agentChatSlice";
+import {
+  addMessage,
+  setIsTyping,
+  resetAgentChat,
+} from "@/store/reducers/agentChatSlice";
 import { connectAiSocket, disconnectAiSocket } from "@/lib/aiSocket";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
+import ChatWelcomeMessage from "./ChatWelcomeMessage";
+import SkeletonMessages from "./SkeletonMessages";
+import Thinking from "./Thinking";
+import { formatChatTimestamp } from "@/utils/formatDate";
 
 export default function MainChatSpace() {
   const {
@@ -20,6 +28,7 @@ export default function MainChatSpace() {
     conversation_chain,
     isFetching,
     chatMode,
+    isTyping,
   } = useAppSelector((state) => state.agentChat);
 
   const dispatch = useAppDispatch();
@@ -29,6 +38,13 @@ export default function MainChatSpace() {
   const [streamingMessage, setStreamingMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Reset chat state on unmount
+  useEffect(() => {
+    return () => {
+      dispatch(resetAgentChat());
+    };
+  }, [dispatch]);
 
   // Connect socket on mount, disconnect on unmount, and handle visitor connection
   useEffect(() => {
@@ -120,18 +136,22 @@ export default function MainChatSpace() {
     }
   }, [newMessageAnimating]);
 
-  const handleSendMessage = () => {
-    if (inputValue.trim() === "") return;
+  // Scroll to bottom on initial mount
+  useEffect(() => {
+    scrollToBottom();
+  }, []);
 
-    if (chatMode === "ai") {
-      dispatch(setIsTyping(true));
-    }
+  const handleSendMessage = (message?: string) => {
+    const msg = message || inputValue.trim();
+    if (msg === "") return;
+
+    const user_message_created_at = new Date().toISOString();
 
     const newMessage = {
       message_id: crypto.randomUUID(),
       role: "user" as const,
-      content: inputValue.trim(),
-      created_at: new Date().toISOString(),
+      content: msg,
+      created_at: user_message_created_at,
     };
 
     dispatch(addMessage(newMessage));
@@ -139,8 +159,14 @@ export default function MainChatSpace() {
     if (socket) {
       socket.emit("atlas-visitor-message", {
         agent_id,
-        message: inputValue.trim(),
+        message: msg,
+        chat_session_id,
+        created_at: user_message_created_at,
       });
+
+      if (chatMode === "ai") {
+        dispatch(setIsTyping(true));
+      }
     }
 
     setNewMessageAnimating(true);
@@ -181,70 +207,95 @@ export default function MainChatSpace() {
       <div className="flex-1 overflow-y-auto">
         <div className="flex flex-col min-h-full">
           <div className="flex-grow"></div>
-          <div className="pl-[18px] pr-[16px] font-[600] py-4 space-y-6">
-            {conversation_chain.map((message, index) => (
-              <div
-                key={message.message_id}
-                className={`flex gap-3 ${
-                  message.role === "user" ? "flex-row-reverse" : ""
-                }`}
-              >
+          {isFetching ? (
+            <SkeletonMessages />
+          ) : conversation_chain.length === 0 ? (
+            <ChatWelcomeMessage
+              handleSendMessage={handleSendMessage}
+              setInputValue={setInputValue}
+            />
+          ) : (
+            <div className="pl-[18px] pr-[16px] font-[600] py-4 space-y-6">
+              {conversation_chain.map((message, index) => (
                 <div
-                  className={`flex-1 space-y-1 ${
-                    message.role === "user" ? "text-right" : ""
+                  key={message.message_id}
+                  className={`flex gap-3 ${
+                    message.role === "user" ? "flex-row-reverse" : ""
                   }`}
                 >
-                  {message.role === "agent" || message.role === "human" ? (
+                  <div
+                    className={`flex-1 space-y-1 ${
+                      message.role === "user" ? "text-right" : ""
+                    }`}
+                  >
+                    {message.role === "agent" || message.role === "human" ? (
+                      <div className="text-[13px] text-gray-600 leading-relaxed">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeHighlight]}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <div
+                        className={`inline-block rounded-2xl px-[14px] py-[12px] text-[13px] text-white text-left shadow-sm max-w-[85%] transition-all duration-200 ${
+                          message.role === "user" &&
+                          index === conversation_chain.length - 1 &&
+                          newMessageAnimating
+                            ? "opacity-0 translate-y-2"
+                            : "opacity-100 translate-y-0"
+                        }`}
+                        style={{
+                          backgroundColor: primary_color,
+                          color: text_color,
+                          wordBreak: "break-word",
+                          overflowWrap: "anywhere",
+                        }}
+                      >
+                        {message.content}
+                      </div>
+                    )}
+                    <div
+                      className={`text-[10px] text-gray-400 mt-1 ${
+                        message.role === "user" ? "text-right" : "text-left"
+                      }`}
+                    >
+                      {formatChatTimestamp(message.created_at)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {isTyping && (
+                <div className="mt-[4px]">
+                  <Thinking />
+                </div>
+              )}
+              {streamingMessage && (
+                <div className="flex gap-3">
+                  <div className="flex-1 space-y-1">
                     <div className="text-[13px] text-gray-600 leading-relaxed">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeHighlight]}
                       >
-                        {message.content}
+                        {streamingMessage}
                       </ReactMarkdown>
                     </div>
-                  ) : (
-                    <div
-                      className={`inline-block rounded-2xl px-[14px] py-[12px] text-[13px] text-white text-left shadow-sm max-w-[85%] transition-all duration-200 ${
-                        message.role === "user" &&
-                        index === conversation_chain.length - 1 &&
-                        newMessageAnimating
-                          ? "opacity-0 translate-y-2"
-                          : "opacity-100 translate-y-0"
-                      }`}
-                      style={{
-                        backgroundColor: primary_color,
-                        color: text_color,
-                        wordBreak: "break-word",
-                        overflowWrap: "anywhere",
-                      }}
-                    >
-                      {message.content}
+                    <div className="text-[10px] text-gray-400 mt-1 text-left">
+                      {formatChatTimestamp(new Date().toISOString())}
                     </div>
-                  )}
-                </div>
-              </div>
-            ))}
-            {streamingMessage && (
-              <div className="flex gap-3">
-                <div className="flex-1 space-y-1">
-                  <div className="text-[13px] text-gray-600 leading-relaxed">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeHighlight]}
-                    >
-                      {streamingMessage}
-                    </ReactMarkdown>
                   </div>
                 </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="flex-shrink-0 pt-[6px] pb-[10px] px-[12px]">
+      <div className="flex-shrink-0 pt-[6px] pb-[6px] px-[12px]">
         <div className="pr-[10px] relative flex items-end gap-2 bg-white border border-gray-200 rounded-xl shadow-sm transition-all py-2">
           <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors mb-0.5"></button>
           <textarea
@@ -258,11 +309,16 @@ export default function MainChatSpace() {
             style={{ minHeight: "40px", maxHeight: "100px" }}
           />
           <button
-            className="p-1.5 text-white bg-black rounded-lg transition-colors shadow-sm mb-[-2px] mr-[-2px]  cursor-pointer"
-            onClick={handleSendMessage}
+            className={`p-1.5 text-white bg-black rounded-lg transition-all duration-300 shadow-sm mb-[-2px] mr-[-2px] ${
+              inputValue.trim() === ""
+                ? "cursor-not-allowed opacity-10 "
+                : "cursor-pointer"
+            }`}
+            onClick={() => handleSendMessage()}
+            disabled={inputValue.trim() === ""}
             style={{ background: primary_color }}
           >
-            <ArrowUp size={14} style={{ color: text_color }} />
+            <ArrowUp size={16} style={{ color: text_color }} />
           </button>
         </div>
       </div>
