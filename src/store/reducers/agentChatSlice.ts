@@ -20,6 +20,7 @@ interface AgentChatState {
   text_color: string;
   quick_prompts: string[];
   agent_status: string;
+  visitor_at: string | null;
   isFetching: boolean;
   isAgentOpen: boolean;
   conversation_chain: Message[];
@@ -40,6 +41,7 @@ const initialState: AgentChatState = {
   text_color: "",
   quick_prompts: [],
   agent_status: "",
+  visitor_at: null,
   isFetching: false,
   isAgentOpen: false,
   conversation_chain: [],
@@ -90,6 +92,9 @@ const agentChatSlice = createSlice({
     setIsAgentOpen: (state, action: PayloadAction<boolean>) => {
       state.isAgentOpen = action.payload;
     },
+    setVisitorAt: (state, action: PayloadAction<string | null>) => {
+      state.visitor_at = action.payload;
+    },
     setConversationChain: (state, action: PayloadAction<Message[]>) => {
       state.conversation_chain = action.payload;
     },
@@ -115,6 +120,7 @@ const agentChatSlice = createSlice({
       state.text_color = "";
       state.quick_prompts = [];
       state.agent_status = "";
+      state.visitor_at = null;
       state.isFetching = false;
       state.isAgentOpen = false;
       state.conversation_chain = [];
@@ -131,6 +137,7 @@ export const {
   setAgentFields,
   setIsFetching,
   setIsAgentOpen,
+  setVisitorAt,
   setConversationChain,
   addMessage,
   setChatMode,

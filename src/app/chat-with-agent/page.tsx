@@ -8,6 +8,7 @@ import {
   setChatSessionId,
   setTheme,
   setConversationChain,
+  setVisitorAt,
 } from "@/store/reducers/agentChatSlice";
 import AgentChatSpace from "@/components/ElysiumAtlas/AgentChatSpace";
 
@@ -21,6 +22,7 @@ export default function ChatWithAgent() {
   const agentIdParam = searchParams.get("agent_id");
   const chatSessionIdParam = searchParams.get("chat_session_id");
   const themeParam = searchParams.get("theme") as "light" | "dark" | null;
+  const sourceParam = searchParams.get("source");
 
   useEffect(() => {
     if (agentIdParam) {
@@ -33,8 +35,6 @@ export default function ChatWithAgent() {
   }, [agentIdParam, dispatch]);
 
   useEffect(() => {
-    // Clear conversation history for new session
-    dispatch(setConversationChain([]));
     if (chatSessionIdParam) {
       dispatch(setChatSessionId(chatSessionIdParam));
     } else {
@@ -48,6 +48,14 @@ export default function ChatWithAgent() {
     const theme = themeParam === "dark" ? "dark" : "light";
     dispatch(setTheme(theme));
   }, [themeParam, dispatch]);
+
+  useEffect(() => {
+    if (sourceParam) {
+      dispatch(setVisitorAt(sourceParam));
+    } else {
+      dispatch(setVisitorAt(null));
+    }
+  }, [sourceParam, dispatch]);
 
   return agent_id && chat_session_id && <AgentChatSpace />;
 }
