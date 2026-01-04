@@ -7,6 +7,7 @@ import {
   setAgentId,
   setChatSessionId,
   setTheme,
+  setConversationChain,
 } from "@/store/reducers/agentChatSlice";
 import AgentChatSpace from "@/components/ElysiumAtlas/AgentChatSpace";
 
@@ -32,6 +33,8 @@ export default function ChatWithAgent() {
   }, [agentIdParam, dispatch]);
 
   useEffect(() => {
+    // Clear conversation history for new session
+    dispatch(setConversationChain([]));
     if (chatSessionIdParam) {
       dispatch(setChatSessionId(chatSessionIdParam));
     } else {

@@ -6,9 +6,13 @@ import ChatHeader from "./ChatHeader";
 import MainChatSpace from "./MainChatSpace";
 import ChatFooter from "./ChatFooter";
 import fastApiAxios from "@/utils/fastapi_axios";
-import Cookies from "js-cookie";
 import { store } from "@/store";
-import { setAgentFields, setIsFetching } from "@/store/reducers/agentChatSlice";
+import {
+  setAgentFields,
+  setIsFetching,
+  setConversationChain,
+  addMessage,
+} from "@/store/reducers/agentChatSlice";
 
 export default function AgentChatSpace() {
   const { agent_id, chat_session_id } = useAppSelector(
@@ -21,8 +25,6 @@ export default function AgentChatSpace() {
     const fetchData = async () => {
       dispatch(setIsFetching(true));
       try {
-        const sessionToken = Cookies.get("elysium_atlas_session_token");
-
         const payload = {
           agent_id: agent_id,
           fields: [
@@ -65,6 +67,24 @@ export default function AgentChatSpace() {
               agent_status: agentFields.agent_status || "",
             })
           );
+
+          if (chat_session_data && chat_session_data.conversation_chain) {
+            store.dispatch(
+              setConversationChain(chat_session_data.conversation_chain)
+            );
+          } else {
+            const welcomeMessage = agentFields.welcome_message || "";
+            if (welcomeMessage) {
+              store.dispatch(
+                addMessage({
+                  message_id: crypto.randomUUID(),
+                  role: "agent",
+                  content: welcomeMessage,
+                  created_at: new Date().toISOString(),
+                })
+              );
+            }
+          }
         } else {
           console.warn("API response indicates failure:", agentData);
         }

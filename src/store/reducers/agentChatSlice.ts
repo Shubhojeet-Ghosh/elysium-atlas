@@ -1,5 +1,12 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
+interface Message {
+  message_id: string;
+  role: "user" | "agent" | "human";
+  content: string;
+  created_at: string;
+}
+
 interface AgentChatState {
   chat_session_id: string;
   agent_id: string;
@@ -15,6 +22,9 @@ interface AgentChatState {
   agent_status: string;
   isFetching: boolean;
   isAgentOpen: boolean;
+  conversation_chain: Message[];
+  chatMode: "human" | "ai";
+  isTyping: boolean;
 }
 
 const initialState: AgentChatState = {
@@ -32,6 +42,9 @@ const initialState: AgentChatState = {
   agent_status: "",
   isFetching: false,
   isAgentOpen: false,
+  conversation_chain: [],
+  chatMode: "ai",
+  isTyping: false,
 };
 
 const agentChatSlice = createSlice({
@@ -77,6 +90,18 @@ const agentChatSlice = createSlice({
     setIsAgentOpen: (state, action: PayloadAction<boolean>) => {
       state.isAgentOpen = action.payload;
     },
+    setConversationChain: (state, action: PayloadAction<Message[]>) => {
+      state.conversation_chain = action.payload;
+    },
+    addMessage: (state, action: PayloadAction<Message>) => {
+      state.conversation_chain.push(action.payload);
+    },
+    setChatMode: (state, action: PayloadAction<"human" | "ai">) => {
+      state.chatMode = action.payload;
+    },
+    setIsTyping: (state, action: PayloadAction<boolean>) => {
+      state.isTyping = action.payload;
+    },
     resetAgentChat: (state) => {
       state.chat_session_id = "";
       state.agent_id = "";
@@ -92,6 +117,9 @@ const agentChatSlice = createSlice({
       state.agent_status = "";
       state.isFetching = false;
       state.isAgentOpen = false;
+      state.conversation_chain = [];
+      state.chatMode = "ai";
+      state.isTyping = false;
     },
   },
 });
@@ -103,6 +131,10 @@ export const {
   setAgentFields,
   setIsFetching,
   setIsAgentOpen,
+  setConversationChain,
+  addMessage,
+  setChatMode,
+  setIsTyping,
   resetAgentChat,
 } = agentChatSlice.actions;
 
