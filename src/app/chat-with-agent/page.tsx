@@ -10,6 +10,7 @@ import {
   setTheme,
   setConversationChain,
   setVisitorAt,
+  setIsAgentOpen,
 } from "@/store/reducers/agentChatSlice";
 import AgentChatSpace from "@/components/ElysiumAtlas/AgentChatSpace";
 
@@ -57,6 +58,16 @@ export default function ChatWithAgent() {
       dispatch(setVisitorAt(null));
     }
   }, [sourceParam, dispatch]);
+
+  useEffect(() => {
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data.type === "open_chat") {
+        dispatch(setIsAgentOpen(true));
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [dispatch]);
 
   return agent_id && chat_session_id && <AgentChatSpace />;
 }

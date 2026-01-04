@@ -52,6 +52,25 @@ export default function MainChatSpace() {
     };
   }, [dispatch]);
 
+  // Intercept link clicks and open in parent window
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const link = target.closest("a");
+
+      if (link && link.href && !link.href.startsWith("javascript:")) {
+        e.preventDefault();
+        window.parent.postMessage(
+          { type: "navigate_link", url: link.href },
+          "*" // Use specific origin in production
+        );
+      }
+    };
+
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, []);
+
   // Connect socket on mount, disconnect on unmount, and handle visitor connection
   useEffect(() => {
     // Only connect socket after API processing is complete

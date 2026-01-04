@@ -21,6 +21,11 @@ export default function ChatHeader() {
     text_color,
   } = useAppSelector((state) => state.agentChat);
   const dispatch = useAppDispatch();
+
+  const handleClose = () => {
+    dispatch(setIsAgentOpen(false));
+    window.parent.postMessage({ type: "close_chat" }, "*");
+  };
   return (
     <div
       className="flex items-center justify-between px-[16px] py-[8px] rounded-t-[16px]"
@@ -63,7 +68,7 @@ export default function ChatHeader() {
             <TooltipTrigger asChild>
               <button
                 className="p-1.5 text-gray-400 hover:outline-[2px] outline-gray-100 rounded-full transition-colors cursor-pointer"
-                onClick={() => dispatch(setIsAgentOpen(false))}
+                onClick={handleClose}
               >
                 <X size={14} color={text_color} />
               </button>
