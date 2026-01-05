@@ -6,6 +6,7 @@ import { homePageStructuredData } from "@/components/SEO/structuredDataConfig";
 import { GridPattern } from "@/components/ui/shadcn-io/grid-pattern";
 import { cn } from "@/lib/utils";
 import RemoveDarkMode from "@/components/RemoveDarkMode";
+import Script from "next/script";
 
 // Export metadata for Next.js
 export const metadata = homePageMetadata;
@@ -59,6 +60,10 @@ export default function Home() {
           <div className="relative z-20 bg-transparent text-deep-onyx"></div>
         </main>
       </div>
+      <Script
+        src="https://cdn.sgdevstudio.in/widget/v0.0.3/widget.js?agent_id=695c3cd289c5797e0f344593"
+        strategy="afterInteractive"
+      />
     </>
   );
 }
