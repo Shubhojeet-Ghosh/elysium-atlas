@@ -10,6 +10,14 @@ const nextConfig: NextConfig = {
         hostname: "cdn.sgdevstudio.in",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "**",
+      },
+      {
+        protocol: "http",
+        hostname: "**",
+      },
     ],
     qualities: [75, 100],
   },
