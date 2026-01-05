@@ -18,30 +18,38 @@ const MessageActions = memo(
 
     const handleCopy = useCallback(async () => {
       try {
-        // Modern approach - works on most modern browsers
+        // Try modern approach first, but catch if blocked by permissions policy
         if (navigator.clipboard && window.isSecureContext) {
-          await navigator.clipboard.writeText(content);
-          setIsCopied(true);
-          setTimeout(() => setIsCopied(false), 2000);
-        } else {
-          // Fallback for older browsers or non-HTTPS
-          const textArea = document.createElement("textarea");
-          textArea.value = content;
-          textArea.style.position = "fixed";
-          textArea.style.left = "-999999px";
-          textArea.style.top = "-999999px";
-          document.body.appendChild(textArea);
-          textArea.focus();
-          textArea.select();
           try {
-            document.execCommand("copy");
+            await navigator.clipboard.writeText(content);
             setIsCopied(true);
             setTimeout(() => setIsCopied(false), 2000);
-          } catch (err) {
-            console.error("Failed to copy text: ", err);
-          } finally {
-            textArea.remove();
+            return;
+          } catch (clipboardError) {
+            // Clipboard API failed (likely due to iframe permissions), fall back to legacy method
+            console.warn(
+              "Clipboard API blocked, falling back to document.execCommand"
+            );
           }
+        }
+
+        // Fallback for older browsers or when clipboard API is blocked
+        const textArea = document.createElement("textarea");
+        textArea.value = content;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+          document.execCommand("copy");
+          setIsCopied(true);
+          setTimeout(() => setIsCopied(false), 2000);
+        } catch (err) {
+          console.error("Failed to copy text: ", err);
+        } finally {
+          textArea.remove();
         }
       } catch (err) {
         console.error("Failed to copy text: ", err);
