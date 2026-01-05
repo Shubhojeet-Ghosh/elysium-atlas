@@ -212,6 +212,7 @@ export default function SetKnowledgeBase({
       );
 
       if (response.data.success === true) {
+        toast.success("Setting up your agent... This may take a few minutes.");
         router.push(`/my-agents/${response.data.agent_id}`);
       } else {
         toast.error(response.data.message || "Failed to build agent");
