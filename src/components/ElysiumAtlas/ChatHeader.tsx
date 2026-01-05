@@ -28,7 +28,7 @@ export default function ChatHeader() {
   };
   return (
     <div
-      className="flex items-center justify-between px-[16px] py-[8px] rounded-t-[16px]"
+      className="flex items-center justify-between px-[16px] py-[8px] lg:rounded-t-[16px] md:rounded-t-none rounded-t-none"
       style={{ backgroundColor: primary_color }}
     >
       <div className="flex items-center gap-[10px]">

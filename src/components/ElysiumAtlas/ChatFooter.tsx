@@ -10,7 +10,7 @@ export default function ChatFooter() {
 
   return (
     <div
-      className="flex justify-center rounded-b-[16px] py-[8px] border-t border-gray-100"
+      className="flex justify-center lg:rounded-b-[16px] md:rounded-b-none rounded-b-none py-[8px] border-t border-gray-100"
       style={{ backgroundColor: primary_color }}
     >
       <span

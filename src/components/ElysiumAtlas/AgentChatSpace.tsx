@@ -96,7 +96,7 @@ export default function AgentChatSpace() {
   return (
     <>
       <div className="h-[100dvh] w-full flex items-center justify-center bg-indigo-50">
-        <div className="lg:w-[440px] lg:h-[580px] md:w-full md:h-[100dvh] w-full h-[100dvh] shadow-lg rounded-[16px] bg-white">
+        <div className="lg:w-[440px] lg:h-[580px] md:w-full md:h-[100dvh] w-full h-[100dvh] shadow-lg lg:rounded-[16px] md:rounded-none rounded-none  bg-white">
           <div className="flex flex-col h-full w-full">
             <ChatHeader />
             <MainChatSpace />
