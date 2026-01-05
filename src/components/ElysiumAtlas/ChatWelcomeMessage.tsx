@@ -13,14 +13,19 @@ const ChatWelcomeMessage: React.FC<ChatWelcomeMessageProps> = ({
   handleSendMessage,
   setInputValue,
 }) => {
-  const { agent_icon, welcome_message, quick_prompts } = useAppSelector(
-    (state) => state.agentChat
-  );
+  const {
+    agent_icon,
+    welcome_message,
+    quick_prompts,
+    agent_name,
+    primary_color,
+    text_color,
+  } = useAppSelector((state) => state.agentChat);
 
   return (
     <div className="flex pl-[18px] pr-[16px] h-full min-h-[200px] py-[10px]">
       <div className="text-start max-w-md space-y-4">
-        {agent_icon && (
+        {agent_icon ? (
           <div className="flex">
             <Image
               src={agent_icon}
@@ -30,6 +35,13 @@ const ChatWelcomeMessage: React.FC<ChatWelcomeMessageProps> = ({
               className="w-16 h-16 rounded-full object-cover"
               quality={100}
             />
+          </div>
+        ) : (
+          <div
+            className="w-16 h-16 rounded-full bg-black flex items-center justify-center text-white font-semibold text-lg shadow-sm"
+            style={{ backgroundColor: primary_color, color: text_color }}
+          >
+            {agent_name?.charAt(0)?.toUpperCase() || "A"}
           </div>
         )}
         <div className="text-[14px] text-gray-800 leading-relaxed font-[600]">

@@ -38,7 +38,7 @@
     return chatSessionId;
   }
 
-  function createChatButton(iconUrl) {
+  function createChatButton(iconUrl, agentName, primaryColor, textColor) {
     const button = d.createElement("div");
     button.id = "chat-widget-button";
     button.style.position = "fixed";
@@ -59,14 +59,33 @@
     button.style.pointerEvents = "none";
     button.style.transition = "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)";
 
-    const img = d.createElement("img");
-    img.src = iconUrl;
-    img.alt = "Chat";
-    img.style.width = "100%";
-    img.style.height = "100%";
-    img.style.objectFit = "cover";
+    // Create icon content
+    if (iconUrl) {
+      const img = d.createElement("img");
+      img.src = iconUrl;
+      img.alt = "Chat";
+      img.style.width = "100%";
+      img.style.height = "100%";
+      img.style.objectFit = "cover";
+      button.appendChild(img);
+    } else {
+      // Fallback: show agent's first letter
+      const initialDiv = d.createElement("div");
+      initialDiv.style.width = "100%";
+      initialDiv.style.height = "100%";
+      initialDiv.style.display = "flex";
+      initialDiv.style.alignItems = "center";
+      initialDiv.style.justifyContent = "center";
+      initialDiv.style.fontSize = "18px";
+      initialDiv.style.fontWeight = "600";
+      initialDiv.style.fontFamily =
+        "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      initialDiv.style.color = textColor || "#000000";
+      initialDiv.style.backgroundColor = primaryColor || "#6c5f8d";
+      initialDiv.textContent = agentName?.charAt(0)?.toUpperCase() || "A";
+      button.appendChild(initialDiv);
+    }
 
-    button.appendChild(img);
     d.body.appendChild(button);
 
     // Trigger animation to show button
@@ -207,7 +226,7 @@
           body: JSON.stringify({
             agent_id: agentId,
             chat_session_id: chatSessionId,
-            fields: ["agent_icon"],
+            fields: ["agent_icon", "agent_name", "primary_color", "text_color"],
             visitor_at: pageUrl,
           }),
         }
@@ -246,10 +265,16 @@
 
     const data = await fetchAgentFields(agentId, chatSessionId, pageUrl);
 
-    if (data?.success && data.agent_fields?.agent_icon) {
+    if (data?.success) {
+      // Always create the chat button, with or without icon
+      createChatButton(
+        data.agent_fields?.agent_icon,
+        data.agent_fields?.agent_name,
+        data.agent_fields?.primary_color,
+        data.agent_fields?.text_color
+      );
       // Preload the iframe
       createChatIframe();
-      createChatButton(data.agent_fields.agent_icon);
     }
 
     // Listen for messages from the iframe

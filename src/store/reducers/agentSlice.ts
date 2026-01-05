@@ -24,6 +24,7 @@ interface UserAgentState {
   llmModel: string;
   availableModels: string[];
   triggerGetAgentDetails: number;
+  widget_script: string | null;
 }
 
 const initialState: UserAgentState = {
@@ -44,6 +45,7 @@ const initialState: UserAgentState = {
   llmModel: "",
   availableModels: ["gpt-4o-mini", "gpt-4.1-mini", "gpt-5-nano-2025-08-07"],
   triggerGetAgentDetails: 0,
+  widget_script: null,
 };
 
 const agentSlice = createSlice({
@@ -219,6 +221,9 @@ const agentSlice = createSlice({
     setTriggerGetAgentDetails: (state, action: PayloadAction<number>) => {
       state.triggerGetAgentDetails = action.payload;
     },
+    setWidgetScript: (state, action: PayloadAction<string | null>) => {
+      state.widget_script = action.payload;
+    },
     resetUserAgent: (state) => {
       state.agentName = "";
       state.agentID = "";
@@ -236,6 +241,7 @@ const agentSlice = createSlice({
       state.welcomeMessage = "";
       state.llmModel = "";
       state.triggerGetAgentDetails = 0;
+      state.widget_script = null;
     },
   },
 });
@@ -273,6 +279,7 @@ export const {
   setLlmModel,
   setAvailableModels,
   setTriggerGetAgentDetails,
+  setWidgetScript,
   resetUserAgent,
 } = agentSlice.actions;
 

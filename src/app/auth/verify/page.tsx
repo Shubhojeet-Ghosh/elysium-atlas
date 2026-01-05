@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import nodeExpressAxios from "@/utils/node_express_apis";
+import { getRedirectUrl } from "@/utils/redirectUtils";
 import Link from "next/link";
 import Logo from "@/components/ElysiumAtlas/LogoComponent";
 import Cookies from "js-cookie";
@@ -53,7 +54,7 @@ export default function VerifyPage() {
           });
 
           setTimeout(() => {
-            window.location.href = "/my-agents";
+            window.location.href = getRedirectUrl();
           }, 150);
         } else {
           setMessage("Verification failed...");

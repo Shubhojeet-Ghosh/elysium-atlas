@@ -45,8 +45,8 @@ export default function ChatHeader() {
           />
         ) : (
           <div
-            className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white font-semibold text-sm"
-            style={{ backgroundColor: text_color, color: primary_color }}
+            className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white font-semibold text-sm shadow-sm"
+            style={{ backgroundColor: primary_color, color: text_color }}
           >
             {agent_name?.charAt(0)?.toUpperCase() || "A"}
           </div>

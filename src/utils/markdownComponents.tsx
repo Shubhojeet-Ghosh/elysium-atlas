@@ -4,28 +4,28 @@ export const markdownComponents: Components = {
   h1: ({ node, ...props }) => (
     <h1
       className="font-bold mt-4 mb-2 text-gray-800"
-      style={{ fontSize: "14px" }}
+      style={{ fontSize: "18px" }}
       {...props}
     />
   ),
   h2: ({ node, ...props }) => (
     <h2
       className="font-bold mt-3 mb-2 text-gray-800"
-      style={{ fontSize: "13px" }}
+      style={{ fontSize: "16px" }}
       {...props}
     />
   ),
   h3: ({ node, ...props }) => (
     <h3
       className="font-semibold mt-3 mb-2 text-gray-800"
-      style={{ fontSize: "16px" }}
+      style={{ fontSize: "14px" }}
       {...props}
     />
   ),
   h4: ({ node, ...props }) => (
     <h4
       className="font-semibold mt-2 mb-1 text-gray-800"
-      style={{ fontSize: "11px" }}
+      style={{ fontSize: "12px" }}
       {...props}
     />
   ),

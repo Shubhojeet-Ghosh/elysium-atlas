@@ -27,6 +27,7 @@ import {
   setWelcomeMessage,
   setLlmModel,
   setTriggerGetAgentDetails,
+  setWidgetScript,
 } from "@/store/reducers/agentSlice";
 
 export default function AgentPage() {
@@ -74,6 +75,7 @@ export default function AgentPage() {
           dispatch(setTemperature(agentDetails.temperature || 0.5));
           dispatch(setWelcomeMessage(agentDetails.welcome_message));
           dispatch(setLlmModel(agentDetails.llm_model));
+          dispatch(setWidgetScript(agentDetails.widget_script || null));
           dispatch(
             setKnowledgeBaseLinks(
               agentDetails.links.map((link: any) => ({

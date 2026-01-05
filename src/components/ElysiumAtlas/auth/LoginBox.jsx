@@ -21,6 +21,7 @@ import {
   openGoogleOAuth,
   getGoogleAccessTokenFromHash,
 } from "@/utils/googleAuth";
+import { getRedirectUrl } from "@/utils/redirectUtils";
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 const REDIRECT_URI =
@@ -83,7 +84,7 @@ export default function LoginBox() {
           });
 
           setTimeout(() => {
-            window.location.href = "/my-agents";
+            window.location.href = getRedirectUrl();
           }, 150);
         } else {
           toast.success("Magic link sent to your email", {
@@ -146,7 +147,7 @@ export default function LoginBox() {
               position: "top-center",
             });
             setTimeout(() => {
-              window.location.href = "/my-agents";
+              window.location.href = getRedirectUrl();
             }, 150);
           } else {
             toast.error(response_data.message, {
