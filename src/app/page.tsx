@@ -61,7 +61,7 @@ export default function Home() {
         </main>
       </div>
       <Script
-        src="https://cdn.sgdevstudio.in/widget/v0.0.3/widget.js?agent_id=695c3cd289c5797e0f344593"
+        src="https://cdn.sgdevstudio.in/widget/v0.0.4/widget.js?agent_id=695c3cd289c5797e0f344593"
         strategy="afterInteractive"
       />
     </>
