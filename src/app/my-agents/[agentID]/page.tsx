@@ -78,7 +78,7 @@ export default function AgentPage() {
           dispatch(setWidgetScript(agentDetails.widget_script || null));
           dispatch(
             setKnowledgeBaseLinks(
-              agentDetails.links.map((link: any) => ({
+              agentDetails.links.data.map((link: any) => ({
                 link: link.url,
                 checked: true,
                 status: "uploaded",
@@ -87,7 +87,7 @@ export default function AgentPage() {
           );
           dispatch(
             setKnowledgeBaseFiles(
-              agentDetails.files.map((file: any) => ({
+              agentDetails.files.data.map((file: any) => ({
                 name: file.file_name,
                 size: 0,
                 type: "",
@@ -100,7 +100,7 @@ export default function AgentPage() {
           );
           dispatch(
             setKnowledgeBaseText(
-              agentDetails.custom_texts.map((text: any) => ({
+              agentDetails.custom_texts.data.map((text: any) => ({
                 custom_text_alias: text.custom_text_alias,
                 custom_text: "",
                 lastUpdated: text.created_at,
@@ -110,7 +110,7 @@ export default function AgentPage() {
           );
           dispatch(
             setKnowledgeBaseQnA(
-              agentDetails.qa_pairs.map((qna: any) => ({
+              agentDetails.qa_pairs.data.map((qna: any) => ({
                 qna_alias: qna.qna_alias,
                 question: "",
                 answer: "",

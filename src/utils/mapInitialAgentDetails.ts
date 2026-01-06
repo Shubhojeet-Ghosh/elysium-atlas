@@ -12,13 +12,13 @@ export function mapInitialAgentDetails(details: any) {
     welcomeMessage: details.welcome_message,
     llmModel: details.llm_model,
     knowledgeBaseLinks:
-      details.links?.map((link: any) => ({
+      details.links?.data?.map((link: any) => ({
         link: link.url,
         checked: true,
         status: "uploaded",
       })) || [],
     knowledgeBaseFiles:
-      details.files?.map((file: any) => ({
+      details.files?.data?.map((file: any) => ({
         name: file.file_name,
         size: 0,
         type: "",
@@ -28,14 +28,14 @@ export function mapInitialAgentDetails(details: any) {
         status: "uploaded",
       })) || [],
     knowledgeBaseText:
-      details.custom_texts?.map((text: any) => ({
+      details.custom_texts?.data?.map((text: any) => ({
         custom_text_alias: text.custom_text_alias,
         custom_text: "",
         lastUpdated: text.created_at,
         status: "uploaded",
       })) || [],
     knowledgeBaseQnA:
-      details.qa_pairs?.map((qna: any) => ({
+      details.qa_pairs?.data?.map((qna: any) => ({
         qna_alias: qna.qna_alias,
         question: "",
         answer: "",
