@@ -1,7 +1,7 @@
 {
   "name": "elysium-atlas",
   "version": "0.1.32",
-  "widget_version": "v0.0.3",
+  "widget_version": "v0.0.4",
   "private": true,
   "scripts": {
     "dev": "next dev --port 3002",

@@ -147,14 +147,28 @@
     )}`;
     iframe.src = iframeSrc;
     iframe.style.position = "fixed";
-    iframe.style.bottom = "20px";
-    iframe.style.right = "20px";
-    iframe.style.width = "450px";
-    iframe.style.height = "500px";
     iframe.style.border = "none";
-    iframe.style.borderRadius = "12px";
-    iframe.style.boxShadow = "0 4px 20px rgba(0, 0, 0, 0.2)";
     iframe.style.zIndex = "10000";
+
+    // Responsive sizing: full screen on mobile, popup on desktop
+    const isMobile = w.innerWidth <= 768;
+    if (isMobile) {
+      iframe.style.bottom = "0";
+      iframe.style.right = "0";
+      iframe.style.left = "0";
+      iframe.style.top = "0";
+      iframe.style.width = "100%";
+      iframe.style.height = "100dvh";
+      iframe.style.borderRadius = "0";
+    } else {
+      iframe.style.bottom = "20px";
+      iframe.style.right = "20px";
+      iframe.style.width = "450px";
+      iframe.style.height = "500px";
+      iframe.style.borderRadius = "12px";
+    }
+
+    iframe.style.boxShadow = "0 4px 20px rgba(0, 0, 0, 0.2)";
 
     // Initial hidden state
     iframe.style.opacity = "0";
