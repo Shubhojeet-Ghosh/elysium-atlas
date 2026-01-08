@@ -6,6 +6,7 @@ import { CustomTabs } from "@/components/ui/CustomTabs";
 import AgentBuilderTabs from "./AgentBuilderTabs";
 import AgentMainContent from "./AgentMainContent";
 import UnsavedChangesBar from "./UnsavedChangesBar";
+import AgentLinks from "./AgentLinks";
 import { useCurrentAgentDetails } from "./useAgentDetailsCompare";
 import { useAppDispatch, useAppSelector } from "@/store";
 import PrimaryButton from "../ui/PrimaryButton";
@@ -111,15 +112,14 @@ export default function MyAgent({
       payload.temperature = current.temperature;
     }
 
-    // Compare arrays for links
-    if (
-      JSON.stringify(mappedInitial.knowledgeBaseLinks) !==
-      JSON.stringify(current.knowledgeBaseLinks)
-    ) {
-      payload.links =
-        current.knowledgeBaseLinks
-          ?.filter((link: any) => link.checked)
-          ?.map((link: any) => link.link) || [];
+    // Compare arrays for links - check if there are new links to add
+    const newLinksToAdd =
+      current.knowledgeBaseLinks
+        ?.filter((link: any) => link.checked && link.status === "new")
+        ?.map((link: any) => link.link) || [];
+
+    if (newLinksToAdd.length > 0) {
+      payload.links = newLinksToAdd;
     }
 
     // Compare arrays for files
@@ -181,6 +181,12 @@ export default function MyAgent({
         initialAgentDetails
       );
 
+      // Keep track of new links to remove after successful save
+      const newLinksToRemove =
+        current.knowledgeBaseLinks
+          ?.filter((link: any) => link.checked && link.status === "new")
+          ?.map((link: any) => link.link) || [];
+
       console.log("Update payload:", payload);
 
       const token = Cookies.get("elysium_atlas_session_token");
@@ -197,6 +203,15 @@ export default function MyAgent({
 
       if (response.data.success) {
         toast.success(response.data.message || "Agent updated successfully");
+
+        // Remove new links from Redux after successful save
+        if (newLinksToRemove.length > 0) {
+          const updatedLinks = current.knowledgeBaseLinks.filter(
+            (link: any) => !newLinksToRemove.includes(link.link)
+          );
+          dispatch(setKnowledgeBaseLinks(updatedLinks));
+        }
+
         dispatch(setTriggerGetAgentDetails(triggerGetAgentDetails + 1));
       } else {
         toast.error(
@@ -316,6 +331,11 @@ export default function MyAgent({
           initialAgentDetails={mappedInitial}
           onSave={handleUpdate}
         />
+      )}
+      {activeTab === "links" && (
+        <div className="mt-6">
+          <AgentLinks />
+        </div>
       )}
       {mappedInitial && (
         <UnsavedChangesBar

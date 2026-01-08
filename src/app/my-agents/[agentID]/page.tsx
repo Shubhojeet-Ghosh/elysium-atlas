@@ -76,49 +76,6 @@ export default function AgentPage() {
           dispatch(setWelcomeMessage(agentDetails.welcome_message));
           dispatch(setLlmModel(agentDetails.llm_model));
           dispatch(setWidgetScript(agentDetails.widget_script || null));
-          dispatch(
-            setKnowledgeBaseLinks(
-              agentDetails.links.data.map((link: any) => ({
-                link: link.url,
-                checked: true,
-                status: "uploaded",
-              }))
-            )
-          );
-          dispatch(
-            setKnowledgeBaseFiles(
-              agentDetails.files.data.map((file: any) => ({
-                name: file.file_name,
-                size: 0,
-                type: "",
-                checked: true,
-                s3_key: file.file_key,
-                cdn_url: null,
-                status: "uploaded",
-              }))
-            )
-          );
-          dispatch(
-            setKnowledgeBaseText(
-              agentDetails.custom_texts.data.map((text: any) => ({
-                custom_text_alias: text.custom_text_alias,
-                custom_text: "",
-                lastUpdated: text.created_at,
-                status: "uploaded",
-              }))
-            )
-          );
-          dispatch(
-            setKnowledgeBaseQnA(
-              agentDetails.qa_pairs.data.map((qna: any) => ({
-                qna_alias: qna.qna_alias,
-                question: "",
-                answer: "",
-                lastUpdated: qna.created_at,
-                status: "uploaded",
-              }))
-            )
-          );
 
           // If status is not in allowedStatuses, poll again after 5 seconds
           if (!allowedStatuses.includes(agentDetails.agent_status)) {

@@ -241,7 +241,8 @@ export default function KnowledgeBaseLinksList() {
               className="text-[12px] font-bold px-3 py-1 h-8"
               onClick={() => setManualLinkDialogOpen(true)}
             >
-              <span className="text-[18px] mr-[4px]">+</span> Add More
+              <span className="text-[18px]">+</span>{" "}
+              <span className="hidden md:inline">Add More</span>
             </OutlineButton>
             <div className="relative w-[200px]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />

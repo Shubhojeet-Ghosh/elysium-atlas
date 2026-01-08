@@ -19,7 +19,7 @@ export default function AgentEmbedCard() {
   };
 
   return (
-    <div className="lg:max-w-[420px] lg:w-full md:max-w-[340px] md:w-full w-full min-h-[180px] bg-gradient-to-br from-serene-purple/50 to-serene-purple/30 rounded-[20px] px-[24px] py-[20px] shadow-sm hover:shadow-md transition-all duration-200">
+    <div className="lg:max-w-[340px] lg:w-full md:max-w-[340px] md:w-full w-full min-h-[180px] bg-gradient-to-br from-serene-purple/50 to-serene-purple/30 rounded-[20px] px-[24px] py-[20px] shadow-sm hover:shadow-md transition-all duration-200">
       <div className="flex items-start gap-3 mb-4">
         <div className="rounded-full p-[12px] bg-gradient-to-br from-pure-mist to-white flex items-center justify-center shadow-sm">
           <Code className="text-serene-purple" size={18} />

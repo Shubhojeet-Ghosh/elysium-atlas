@@ -3,7 +3,7 @@ import { TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import OutlineButton from "@/components/ui/OutlineButton";
 import PrimaryButton from "@/components/ui/PrimaryButton";
-import { deepEqualNormalized } from "@/utils/comparisonUtils";
+import { deepEqualNormalizedIgnoringExisting } from "@/utils/comparisonUtils";
 
 interface UnsavedChangesBarProps {
   initial: any;
@@ -21,7 +21,10 @@ export default function UnsavedChangesBar({
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    const isDiff = initial && current && !deepEqualNormalized(initial, current);
+    const isDiff =
+      initial &&
+      current &&
+      !deepEqualNormalizedIgnoringExisting(initial, current);
     // Debug logs
     // console.log("[UnsavedChangesBar] initial:", initial);
     // console.log("[UnsavedChangesBar] current:", current);

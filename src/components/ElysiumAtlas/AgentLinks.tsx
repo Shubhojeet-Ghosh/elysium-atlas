@@ -1,0 +1,188 @@
+"use client";
+import { useState, useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { RootState } from "@/store";
+import {
+  setBaseURL,
+  addKnowledgeBaseLinks,
+  setKnowledgeBaseLinks,
+} from "@/store/reducers/agentSlice";
+import CustomInput from "@/components/inputs/CustomInput";
+import PrimaryButton from "@/components/ui/PrimaryButton";
+import Spinner from "@/components/ui/Spinner";
+import AgentAddSitemapDialog from "./AgentAddSitemapDialog";
+import AgentLinksList from "./AgentLinksList";
+import { toast } from "sonner";
+import fastApiAxios from "@/utils/fastapi_axios";
+import Cookies from "js-cookie";
+import { cleanAndDeduplicateLinks } from "@/utils/linkUtils";
+
+export default function AgentLinks() {
+  const dispatch = useDispatch();
+  const baseURL = useSelector((state: RootState) => state.agent.baseURL);
+  const agentID = useSelector((state: RootState) => state.agent.agentID);
+  const knowledgeBaseLinks = useSelector(
+    (state: RootState) => state.agent.knowledgeBaseLinks
+  );
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingLinks, setIsLoadingLinks] = useState(false);
+
+  const validateURL = (url: string): boolean => {
+    if (!url || url.trim() === "") {
+      return false;
+    }
+    return url.trim().length > 0;
+  };
+
+  const fetchAgentLinks = async () => {
+    if (!agentID) return;
+
+    setIsLoadingLinks(true);
+    const token = Cookies.get("elysium_atlas_session_token");
+
+    try {
+      const response = await fastApiAxios.post(
+        "/elysium-agents/elysium-atlas/agent/v1/get-agent-urls",
+        {
+          agent_id: agentID,
+          limit: 1000,
+          cursor: null,
+          include_count: false,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success === true) {
+        const urls = response.data.urls;
+        const mappedLinks = urls.data.map((urlItem: any) => ({
+          link: urlItem.url,
+          checked: false,
+          status: "existing",
+        }));
+
+        dispatch(setKnowledgeBaseLinks(mappedLinks));
+      }
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to fetch agent links";
+      toast.error(errorMessage);
+    } finally {
+      setIsLoadingLinks(false);
+    }
+  };
+
+  useEffect(() => {
+    if (agentID) {
+      fetchAgentLinks();
+    }
+  }, [agentID]);
+
+  const handleExtractLinks = async () => {
+    // Basic validation
+    if (!validateURL(baseURL)) {
+      toast.error("Please enter a valid URL");
+      return;
+    }
+
+    setIsLoading(true);
+    const token = Cookies.get("elysium_atlas_session_token");
+
+    try {
+      const response = await fastApiAxios.post(
+        "/elysium-agents/elysium-atlas/v1/extract-url-links",
+        {
+          source: "url",
+          link: baseURL,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success === true) {
+        const responseLinks = response.data.links || [];
+
+        const normalized_base_url = response.data.base_url || baseURL;
+        dispatch(setBaseURL(normalized_base_url));
+
+        // Clean and deduplicate links from response
+        const cleanedLinks = cleanAndDeduplicateLinks(responseLinks);
+
+        // Get existing links set
+        const existingLinksSet = new Set(
+          knowledgeBaseLinks.map((item) => item.link)
+        );
+        const uniqueNewLinks = cleanedLinks.filter(
+          (link) => !existingLinksSet.has(link)
+        );
+
+        if (uniqueNewLinks.length > 0) {
+          // Add new links with checked: true by default
+          dispatch(
+            addKnowledgeBaseLinks({ links: uniqueNewLinks, checked: true })
+          );
+          toast.success(
+            response.data.message ||
+              `Successfully extracted ${uniqueNewLinks.length} new unique links from URL`
+          );
+        } else {
+          toast.info(
+            "All extracted links are already in the list or were filtered out"
+          );
+        }
+      } else {
+        toast.error(
+          response.data.message || "Failed to extract links from URL"
+        );
+      }
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to extract links from URL. Please check the URL and try again.";
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col">
+      <div className="lg:text-[14px] text-[12px] font-bold mt-[4px]">
+        Base Website Link
+      </div>
+      <div className="flex items-center gap-3 mt-[4px]">
+        <CustomInput
+          type="url"
+          placeholder="Enter base website URL (e.g., https://example.com)"
+          value={baseURL}
+          onChange={(e) => dispatch(setBaseURL(e.target.value))}
+          className="flex-1 px-[12px] py-[10px]"
+        />
+        <PrimaryButton
+          className="text-[12px] font-semibold flex items-center justify-center gap-2 min-w-[110px] min-h-[41px] shrink-0"
+          onClick={handleExtractLinks}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <Spinner className="border-white dark:border-deep-onyx" />
+          ) : (
+            <span>Extract Links</span>
+          )}
+        </PrimaryButton>
+        <AgentAddSitemapDialog />
+      </div>
+      <div className="mt-[2px]">
+        <AgentLinksList isLoadingLinks={isLoadingLinks} />
+      </div>
+    </div>
+  );
+}

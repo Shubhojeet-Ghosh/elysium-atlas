@@ -93,7 +93,7 @@ const agentSlice = createSlice({
           checked: action.payload.checked ?? true,
           status: "new",
         }));
-      state.knowledgeBaseLinks = [...state.knowledgeBaseLinks, ...newLinks];
+      state.knowledgeBaseLinks = [...newLinks, ...state.knowledgeBaseLinks];
     },
     toggleKnowledgeBaseLink: (state, action: PayloadAction<number>) => {
       if (state.knowledgeBaseLinks[action.payload]) {
