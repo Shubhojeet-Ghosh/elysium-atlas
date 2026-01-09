@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import { Check, ChevronsUpDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface AutoCompleteItem {
   value: string;
   label: string;
+  icon?: string | null;
 }
 
 interface AutoCompleteProps {
@@ -78,9 +80,20 @@ export default function AutoComplete({
           className
         )}
       >
-        <span className={cn(!selectedItem && "text-muted-foreground")}>
-          {selectedItem ? selectedItem.label : placeholder}
-        </span>
+        <div className="flex items-center gap-2">
+          {selectedItem?.icon && (
+            <Image
+              src={selectedItem.icon}
+              alt={`${selectedItem.label} icon`}
+              width={20}
+              height={20}
+              className="rounded-full"
+            />
+          )}
+          <span className={cn(!selectedItem && "text-muted-foreground")}>
+            {selectedItem ? selectedItem.label : placeholder}
+          </span>
+        </div>
         <ChevronsUpDown className="h-4 w-4 opacity-50" />
       </button>
 
@@ -122,7 +135,18 @@ export default function AutoComplete({
                     className
                   )}
                 >
-                  {item.label}
+                  <div className="flex items-center gap-2">
+                    {item.icon && (
+                      <Image
+                        src={item.icon}
+                        alt={`${item.label} icon`}
+                        width={20}
+                        height={20}
+                        className="rounded-full"
+                      />
+                    )}
+                    {item.label}
+                  </div>
                   <Check
                     className={cn(
                       "h-4 w-4",

@@ -212,8 +212,10 @@ export default function SetKnowledgeBase({
       );
 
       if (response.data.success === true) {
-        toast.success("Setting up your agent... This may take a few minutes.");
-        router.push(`/my-agents/${response.data.agent_id}`);
+        toast.success("Setting up your agent... Redirecting shortly.");
+        setTimeout(() => {
+          router.push(`/my-agents/${response.data.agent_id}`);
+        }, 3000);
       } else {
         toast.error(response.data.message || "Failed to build agent");
       }
@@ -223,7 +225,6 @@ export default function SetKnowledgeBase({
         error.message ||
         "Failed to build agent. Please try again.";
       toast.error(errorMessage);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -323,7 +324,7 @@ export default function SetKnowledgeBase({
         <KnowledgeBaseNavigation
           onBack={handleBack}
           onContinue={handleContinue}
-          disabled={!hasContent}
+          hasContent={hasContent}
           isLoading={isLoading}
         />
       </div>

@@ -22,7 +22,6 @@ interface UserAgentState {
   temperature: number;
   welcomeMessage: string;
   llmModel: string;
-  availableModels: string[];
   triggerGetAgentDetails: number;
   widget_script: string | null;
 }
@@ -43,7 +42,6 @@ const initialState: UserAgentState = {
   temperature: 0,
   welcomeMessage: "",
   llmModel: "",
-  availableModels: ["gpt-4o-mini", "gpt-4.1-mini", "gpt-5-nano-2025-08-07"],
   triggerGetAgentDetails: 0,
   widget_script: null,
 };
@@ -215,9 +213,6 @@ const agentSlice = createSlice({
     setLlmModel: (state, action: PayloadAction<string>) => {
       state.llmModel = action.payload;
     },
-    setAvailableModels: (state, action: PayloadAction<string[]>) => {
-      state.availableModels = action.payload;
-    },
     setTriggerGetAgentDetails: (state, action: PayloadAction<number>) => {
       state.triggerGetAgentDetails = action.payload;
     },
@@ -277,7 +272,6 @@ export const {
   setTemperature,
   setWelcomeMessage,
   setLlmModel,
-  setAvailableModels,
   setTriggerGetAgentDetails,
   setWidgetScript,
   resetUserAgent,

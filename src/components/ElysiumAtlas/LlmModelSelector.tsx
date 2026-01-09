@@ -14,19 +14,18 @@ import AutoComplete from "@/components/ui/AutoComplete";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { setTemperature } from "@/store/reducers/agentSlice";
+import { AVAILABLE_MODELS } from "@/lib/llmConfig";
 
 export default function LlmModelSelector() {
   const [open, setOpen] = useState(false);
   const temperature = useAppSelector((state) => state.agent.temperature);
   const llmModel = useAppSelector((state) => state.agent.llmModel);
-  const availableModels = useAppSelector(
-    (state) => state.agent.availableModels
-  );
   const dispatch = useAppDispatch();
 
-  const modelItems = availableModels.map((model) => ({
-    value: model,
-    label: model,
+  const modelItems = AVAILABLE_MODELS.map((model) => ({
+    value: model.model_code,
+    label: model.model_code,
+    icon: model.model_icon,
   }));
 
   return (
