@@ -38,4 +38,19 @@ export const AVAILABLE_MODELS = [
     model_icon:
       "https://cdn.sgdevstudio.in/assets/icons/llm_icons/claude-icon.svg",
   },
+  {
+    model_code: "grok-4-1-fast-non-reasoning",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/grok_icon.svg",
+  },
+  {
+    model_code: "grok-4-1-fast-reasoning",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/grok_icon.svg",
+  },
+  {
+    model_code: "grok-code-fast-1",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/grok_icon.svg",
+  },
 ];
