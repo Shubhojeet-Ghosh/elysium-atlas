@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useDispatch } from "react-redux";
 import { setCurrentStep } from "@/store/reducers/agentBuilderSlice";
 import ChatInterface from "./ChatInterface";
+import { resetAgentBuilder } from "@/store/reducers/agentBuilderSlice";
 
 export default function CreateAgentCard() {
   const [isHovered, setIsHovered] = useState(false);
@@ -11,6 +12,7 @@ export default function CreateAgentCard() {
   const dispatch = useDispatch();
 
   const handleCreateAgent = () => {
+    dispatch(resetAgentBuilder());
     dispatch(setCurrentStep(1));
     router.push("/my-agents/build");
   };

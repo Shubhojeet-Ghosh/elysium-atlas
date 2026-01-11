@@ -8,6 +8,8 @@ import AgentMainContent from "./AgentMainContent";
 import UnsavedChangesBar from "./UnsavedChangesBar";
 import AgentLinks from "./AgentLinks";
 import AgentFiles from "./AgentFiles";
+import AgentText from "./AgentText";
+import AgentQnA from "./AgentQnA";
 import { useCurrentAgentDetails } from "./useAgentDetailsCompare";
 import { useAppDispatch, useAppSelector } from "@/store";
 import PrimaryButton from "../ui/PrimaryButton";
@@ -65,6 +67,14 @@ export default function MyAgent({
 
   const knowledgeBaseFiles = useAppSelector(
     (state) => state.agent.knowledgeBaseFiles
+  );
+
+  const knowledgeBaseText = useAppSelector(
+    (state) => state.agent.knowledgeBaseText
+  );
+
+  const knowledgeBaseQnA = useAppSelector(
+    (state) => state.agent.knowledgeBaseQnA
   );
 
   // Initialize mappedInitial from initialAgentDetails
@@ -141,6 +151,79 @@ export default function MyAgent({
       }
     }
   }, [knowledgeBaseFiles, mappedInitial]);
+
+  // Sync mappedInitial with knowledgeBaseText when they are fetched
+  // This ensures the "Clear" button preserves existing texts and prevents false unsaved changes
+  useEffect(() => {
+    if (mappedInitial && knowledgeBaseText.length > 0) {
+      // Only update if knowledgeBaseText have "existing" status items
+      // (meaning they were fetched from the API, not newly added)
+      const existingTexts = knowledgeBaseText.filter(
+        (text) => text.status === "existing"
+      );
+
+      // Only sync if there are existing texts and they differ from mappedInitial
+      if (existingTexts.length > 0) {
+        const currentMappedTextAliases = new Set(
+          mappedInitial.knowledgeBaseText?.map(
+            (t: any) => t.custom_text_alias
+          ) || []
+        );
+        const fetchedTextAliases = new Set(
+          existingTexts.map((t) => t.custom_text_alias)
+        );
+
+        // Check if the text lists are different (different lengths or different aliases)
+        const isDifferent =
+          existingTexts.length !==
+            (mappedInitial.knowledgeBaseText?.length || 0) ||
+          !Array.from(fetchedTextAliases).every((alias) =>
+            currentMappedTextAliases.has(alias)
+          );
+
+        if (isDifferent) {
+          setMappedInitial((prev: any) => ({
+            ...prev,
+            knowledgeBaseText: existingTexts,
+          }));
+        }
+      }
+    }
+  }, [knowledgeBaseText, mappedInitial]);
+
+  // Sync mappedInitial with knowledgeBaseQnA when they are fetched
+  // This ensures the "Clear" button preserves existing QnA and prevents false unsaved changes
+  useEffect(() => {
+    if (mappedInitial && knowledgeBaseQnA.length > 0) {
+      // Only update if knowledgeBaseQnA have "existing" status items
+      const existingQnA = knowledgeBaseQnA.filter(
+        (qna) => qna.status === "existing"
+      );
+
+      // Only sync if there are existing QnA and they differ from mappedInitial
+      if (existingQnA.length > 0) {
+        const currentMappedQnAAliases = new Set(
+          mappedInitial.knowledgeBaseQnA?.map((q: any) => q.qna_alias) || []
+        );
+        const fetchedQnAAliases = new Set(existingQnA.map((q) => q.qna_alias));
+
+        // Check if the QnA lists are different
+        const isDifferent =
+          existingQnA.length !==
+            (mappedInitial.knowledgeBaseQnA?.length || 0) ||
+          !Array.from(fetchedQnAAliases).every((alias) =>
+            currentMappedQnAAliases.has(alias)
+          );
+
+        if (isDifferent) {
+          setMappedInitial((prev: any) => ({
+            ...prev,
+            knowledgeBaseQnA: existingQnA,
+          }));
+        }
+      }
+    }
+  }, [knowledgeBaseQnA, mappedInitial]);
 
   const dispatch = useAppDispatch();
   const triggerGetAgentDetails = useAppSelector(
@@ -375,6 +458,25 @@ export default function MyAgent({
           ?.filter((link: any) => link.checked && link.status === "new")
           ?.map((link: any) => link.link) || [];
 
+      // Keep track of new custom texts to remove after successful save
+      const newTextsToRemove =
+        current.knowledgeBaseText
+          ?.filter((text: any) => text.status === "new")
+          ?.map((text: any) => text.custom_text_alias) || [];
+
+      // Add new custom texts to payload if any exist
+      const newCustomTexts =
+        current.knowledgeBaseText?.filter(
+          (text: any) => text.status === "new"
+        ) || [];
+
+      if (newCustomTexts.length > 0) {
+        payload.custom_texts = newCustomTexts.map((text: any) => ({
+          custom_text_alias: text.custom_text_alias,
+          custom_text: text.custom_text,
+        }));
+      }
+
       console.log("Update payload:", payload);
 
       // Make API call
@@ -405,6 +507,27 @@ export default function MyAgent({
             (file: any) => !newFilesToRemove.includes(file.name)
           );
           dispatch(setKnowledgeBaseFiles(updatedFiles));
+        }
+
+        // Remove newly added custom texts from Redux after successful save
+        if (newTextsToRemove.length > 0) {
+          const updatedTexts = current.knowledgeBaseText.filter(
+            (text: any) => !newTextsToRemove.includes(text.custom_text_alias)
+          );
+          dispatch(setKnowledgeBaseText(updatedTexts));
+        }
+
+        // Remove newly added QnA from Redux after successful save
+        const newQnAToRemove =
+          current.knowledgeBaseQnA
+            ?.filter((qna: any) => qna.status === "new")
+            ?.map((qna: any) => qna.qna_alias) || [];
+
+        if (newQnAToRemove.length > 0) {
+          const updatedQnA = current.knowledgeBaseQnA.filter(
+            (qna: any) => !newQnAToRemove.includes(qna.qna_alias)
+          );
+          dispatch(setKnowledgeBaseQnA(updatedQnA));
         }
 
         dispatch(setTriggerGetAgentDetails(triggerGetAgentDetails + 1));
@@ -464,12 +587,48 @@ export default function MyAgent({
       dispatch(setWelcomeMessage(dataToUse.welcomeMessage || ""));
     if (dataToUse.llmModel !== undefined)
       dispatch(setLlmModel(dataToUse.llmModel || ""));
-    if (dataToUse.knowledgeBaseLinks !== undefined)
-      if (dataToUse.knowledgeBaseQnA !== undefined)
-        dispatch(setKnowledgeBaseQnA(dataToUse.knowledgeBaseQnA || []));
 
-    // Also reset local file state
-    setDocumentFiles([]);
+    // Reset knowledge base data - filter out new items, keep only existing
+    if (knowledgeBaseLinks !== undefined) {
+      const existingLinks = knowledgeBaseLinks.filter(
+        (link) => link.status === "existing"
+      );
+      dispatch(setKnowledgeBaseLinks(existingLinks));
+    }
+
+    if (knowledgeBaseFiles !== undefined) {
+      const existingFiles = knowledgeBaseFiles.filter(
+        (file) => file.status === "existing"
+      );
+      dispatch(setKnowledgeBaseFiles(existingFiles));
+
+      // Also update local documentFiles to remove files that were filtered out
+      // The reverse sync in AgentFiles will handle this, but we can clear new files explicitly
+      setDocumentFiles((prevFiles) => {
+        const existingFileNames = new Set(existingFiles.map((f) => f.name));
+        return prevFiles.filter((file) => existingFileNames.has(file.name));
+      });
+    }
+
+    if (knowledgeBaseText !== undefined) {
+      const existingTexts = knowledgeBaseText.filter(
+        (text) => text.status === "existing"
+      );
+      dispatch(setKnowledgeBaseText(existingTexts));
+    }
+
+    // For knowledgeBaseQnA, we want to clear ONLY the new entries
+    // but keep the existing ones that were fetched from the API
+    if (knowledgeBaseQnA.length > 0) {
+      const existingQnA = knowledgeBaseQnA.filter(
+        (qna) => qna.status === "existing"
+      );
+      dispatch(setKnowledgeBaseQnA(existingQnA));
+
+      // Also ensure documentFiles locally is synced if needed
+    } else if (dataToUse.knowledgeBaseQnA !== undefined) {
+      dispatch(setKnowledgeBaseQnA(dataToUse.knowledgeBaseQnA || []));
+    }
   };
 
   useEffect(() => {
@@ -536,6 +695,16 @@ export default function MyAgent({
             documentFiles={documentFiles}
             setDocumentFiles={setDocumentFiles}
           />
+        </div>
+      )}
+      {activeTab === "text" && (
+        <div className="mt-6">
+          <AgentText />
+        </div>
+      )}
+      {activeTab === "qna" && (
+        <div className="mt-6">
+          <AgentQnA />
         </div>
       )}
       {mappedInitial && (

@@ -63,7 +63,8 @@ export const deepEqualNormalized = (obj1: any, obj2: any): boolean => {
 /**
  * Filter array items to only include those with status !== "existing"
  * Used to exclude existing/fetched items from change detection
- * For items with status="new", only include them if checked is true
+ * For items with status="new", only include them if checked is true (for files/links)
+ * For items without checked field (custom texts, QnA), include all new items
  */
 const filterNonExisting = (arr: any[]): any[] => {
   if (!Array.isArray(arr)) return arr;
@@ -73,9 +74,13 @@ const filterNonExisting = (arr: any[]): any[] => {
       if (item.status === "existing") {
         return false;
       }
-      // For new items, only include if checked is true
-      if (item.status === "new") {
+      // For new items with checked field (files/links), only include if checked is true
+      if (item.status === "new" && "checked" in item) {
         return item.checked === true;
+      }
+      // For new items without checked field (custom texts, QnA), include all
+      if (item.status === "new") {
+        return true;
       }
       return true;
     }
