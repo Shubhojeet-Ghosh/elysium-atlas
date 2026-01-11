@@ -7,6 +7,7 @@ import AgentBuilderTabs from "./AgentBuilderTabs";
 import AgentMainContent from "./AgentMainContent";
 import UnsavedChangesBar from "./UnsavedChangesBar";
 import AgentLinks from "./AgentLinks";
+import AgentFiles from "./AgentFiles";
 import { useCurrentAgentDetails } from "./useAgentDetailsCompare";
 import { useAppDispatch, useAppSelector } from "@/store";
 import PrimaryButton from "../ui/PrimaryButton";
@@ -37,6 +38,7 @@ import fastApiAxios from "@/utils/fastapi_axios";
 import { isEquivalent, normalizeValue } from "@/utils/comparisonUtils";
 import { toast } from "sonner";
 import { SquareArrowOutUpRight } from "lucide-react";
+import axios from "axios";
 
 export default function MyAgent({
   initialAgentDetails,
@@ -52,11 +54,93 @@ export default function MyAgent({
     return searchParams.get("activeTab") || "agent";
   });
 
-  const mappedInitial = useMemo(
-    () =>
-      initialAgentDetails ? mapInitialAgentDetails(initialAgentDetails) : null,
-    [initialAgentDetails]
+  const [mappedInitial, setMappedInitial] = useState<any>(null);
+
+  /* State lifted from AgentFiles to persist across tab switches */
+  const [documentFiles, setDocumentFiles] = useState<File[]>([]);
+
+  const knowledgeBaseLinks = useAppSelector(
+    (state) => state.agent.knowledgeBaseLinks
   );
+
+  const knowledgeBaseFiles = useAppSelector(
+    (state) => state.agent.knowledgeBaseFiles
+  );
+
+  // Initialize mappedInitial from initialAgentDetails
+  useEffect(() => {
+    if (initialAgentDetails) {
+      setMappedInitial(mapInitialAgentDetails(initialAgentDetails));
+    }
+  }, [initialAgentDetails]);
+
+  // Sync mappedInitial with knowledgeBaseLinks when they are fetched
+  // This ensures the "Clear" button preserves existing links and prevents false unsaved changes
+  useEffect(() => {
+    if (mappedInitial && knowledgeBaseLinks.length > 0) {
+      // Only update if knowledgeBaseLinks have "existing" status items
+      // (meaning they were fetched from the API, not newly added)
+      const existingLinks = knowledgeBaseLinks.filter(
+        (link) => link.status === "existing"
+      );
+
+      // Only sync if there are existing links and they differ from mappedInitial
+      if (existingLinks.length > 0) {
+        const currentMappedLinkUrls = new Set(
+          mappedInitial.knowledgeBaseLinks.map((l: any) => l.link)
+        );
+        const fetchedLinkUrls = new Set(existingLinks.map((l) => l.link));
+
+        // Check if the link lists are different (different lengths or different URLs)
+        const isDifferent =
+          existingLinks.length !== mappedInitial.knowledgeBaseLinks.length ||
+          !Array.from(fetchedLinkUrls).every((url) =>
+            currentMappedLinkUrls.has(url)
+          );
+
+        if (isDifferent) {
+          setMappedInitial((prev: any) => ({
+            ...prev,
+            knowledgeBaseLinks: existingLinks,
+          }));
+        }
+      }
+    }
+  }, [knowledgeBaseLinks, mappedInitial]);
+
+  // Sync mappedInitial with knowledgeBaseFiles when they are fetched
+  // This ensures the "Clear" button preserves existing files and prevents false unsaved changes
+  useEffect(() => {
+    if (mappedInitial && knowledgeBaseFiles.length > 0) {
+      // Only update if knowledgeBaseFiles have "existing" status items
+      // (meaning they were fetched from the API, not newly added)
+      const existingFiles = knowledgeBaseFiles.filter(
+        (file) => file.status === "existing"
+      );
+
+      // Only sync if there are existing files and they differ from mappedInitial
+      if (existingFiles.length > 0) {
+        const currentMappedFileNames = new Set(
+          mappedInitial.knowledgeBaseFiles.map((f: any) => f.name)
+        );
+        const fetchedFileNames = new Set(existingFiles.map((f) => f.name));
+
+        // Check if the file lists are different (different lengths or different names)
+        const isDifferent =
+          existingFiles.length !== mappedInitial.knowledgeBaseFiles.length ||
+          !Array.from(fetchedFileNames).every((name) =>
+            currentMappedFileNames.has(name)
+          );
+
+        if (isDifferent) {
+          setMappedInitial((prev: any) => ({
+            ...prev,
+            knowledgeBaseFiles: existingFiles,
+          }));
+        }
+      }
+    }
+  }, [knowledgeBaseFiles, mappedInitial]);
 
   const dispatch = useAppDispatch();
   const triggerGetAgentDetails = useAppSelector(
@@ -175,11 +259,115 @@ export default function MyAgent({
         return;
       }
 
+      const token = Cookies.get("elysium_atlas_session_token");
+
+      // Build initial payload
       let payload = buildUpdatePayload(
         mappedInitial,
         current,
         initialAgentDetails
       );
+
+      // Keep track of newly uploaded files to remove after successful save
+      // This needs to be done *before* their status is changed to "existing" in Redux
+      const newFilesToRemove =
+        current.knowledgeBaseFiles
+          ?.filter((file: any) => file.checked && file.status === "new")
+          ?.map((file: any) => file.name) || [];
+
+      // Handle file uploads if there are new files
+      if (documentFiles.length > 0 && agentID) {
+        // Generate presigned URLs for new files
+        const filesPayload = documentFiles.map((file) => ({
+          folder_path: `/agents/${agentID}/knowledgebase_files`,
+          filename: file.name,
+          filetype: file.type,
+          visibility: "private",
+        }));
+
+        try {
+          const presignedResponse = await fastApiAxios.post(
+            "/elysium-agents/elysium-atlas/agent/v1/generate-presigned-urls",
+            { files: filesPayload },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          if (!presignedResponse.data.success) {
+            toast.error(
+              presignedResponse.data.message ||
+                "Failed to generate presigned URLs"
+            );
+            return;
+          }
+
+          // Upload files to presigned URLs
+          const uploadPromises =
+            presignedResponse.data.presigned_urls.files.map(
+              async (urlObj: {
+                filename: string;
+                upload_url: string;
+                s3_key: string;
+                cdn_url?: string;
+              }) => {
+                const file = documentFiles.find(
+                  (df) => df.name === urlObj.filename
+                );
+                if (file) {
+                  await axios.put(urlObj.upload_url, file, {
+                    headers: {
+                      "Content-Type": file.type,
+                    },
+                  });
+                }
+              }
+            );
+
+          await Promise.all(uploadPromises);
+
+          // Update knowledgeBaseFiles with s3_key and cdn_url
+          const updatedFiles = knowledgeBaseFiles.map((file) => {
+            const presignedFile =
+              presignedResponse.data.presigned_urls.files.find(
+                (f: any) => f.filename === file.name
+              );
+            if (presignedFile) {
+              return {
+                ...file,
+                s3_key: presignedFile.s3_key,
+                cdn_url: presignedFile.cdn_url || null,
+                status: "existing", // Mark as existing after upload
+              };
+            }
+            return file;
+          });
+          dispatch(setKnowledgeBaseFiles(updatedFiles));
+
+          // Update payload with uploaded file data (including s3_key from presigned API)
+          payload.files =
+            updatedFiles
+              ?.filter((file: any) => file.checked)
+              ?.map((file: any) => ({
+                file_name: file.name,
+                file_key: file.s3_key,
+                cdn_url: file.cdn_url,
+                file_source: "local",
+              })) || [];
+
+          // Clear documentFiles after successful upload
+          setDocumentFiles([]);
+        } catch (error: any) {
+          const uploadErrorMessage =
+            error.response?.data?.message ||
+            error.message ||
+            "Failed to upload files. Please try again.";
+          toast.error(uploadErrorMessage);
+          return;
+        }
+      }
 
       // Keep track of new links to remove after successful save
       const newLinksToRemove =
@@ -189,7 +377,6 @@ export default function MyAgent({
 
       console.log("Update payload:", payload);
 
-      const token = Cookies.get("elysium_atlas_session_token");
       // Make API call
       const response = await fastApiAxios.post(
         "/elysium-agents/elysium-atlas/agent/v1/update-agent",
@@ -210,6 +397,14 @@ export default function MyAgent({
             (link: any) => !newLinksToRemove.includes(link.link)
           );
           dispatch(setKnowledgeBaseLinks(updatedLinks));
+        }
+
+        // Remove newly uploaded files from Redux after successful save
+        if (newFilesToRemove.length > 0) {
+          const updatedFiles = current.knowledgeBaseFiles.filter(
+            (file: any) => !newFilesToRemove.includes(file.name)
+          );
+          dispatch(setKnowledgeBaseFiles(updatedFiles));
         }
 
         dispatch(setTriggerGetAgentDetails(triggerGetAgentDetails + 1));
@@ -270,13 +465,11 @@ export default function MyAgent({
     if (dataToUse.llmModel !== undefined)
       dispatch(setLlmModel(dataToUse.llmModel || ""));
     if (dataToUse.knowledgeBaseLinks !== undefined)
-      dispatch(setKnowledgeBaseLinks(dataToUse.knowledgeBaseLinks || []));
-    if (dataToUse.knowledgeBaseFiles !== undefined)
-      dispatch(setKnowledgeBaseFiles(dataToUse.knowledgeBaseFiles || []));
-    if (dataToUse.knowledgeBaseText !== undefined)
-      dispatch(setKnowledgeBaseText(dataToUse.knowledgeBaseText || []));
-    if (dataToUse.knowledgeBaseQnA !== undefined)
-      dispatch(setKnowledgeBaseQnA(dataToUse.knowledgeBaseQnA || []));
+      if (dataToUse.knowledgeBaseQnA !== undefined)
+        dispatch(setKnowledgeBaseQnA(dataToUse.knowledgeBaseQnA || []));
+
+    // Also reset local file state
+    setDocumentFiles([]);
   };
 
   useEffect(() => {
@@ -335,6 +528,14 @@ export default function MyAgent({
       {activeTab === "links" && (
         <div className="mt-6">
           <AgentLinks />
+        </div>
+      )}
+      {activeTab === "files" && (
+        <div className="mt-6">
+          <AgentFiles
+            documentFiles={documentFiles}
+            setDocumentFiles={setDocumentFiles}
+          />
         </div>
       )}
       {mappedInitial && (

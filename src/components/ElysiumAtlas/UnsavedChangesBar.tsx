@@ -31,13 +31,20 @@ export default function UnsavedChangesBar({
     // console.log("[UnsavedChangesBar] show:", isDiff);
 
     if (isDiff) {
-      setShow(true);
-      // Small delay to trigger the fade-in animation
-      setTimeout(() => setIsVisible(true), 10);
+      // Add a small delay before showing to prevent momentary flashes
+      // during state synchronization (when files/links are fetched)
+      const showTimer = setTimeout(() => {
+        setShow(true);
+        // Small delay to trigger the fade-in animation
+        setTimeout(() => setIsVisible(true), 10);
+      }, 100); // 100ms debounce
+
+      return () => clearTimeout(showTimer);
     } else {
       setIsVisible(false);
       // Delay hiding the component to allow fade-out animation
-      setTimeout(() => setShow(false), 300);
+      const hideTimer = setTimeout(() => setShow(false), 300);
+      return () => clearTimeout(hideTimer);
     }
   }, [initial, current]);
 
