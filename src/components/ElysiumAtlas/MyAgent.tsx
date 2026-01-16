@@ -651,7 +651,15 @@ export default function MyAgent({
     // Reset chat state before opening preview
     dispatch(resetAgentChat());
 
-    const chatSessionId = "app-" + uuidv4();
+    // Check if a preview chat session ID already exists in localStorage
+    let chatSessionId = localStorage.getItem("preview_chat_session_id");
+
+    if (!chatSessionId) {
+      // Create a new chat session ID and store it in localStorage
+      chatSessionId = "app-" + uuidv4();
+      localStorage.setItem("preview_chat_session_id", chatSessionId);
+    }
+
     const url = `/chat-with-agent?agent_id=${agentID}&chat_session_id=${chatSessionId}`;
     window.open(url, "_blank");
   };

@@ -1,5 +1,5 @@
 import { useAppSelector, useAppDispatch } from "@/store";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import ChatHeader from "./ChatHeader";
 import MainChatSpace from "./MainChatSpace";
 import ChatFooter from "./ChatFooter";
@@ -18,7 +18,6 @@ export default function AgentChatSpace() {
   );
 
   const dispatch = useAppDispatch();
-  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -87,8 +86,7 @@ export default function AgentChatSpace() {
       }
     };
 
-    if (agent_id && chat_session_id && !hasFetchedRef.current) {
-      hasFetchedRef.current = true;
+    if (agent_id && chat_session_id) {
       fetchData();
     }
   }, [agent_id, chat_session_id, visitor_at, dispatch]);

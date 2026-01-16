@@ -1,64 +1,61 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { useAppDispatch, useAppSelector } from "@/store";
+import { useAppDispatch } from "@/store";
 import {
   setAgentId,
   setChatSessionId,
   setTheme,
-  setConversationChain,
   setVisitorAt,
   setIsAgentOpen,
+  resetAgentChat,
 } from "@/store/reducers/agentChatSlice";
 import AgentChatSpace from "@/components/ElysiumAtlas/AgentChatSpace";
 
 export default function ChatWithAgent() {
   const searchParams = useSearchParams();
   const dispatch = useAppDispatch();
-  const { agent_id, chat_session_id } = useAppSelector(
-    (state) => state.agentChat
-  );
+
+  // Local state to control when the component is ready to render
+  const [isReady, setIsReady] = useState(false);
 
   const agentIdParam = searchParams.get("agent_id");
   const chatSessionIdParam = searchParams.get("chat_session_id");
   const themeParam = searchParams.get("theme") as "light" | "dark" | null;
   const sourceParam = searchParams.get("source");
 
+  // Initialize on mount - reset first, then set all values
   useEffect(() => {
-    if (agentIdParam) {
-      dispatch(setAgentId(agentIdParam));
-    } else {
-      // Generate a random UUID if agent_id is not provided or falsy
-      const generatedAgentId = uuidv4();
-      dispatch(setAgentId(generatedAgentId));
-    }
-  }, [agentIdParam, dispatch]);
+    // Reset any existing state first
+    dispatch(resetAgentChat());
 
-  useEffect(() => {
-    if (chatSessionIdParam) {
-      dispatch(setChatSessionId(chatSessionIdParam));
-    } else {
-      // Generate a random UUID with "un-" prefix if chat_session_id is not provided or falsy
-      const generatedSessionId = `un-${uuidv4()}`;
-      dispatch(setChatSessionId(generatedSessionId));
-    }
-  }, [chatSessionIdParam, dispatch]);
+    // Set agent_id
+    const agentId = agentIdParam || uuidv4();
+    dispatch(setAgentId(agentId));
 
-  useEffect(() => {
+    // Set chat_session_id
+    const sessionId = chatSessionIdParam || `un-${uuidv4()}`;
+    dispatch(setChatSessionId(sessionId));
+
+    // Set theme
     const theme = themeParam === "dark" ? "dark" : "light";
     dispatch(setTheme(theme));
-  }, [themeParam, dispatch]);
 
-  useEffect(() => {
-    if (sourceParam) {
-      dispatch(setVisitorAt(sourceParam));
-    } else {
-      dispatch(setVisitorAt(null));
-    }
-  }, [sourceParam, dispatch]);
+    // Set visitor source
+    dispatch(setVisitorAt(sourceParam || null));
 
+    // Mark as ready to render
+    setIsReady(true);
+
+    // Cleanup on unmount - reset state
+    return () => {
+      dispatch(resetAgentChat());
+    };
+  }, [agentIdParam, chatSessionIdParam, themeParam, sourceParam, dispatch]);
+
+  // Handle open_chat message from parent
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
       if (e.data.type === "open_chat") {
@@ -69,5 +66,6 @@ export default function ChatWithAgent() {
     return () => window.removeEventListener("message", handleMessage);
   }, [dispatch]);
 
-  return agent_id && chat_session_id && <AgentChatSpace />;
+  // Only render when ready
+  return isReady ? <AgentChatSpace /> : null;
 }

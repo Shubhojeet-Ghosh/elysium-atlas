@@ -4,11 +4,7 @@ import { useState, useRef, useEffect, useCallback, memo } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { ArrowUp, ArrowDown } from "lucide-react";
-import {
-  addMessage,
-  setIsTyping,
-  resetAgentChat,
-} from "@/store/reducers/agentChatSlice";
+import { addMessage, setIsTyping } from "@/store/reducers/agentChatSlice";
 import { connectAiSocket, disconnectAiSocket } from "@/lib/aiSocket";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -44,13 +40,6 @@ export default function MainChatSpace() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  // Reset chat state on unmount
-  useEffect(() => {
-    return () => {
-      dispatch(resetAgentChat());
-    };
-  }, [dispatch]);
 
   // Intercept link clicks and open in parent window
   useEffect(() => {
@@ -194,8 +183,8 @@ export default function MainChatSpace() {
 
       dispatch(addMessage(newMessage));
 
-      if (socket) {
-        socket.emit("atlas-visitor-message", {
+      const emitMessage = (socketInstance: any) => {
+        socketInstance.emit("atlas-visitor-message", {
           agent_id,
           message: msg,
           chat_session_id,
@@ -204,6 +193,36 @@ export default function MainChatSpace() {
 
         if (chatMode === "ai") {
           dispatch(setIsTyping(true));
+        }
+      };
+
+      if (socket) {
+        // Check if socket is connected
+        if (socket.connected) {
+          // Socket is connected, emit directly
+          emitMessage(socket);
+        } else {
+          // Socket is disconnected, reconnect first then emit
+          console.log(
+            "Socket disconnected, reconnecting before sending message..."
+          );
+          const reconnectedSocket = connectAiSocket();
+
+          // Wait for connection before emitting
+          if (reconnectedSocket.connected) {
+            emitMessage(reconnectedSocket);
+          } else {
+            // Listen for connect event and then emit
+            reconnectedSocket.once("connect", () => {
+              console.log("Socket reconnected, sending message...");
+              // Re-emit visitor connected event
+              reconnectedSocket.emit("atlas-visitor-connected", {
+                agent_id,
+                chat_session_id,
+              });
+              emitMessage(reconnectedSocket);
+            });
+          }
         }
       }
 
