@@ -3,6 +3,7 @@ import { Space_Grotesk, Manrope } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import ReduxProviderWrapper from "@/components/ReduxProviderWrapper";
+import NProgressProvider from "@/components/NProgressProvider";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -29,7 +30,9 @@ export default function RootLayout({
       <body
         className={`${spaceGrotesk.variable} ${manrope.variable} antialiased`}
       >
-        <ReduxProviderWrapper>{children}</ReduxProviderWrapper>
+        <ReduxProviderWrapper>
+          <NProgressProvider>{children}</NProgressProvider>
+        </ReduxProviderWrapper>
         <Toaster />
       </body>
     </html>

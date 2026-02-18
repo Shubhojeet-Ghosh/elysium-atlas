@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { UserRoundPlus } from "lucide-react";
+import NProgress from "nprogress";
 
 interface ChatInterfaceProps {
   onCTAClick?: () => void;
@@ -28,7 +29,13 @@ export default function ChatInterface({ onCTAClick }: ChatInterfaceProps) {
   }, []);
 
   return (
-    <div className="flex flex-col gap-[1px] text-[12px] font-medium overflow-hidden">
+    <div
+      className="flex flex-col gap-[1px] text-[12px] font-medium overflow-hidden cursor-pointer"
+      onClick={() => {
+        NProgress.start();
+        onCTAClick?.();
+      }}
+    >
       <div className="flex flex-col gap-4 py-4 lg:px-[20px] px-[10px] overflow-hidden">
         {/* User Message - Right aligned */}
         <div className="flex items-start justify-end animate-in fade-in zoom-in-95 duration-500">
@@ -77,13 +84,7 @@ export default function ChatInterface({ onCTAClick }: ChatInterfaceProps) {
 
       {/* Typing indicator or CTA */}
       <div className="flex items-center justify-center border-t border-gray-200 dark:border-white py-4 text-[14px] font-semibold">
-        <div
-          className="w-full flex items-center justify-center gap-2 text-deep-onyx dark:text-pure-mist"
-          onClick={(e) => {
-            e.stopPropagation();
-            onCTAClick?.();
-          }}
-        >
+        <div className="w-full flex items-center justify-center gap-2 text-deep-onyx dark:text-pure-mist">
           <UserRoundPlus className="w-4 h-4" />
           Build Your Agent
         </div>

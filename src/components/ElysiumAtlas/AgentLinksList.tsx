@@ -57,7 +57,7 @@ export default function AgentLinksList({
 }: AgentLinksListProps) {
   const dispatch = useDispatch();
   const knowledgeBaseLinks = useSelector(
-    (state: RootState) => state.agent.knowledgeBaseLinks
+    (state: RootState) => state.agent.knowledgeBaseLinks,
   );
   const agentID = useSelector((state: RootState) => state.agent.agentID);
   const [currentPage, setCurrentPage] = useState(1);
@@ -81,7 +81,7 @@ export default function AgentLinksList({
     }
     const lowerSearchTerm = searchTerm.toLowerCase();
     return knowledgeBaseLinks.filter((item) =>
-      item.link.toLowerCase().includes(lowerSearchTerm)
+      item.link.toLowerCase().includes(lowerSearchTerm),
     );
   }, [knowledgeBaseLinks, searchTerm]);
 
@@ -89,14 +89,6 @@ export default function AgentLinksList({
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
-
-  // Configure NProgress on mount
-  useEffect(() => {
-    NProgress.configure({
-      showSpinner: false,
-      trickleSpeed: 200,
-    });
-  }, []);
 
   const totalPages = Math.ceil(filteredLinks.length / LINKS_PER_PAGE);
   const startIndex = (currentPage - 1) * LINKS_PER_PAGE;
@@ -132,7 +124,7 @@ export default function AgentLinksList({
   // Check if any existing links are checked (for showing Reindex Selected)
   const hasExistingChecked = useMemo(() => {
     return knowledgeBaseLinks.some(
-      (item) => item.checked && item.status === "existing"
+      (item) => item.checked && item.status === "existing",
     );
   }, [knowledgeBaseLinks]);
 
@@ -237,7 +229,7 @@ export default function AgentLinksList({
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.data.success === true) {
@@ -283,12 +275,12 @@ export default function AgentLinksList({
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.data.success === true) {
         toast.success(
-          response.data.message || "Successfully removed links from agent"
+          response.data.message || "Successfully removed links from agent",
         );
         NProgress.done();
         return response.data;
@@ -336,7 +328,7 @@ export default function AgentLinksList({
         // Ping the URL to validate and normalize it
         const pingResponse = await fastApiAxios.post(
           "/elysium-agents/elysium-atlas/v1/ping-url",
-          { url: manualLink.trim() }
+          { url: manualLink.trim() },
         );
 
         if (pingResponse.data.success && pingResponse.data.data.reachable) {
@@ -344,7 +336,7 @@ export default function AgentLinksList({
 
           // Check if the normalized URL already exists
           const exists = knowledgeBaseLinks.some(
-            (item) => item.link === normalizedUrl
+            (item) => item.link === normalizedUrl,
           );
 
           if (!exists) {
@@ -361,7 +353,7 @@ export default function AgentLinksList({
           }
         } else {
           toast.error(
-            "URL is not reachable. Please check the URL and try again."
+            "URL is not reachable. Please check the URL and try again.",
           );
         }
       } catch (error: any) {
@@ -708,7 +700,7 @@ export default function AgentLinksList({
                           );
                         }
                         return null;
-                      }
+                      },
                     )}
                   </div>
 
@@ -736,7 +728,7 @@ export default function AgentLinksList({
               {currentLinks.map((item, localIndex) => {
                 // Find the original index in the full knowledgeBaseLinks array
                 const originalIndex = knowledgeBaseLinks.findIndex(
-                  (linkItem) => linkItem.link === item.link
+                  (linkItem) => linkItem.link === item.link,
                 );
                 return (
                   <div
@@ -800,7 +792,7 @@ export default function AgentLinksList({
                               e.stopPropagation();
                               handleRemoveLink(
                                 item.link,
-                                item.status === "existing"
+                                item.status === "existing",
                               );
                             }}
                             disabled={deletingLink === item.link}

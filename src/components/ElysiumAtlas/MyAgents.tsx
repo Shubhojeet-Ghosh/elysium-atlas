@@ -10,18 +10,19 @@ import { Plus } from "lucide-react";
 import MyAgentsTable from "./MyAgentsTable";
 import { useRouter } from "next/navigation";
 import { resetAgentBuilder } from "@/store/reducers/agentBuilderSlice";
+import NProgress from "nprogress";
 
 export default function MyAgents() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const agents = useAppSelector((state) => state.userAgents.myAgents);
   const triggerFetch = useAppSelector(
-    (state) => state.userAgents.trigger_fetch_agents
+    (state) => state.userAgents.trigger_fetch_agents,
   );
-  // Placeholder state for loading and agentName
 
   // Placeholder handler for button
   const handleBuildNewAgent = () => {
+    NProgress.start();
     dispatch(resetAgentBuilder());
     router.push("/my-agents/build");
   };
@@ -44,13 +45,13 @@ export default function MyAgents() {
                   Authorization: `Bearer ${token}`,
                 },
               }
-            : undefined
+            : undefined,
         );
         if (res.data && res.data.success && Array.isArray(res.data.agents)) {
           if (isMounted) dispatch(setMyAgents(res.data.agents));
           // Check if any agent_status is not in allowedStatuses
           const hasPending = res.data.agents.some(
-            (agent: any) => !allowedStatuses.includes(agent.agent_status)
+            (agent: any) => !allowedStatuses.includes(agent.agent_status),
           );
           if (hasPending && isMounted) {
             pollingRef.current = setTimeout(fetchAgentsAndMaybePoll, 5000);

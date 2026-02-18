@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { useRouter } from "next/navigation";
+import NProgress from "nprogress";
 
 import {
   Table,
@@ -62,7 +63,7 @@ export default function MyAgentsTable() {
     return (agents || []).filter(
       (agent: any) =>
         agent.agent_name.toLowerCase().includes(lowerSearchTerm) ||
-        agent.agent_status.toLowerCase().includes(lowerSearchTerm)
+        agent.agent_status.toLowerCase().includes(lowerSearchTerm),
     );
   }, [agents, searchTerm]);
 
@@ -76,7 +77,7 @@ export default function MyAgentsTable() {
   const endIndex = startIndex + AGENTS_PER_PAGE;
   const currentAgents = useMemo(
     () => filteredAgents.slice(startIndex, endIndex),
-    [filteredAgents, startIndex, endIndex]
+    [filteredAgents, startIndex, endIndex],
   );
 
   // Handle scroll to detect gradient visibility
@@ -115,6 +116,11 @@ export default function MyAgentsTable() {
     setCurrentPage(page);
   };
 
+  const handleAgentClick = (agentId: string) => {
+    NProgress.start();
+    router.push(`/my-agents/${agentId}`);
+  };
+
   const handleDeleteAgent = (agent: any) => {
     setAgentToDelete(agent);
     setDeleteDialogOpen(true);
@@ -136,7 +142,7 @@ export default function MyAgentsTable() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.data.success === true) {
@@ -211,9 +217,7 @@ export default function MyAgentsTable() {
                     <TableRow
                       key={agent.agent_id}
                       className="cursor-pointer border-b border-gray-100 dark:border-deep-onyx hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 hover:text-serene-purple dark:hover:text-serene-purple transition-all duration-200"
-                      onClick={() =>
-                        router.push(`/my-agents/${agent.agent_id}`)
-                      }
+                      onClick={() => handleAgentClick(agent.agent_id)}
                     >
                       <TableCell className="font-medium min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] py-2 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist">
                         <div className="truncate">{agent.agent_name}</div>
@@ -229,7 +233,7 @@ export default function MyAgentsTable() {
                       </TableCell>
                       <TableCell className="w-[40px] md:w-[60px] py-2 px-[10px] text-right">
                         {["active", "inactive", "failed"].includes(
-                          agent.agent_status.toLowerCase()
+                          agent.agent_status.toLowerCase(),
                         ) ? (
                           <div className="mx-auto flex items-center justify-center h-[30px] w-[30px]">
                             <DropdownMenu>
@@ -337,7 +341,7 @@ export default function MyAgentsTable() {
                             );
                           }
                           return null;
-                        }
+                        },
                       )}
                     </div>
                     <button
