@@ -1,15 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, memo } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import { addMessage, setIsTyping } from "@/store/reducers/agentChatSlice";
-import {
-  connectAiSocket,
-  disconnectAiSocket,
-  waitForAiSocketConnection,
-} from "@/lib/aiSocket";
+import { connectAiSocket, disconnectAiSocket } from "@/lib/aiSocket";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -20,15 +16,13 @@ import ChatMessage from "./ChatMessage";
 import MessageActions from "./MessageActions";
 import { formatChatTimestamp } from "@/utils/formatDate";
 import { markdownComponents } from "@/utils/markdownComponents";
-import type { Socket } from "socket.io-client";
-
-const RESPONSE_TIMEOUT_MS = 30000;
 
 export default function MainChatSpace() {
   const {
     agent_id,
     chat_session_id,
     primary_color,
+    secondary_color,
     text_color,
     placeholder_text,
     conversation_chain,
@@ -40,15 +34,12 @@ export default function MainChatSpace() {
   const dispatch = useAppDispatch();
   const [inputValue, setInputValue] = useState("");
   const [newMessageAnimating, setNewMessageAnimating] = useState(false);
+  const [socket, setSocket] = useState<any>(null);
   const [streamingMessage, setStreamingMessage] = useState("");
   const [showScrollButton, setShowScrollButton] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const socketRef = useRef<Socket | null>(null);
-  const streamingMessageRef = useRef("");
-  const responseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isTypingRef = useRef(isTyping);
 
   // Intercept link clicks and open in parent window
   useEffect(() => {
@@ -70,114 +61,30 @@ export default function MainChatSpace() {
   }, []);
 
   // Connect socket on mount, disconnect on unmount, and handle visitor connection
-  const clearResponseTimeout = useCallback(() => {
-    if (responseTimeoutRef.current) {
-      clearTimeout(responseTimeoutRef.current);
-      responseTimeoutRef.current = null;
-    }
-  }, []);
-
-  const finalizeInterruptedResponse = useCallback(
-    (reason: string) => {
-      const partialMessage = streamingMessageRef.current.trim();
-      clearResponseTimeout();
-      isTypingRef.current = false;
-      dispatch(setIsTyping(false));
-
-      if (partialMessage) {
-        dispatch(
-          addMessage({
-            message_id: uuidv4(),
-            role: "agent",
-            content: partialMessage,
-            created_at: new Date().toISOString(),
-          })
-        );
-      } else {
-        dispatch(
-          addMessage({
-            message_id: uuidv4(),
-            role: "agent",
-            content:
-              "Connection was interrupted while generating a response. Please resend your last message.",
-            created_at: new Date().toISOString(),
-          })
-        );
-      }
-
-      setStreamingMessage("");
-      streamingMessageRef.current = "";
-      console.warn(reason);
-    },
-    [clearResponseTimeout, dispatch]
-  );
-
-  const startResponseTimeout = useCallback(() => {
-    clearResponseTimeout();
-    responseTimeoutRef.current = setTimeout(() => {
-      finalizeInterruptedResponse("Response stream timed out.");
-    }, RESPONSE_TIMEOUT_MS);
-  }, [clearResponseTimeout, finalizeInterruptedResponse]);
-
-  const ensureConnectedSocket = useCallback(async (): Promise<Socket> => {
-    const socketInstance = socketRef.current ?? connectAiSocket();
-    socketRef.current = socketInstance;
-
-    if (socketInstance.connected) {
-      return socketInstance;
-    }
-
-    return waitForAiSocketConnection();
-  }, []);
-
   useEffect(() => {
-    streamingMessageRef.current = streamingMessage;
-  }, [streamingMessage]);
-
-  useEffect(() => {
-    isTypingRef.current = isTyping;
-  }, [isTyping]);
-
-  useEffect(() => {
+    // Only connect socket after API processing is complete
     if (isFetching) {
       return;
     }
 
+    // Connect the AI socket and store the instance
     const socketInstance = connectAiSocket();
-    socketRef.current = socketInstance;
-
-    const emitVisitorConnected = () => {
-      if (!agent_id || !chat_session_id) return;
-      socketInstance.emit("atlas-visitor-connected", {
-        agent_id,
-        chat_session_id,
-      });
-    };
+    setSocket(socketInstance);
 
     const handleConnect = () => {
-      emitVisitorConnected();
-    };
-
-    const handleDisconnect = () => {
-      if (isTypingRef.current || streamingMessageRef.current) {
-        finalizeInterruptedResponse("Socket disconnected during active response.");
-      } else {
-        isTypingRef.current = false;
-        dispatch(setIsTyping(false));
+      // Send atlas-visitor-connected event if both agent_id and chat_session_id are truthy
+      if (agent_id && chat_session_id) {
+        socketInstance.emit("atlas-visitor-connected", {
+          agent_id,
+          chat_session_id,
+        });
       }
     };
 
-    const handleConnectError = () => {
-      if (isTypingRef.current || streamingMessageRef.current) {
-        finalizeInterruptedResponse(
-          "Socket connect error occurred during active response."
-        );
-      } else {
-        isTypingRef.current = false;
-        dispatch(setIsTyping(false));
-      }
-    };
+    // Listen for connection event
+    socketInstance.on("connect", handleConnect);
 
+    // Listen for response chunks
     const handleResponseChunk = (data: {
       chunk: string;
       done: boolean;
@@ -186,72 +93,55 @@ export default function MainChatSpace() {
       created_at?: string;
       role?: string;
     }) => {
-      if (!data.done) {
-        clearResponseTimeout();
-        if (isTypingRef.current) {
-          isTypingRef.current = false;
+      if (data.done) {
+        const newMessage = {
+          message_id: data.message_id || uuidv4(),
+          role: (data.role as "user" | "agent" | "human") || "agent",
+          content: data.full_response || streamingMessage,
+          created_at: data.created_at || new Date().toISOString(),
+        };
+        dispatch(addMessage(newMessage));
+        setStreamingMessage("");
+        dispatch(setIsTyping(false));
+      } else {
+        if (streamingMessage === "") {
           dispatch(setIsTyping(false));
         }
         setStreamingMessage((prev) => prev + data.chunk);
-        return;
       }
-
-      clearResponseTimeout();
-      const finalContent =
-        (data.full_response && data.full_response.trim()) ||
-        streamingMessageRef.current;
-
-      if (finalContent) {
-        dispatch(
-          addMessage({
-            message_id: data.message_id || uuidv4(),
-            role: (data.role as "user" | "agent" | "human") || "agent",
-            content: finalContent,
-            created_at: data.created_at || new Date().toISOString(),
-          })
-        );
-      }
-
-      setStreamingMessage("");
-      streamingMessageRef.current = "";
-      isTypingRef.current = false;
-      dispatch(setIsTyping(false));
     };
 
-    socketInstance.on("connect", handleConnect);
-    socketInstance.on("disconnect", handleDisconnect);
-    socketInstance.on("connect_error", handleConnectError);
     socketInstance.on("atlas_response_chunk", handleResponseChunk);
 
-    if (socketInstance.connected) {
-      emitVisitorConnected();
-    } else {
-      void waitForAiSocketConnection().catch(() => {
-        // Initial connect will keep retrying due socket.io reconnection settings.
+    // If socket is already connected, emit the event
+    if (socketInstance.connected && agent_id && chat_session_id) {
+      socketInstance.emit("atlas-visitor-connected", {
+        agent_id,
+        chat_session_id,
       });
     }
 
+    // Cleanup: disconnect socket when component unmounts
     return () => {
       socketInstance.off("connect", handleConnect);
-      socketInstance.off("disconnect", handleDisconnect);
-      socketInstance.off("connect_error", handleConnectError);
       socketInstance.off("atlas_response_chunk", handleResponseChunk);
-      clearResponseTimeout();
       disconnectAiSocket();
-      socketRef.current = null;
+      setSocket(null);
     };
-  }, [
-    agent_id,
-    chat_session_id,
-    isFetching,
-    dispatch,
-    clearResponseTimeout,
-    finalizeInterruptedResponse,
-  ]);
+  }, [agent_id, chat_session_id, isFetching]);
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     messagesEndRef.current?.scrollIntoView({ behavior });
   };
+
+  useEffect(() => {
+    if (!conversation_chain.length) return;
+
+    const lastRole = conversation_chain[conversation_chain.length - 1]?.role;
+    if (lastRole === "user") {
+      scrollToBottom();
+    }
+  }, [conversation_chain]);
 
   useEffect(() => {
     if (newMessageAnimating) {
@@ -278,7 +168,7 @@ export default function MainChatSpace() {
   };
 
   const handleSendMessage = useCallback(
-    async (message?: string) => {
+    (message?: string) => {
       const msg = message || inputValue.trim();
       if (msg === "") return;
 
@@ -292,21 +182,8 @@ export default function MainChatSpace() {
       };
 
       dispatch(addMessage(newMessage));
-      requestAnimationFrame(() => {
-        scrollToBottom("smooth");
-      });
 
-      setNewMessageAnimating(true);
-      setInputValue("");
-
-      // Reset textarea height
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "40px";
-      }
-
-      try {
-        const socketInstance = await ensureConnectedSocket();
-
+      const emitMessage = (socketInstance: any) => {
         socketInstance.emit("atlas-visitor-message", {
           agent_id,
           message: msg,
@@ -315,34 +192,49 @@ export default function MainChatSpace() {
         });
 
         if (chatMode === "ai") {
-          isTypingRef.current = true;
           dispatch(setIsTyping(true));
-          startResponseTimeout();
         }
-      } catch (error) {
-        isTypingRef.current = false;
-        dispatch(setIsTyping(false));
-        dispatch(
-          addMessage({
-            message_id: uuidv4(),
-            role: "agent",
-            content:
-              "Unable to reach the server right now. Please check your network and try again.",
-            created_at: new Date().toISOString(),
-          })
-        );
-        console.error("Failed to send message over socket:", error);
+      };
+
+      if (socket) {
+        // Check if socket is connected
+        if (socket.connected) {
+          // Socket is connected, emit directly
+          emitMessage(socket);
+        } else {
+          // Socket is disconnected, reconnect first then emit
+          console.log(
+            "Socket disconnected, reconnecting before sending message..."
+          );
+          const reconnectedSocket = connectAiSocket();
+
+          // Wait for connection before emitting
+          if (reconnectedSocket.connected) {
+            emitMessage(reconnectedSocket);
+          } else {
+            // Listen for connect event and then emit
+            reconnectedSocket.once("connect", () => {
+              console.log("Socket reconnected, sending message...");
+              // Re-emit visitor connected event
+              reconnectedSocket.emit("atlas-visitor-connected", {
+                agent_id,
+                chat_session_id,
+              });
+              emitMessage(reconnectedSocket);
+            });
+          }
+        }
+      }
+
+      setNewMessageAnimating(true);
+      setInputValue("");
+
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "40px";
       }
     },
-    [
-      inputValue,
-      ensureConnectedSocket,
-      agent_id,
-      chat_session_id,
-      chatMode,
-      dispatch,
-      startResponseTimeout,
-    ]
+    [inputValue, socket, agent_id, chat_session_id, chatMode, dispatch]
   );
 
   const handleKeyDown = useCallback(

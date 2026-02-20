@@ -8,7 +8,9 @@ import {
   setAgentFields,
   setIsFetching,
   setConversationChain,
+  addMessage,
 } from "@/store/reducers/agentChatSlice";
+import { set } from "nprogress";
 
 export default function AgentChatSpace() {
   const { agent_id, chat_session_id, visitor_at } = useAppSelector(

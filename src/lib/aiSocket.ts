@@ -1,12 +1,66 @@
 import { io, Socket } from "socket.io-client";
 
+// Connection state tracking
+let reconnectAttempts = 0;
+let heartbeatInterval: NodeJS.Timeout | null = null;
+let connectionTimeout: NodeJS.Timeout | null = null;
 let isIntentionalDisconnect = false;
-type SocketConnectionArgs = {
-  elysium_atlas_session_token?: string;
-};
+let lastPongTime = Date.now();
+
+const MAX_RECONNECT_ATTEMPTS = 10;
 const BASE_RECONNECTION_DELAY = 1000;
-const MAX_RECONNECTION_DELAY = 15000;
-const CONNECTION_TIMEOUT = 20000;
+const MAX_RECONNECTION_DELAY = 30000;
+const CONNECTION_TIMEOUT = 10000; // 10 seconds
+const HEARTBEAT_INTERVAL = 30000; // 30 seconds
+const HEARTBEAT_TIMEOUT = 60000; // 60 seconds
+
+/**
+ * Calculate exponential backoff delay with jitter
+ */
+const getReconnectionDelay = (attemptNumber: number): number => {
+  const exponentialDelay = Math.min(
+    BASE_RECONNECTION_DELAY * Math.pow(2, attemptNumber),
+    MAX_RECONNECTION_DELAY
+  );
+  // Add jitter to prevent thundering herd
+  const jitter = Math.random() * 1000;
+  return exponentialDelay + jitter;
+};
+
+/**
+ * Clear all timers and intervals
+ */
+const clearTimers = () => {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+  }
+  if (connectionTimeout) {
+    clearTimeout(connectionTimeout);
+    connectionTimeout = null;
+  }
+};
+
+/**
+ * Start heartbeat monitoring to detect stale connections
+ */
+const startHeartbeat = () => {
+  clearTimers();
+
+  heartbeatInterval = setInterval(() => {
+    if (aiSocket.connected) {
+      const timeSinceLastPong = Date.now() - lastPongTime;
+
+      if (timeSinceLastPong > HEARTBEAT_TIMEOUT) {
+        console.warn("Heartbeat timeout detected, reconnecting...");
+        aiSocket.disconnect();
+        aiSocket.connect();
+      } else {
+        aiSocket.emit("ping");
+      }
+    }
+  }, HEARTBEAT_INTERVAL);
+};
 
 // Create the socket once; don't auto-connect and don't send auth yet
 const aiSocket: Socket = io(
@@ -14,13 +68,12 @@ const aiSocket: Socket = io(
     "https://ai.sgdevstudio.in",
   {
     path: "/socket.io",
-    transports: ["websocket", "polling"],
+    transports: ["websocket", "polling"], // Fallback to polling if websocket fails
     autoConnect: false,
     reconnection: true,
-    reconnectionAttempts: Infinity,
     reconnectionDelay: BASE_RECONNECTION_DELAY,
     reconnectionDelayMax: MAX_RECONNECTION_DELAY,
-    randomizationFactor: 0.5,
+    reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
     timeout: CONNECTION_TIMEOUT,
     forceNew: false,
     multiplex: true,
@@ -30,27 +83,72 @@ const aiSocket: Socket = io(
 // --- Event listeners ---
 aiSocket.on("connect", () => {
   console.log("AI socket connected:", aiSocket.id);
+  reconnectAttempts = 0;
+  lastPongTime = Date.now();
+  clearTimers();
+  startHeartbeat();
+
+  // Clear connection timeout if set
+  if (connectionTimeout) {
+    clearTimeout(connectionTimeout);
+    connectionTimeout = null;
+  }
 });
 
 aiSocket.on("disconnect", (reason) => {
   console.log("AI socket disconnected:", reason);
-  if (isIntentionalDisconnect) {
-    isIntentionalDisconnect = false;
-    return;
+  clearTimers();
+
+  // Only attempt reconnection if not intentional
+  if (!isIntentionalDisconnect) {
+    if (reason === "io server disconnect") {
+      // Server initiated disconnect - attempt to reconnect
+      console.log("Server disconnected, attempting to reconnect...");
+      setTimeout(() => {
+        if (!aiSocket.connected) {
+          aiSocket.connect();
+        }
+      }, getReconnectionDelay(reconnectAttempts));
+    } else if (reason === "transport close" || reason === "transport error") {
+      // Network issues - will auto-reconnect with backoff
+      console.log("Network issue detected, auto-reconnecting...");
+    }
   }
-  console.warn("Socket disconnected unexpectedly; auto-reconnect is active.");
+
+  isIntentionalDisconnect = false;
 });
 
 aiSocket.on("connect_error", (error) => {
-  console.error("AI socket connection error:", error.message);
+  reconnectAttempts++;
+  console.error(
+    `AI socket connection error (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}):`,
+    error.message
+  );
+
+  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    console.error(
+      "Max reconnection attempts reached. Please check your connection."
+    );
+  }
+});
+
+aiSocket.on("reconnect_attempt", (attemptNumber) => {
+  console.log(`Reconnection attempt ${attemptNumber}...`);
 });
 
 aiSocket.on("reconnect_failed", () => {
   console.error("Reconnection failed after maximum attempts");
+  clearTimers();
 });
 
 aiSocket.on("reconnect", (attemptNumber) => {
   console.log(`Successfully reconnected after ${attemptNumber} attempts`);
+  reconnectAttempts = 0;
+});
+
+// Heartbeat response
+aiSocket.on("pong", () => {
+  lastPongTime = Date.now();
 });
 
 // Handle errors during communication
@@ -60,50 +158,37 @@ aiSocket.on("error", (error) => {
 
 /**
  * Connect the AI socket if it's not already connected.
+ * Includes connection timeout handling.
  */
-export const connectAiSocket = (args: SocketConnectionArgs = {}): Socket => {
-  if (args && args.elysium_atlas_session_token) {
-    aiSocket.auth = { token: args.elysium_atlas_session_token };
-  }
-
-  isIntentionalDisconnect = false;
+export const connectAiSocket = (args: any = {}): Socket => {
   if (!aiSocket.connected) {
+    if (args && args.elysium_atlas_session_token) {
+      aiSocket.auth = { token: args.elysium_atlas_session_token };
+    }
+
+    isIntentionalDisconnect = false;
+    reconnectAttempts = 0;
+
+    // Set connection timeout
+    connectionTimeout = setTimeout(() => {
+      if (!aiSocket.connected) {
+        console.warn(
+          "Connection timeout - socket failed to connect within timeout period"
+        );
+        aiSocket.disconnect();
+
+        // Retry connection with backoff
+        setTimeout(() => {
+          if (!aiSocket.connected) {
+            connectAiSocket(args);
+          }
+        }, getReconnectionDelay(1));
+      }
+    }, CONNECTION_TIMEOUT);
+
     aiSocket.connect();
   }
   return aiSocket;
-};
-
-/**
- * Wait for socket connection and reject if timeout is reached.
- */
-export const waitForAiSocketConnection = (
-  timeoutMs = CONNECTION_TIMEOUT
-): Promise<Socket> => {
-  const socket = connectAiSocket();
-  if (socket.connected) {
-    return Promise.resolve(socket);
-  }
-
-  return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      socket.off("connect", onConnect);
-      reject(lastError ?? new Error("Socket connection timeout"));
-    }, timeoutMs);
-    let lastError: Error | null = null;
-
-    const onConnect = () => {
-      clearTimeout(timeoutId);
-      socket.off("connect_error", onError);
-      resolve(socket);
-    };
-
-    const onError = (error: Error) => {
-      lastError = error;
-    };
-
-    socket.once("connect", onConnect);
-    socket.once("connect_error", onError);
-  });
 };
 
 /**
@@ -111,23 +196,27 @@ export const waitForAiSocketConnection = (
  * Marks as intentional to prevent auto-reconnection.
  */
 export const disconnectAiSocket = (): void => {
-  if (aiSocket.connected || aiSocket.active) {
+  if (aiSocket.connected) {
     isIntentionalDisconnect = true;
+    clearTimers();
     aiSocket.disconnect();
   }
 };
 
 /**
- * Check if socket is connected.
+ * Check if socket is connected and healthy
  */
 export const isAiSocketHealthy = (): boolean => {
-  return aiSocket.connected;
+  if (!aiSocket.connected) return false;
+
+  const timeSinceLastPong = Date.now() - lastPongTime;
+  return timeSinceLastPong < HEARTBEAT_TIMEOUT;
 };
 
 /**
  * Force reconnection (useful for handling auth token updates)
  */
-export const reconnectAiSocket = (args: SocketConnectionArgs = {}): Socket => {
+export const reconnectAiSocket = (args: any = {}): Socket => {
   disconnectAiSocket();
   setTimeout(() => {
     connectAiSocket(args);
@@ -139,6 +228,7 @@ export const reconnectAiSocket = (args: SocketConnectionArgs = {}): Socket => {
 if (typeof window !== "undefined") {
   window.addEventListener("beforeunload", () => {
     isIntentionalDisconnect = true;
+    clearTimers();
     if (aiSocket.connected) {
       aiSocket.disconnect();
     }
