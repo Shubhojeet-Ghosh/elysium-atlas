@@ -12,6 +12,8 @@ export interface KnowledgeBaseLink {
   link: string;
   checked: boolean;
   status: string;
+  updated_at: string | null;
+  api_status?: string;
 }
 
 export interface CustomText {

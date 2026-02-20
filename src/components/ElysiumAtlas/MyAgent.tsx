@@ -28,6 +28,7 @@ import {
   setKnowledgeBaseText,
   setKnowledgeBaseQnA,
   setTriggerGetAgentDetails,
+  setTriggerFetchAgentUrls,
 } from "@/store/reducers/agentSlice";
 import {
   setChatSessionId,
@@ -62,19 +63,19 @@ export default function MyAgent({
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
 
   const knowledgeBaseLinks = useAppSelector(
-    (state) => state.agent.knowledgeBaseLinks
+    (state) => state.agent.knowledgeBaseLinks,
   );
 
   const knowledgeBaseFiles = useAppSelector(
-    (state) => state.agent.knowledgeBaseFiles
+    (state) => state.agent.knowledgeBaseFiles,
   );
 
   const knowledgeBaseText = useAppSelector(
-    (state) => state.agent.knowledgeBaseText
+    (state) => state.agent.knowledgeBaseText,
   );
 
   const knowledgeBaseQnA = useAppSelector(
-    (state) => state.agent.knowledgeBaseQnA
+    (state) => state.agent.knowledgeBaseQnA,
   );
 
   // Initialize mappedInitial from initialAgentDetails
@@ -91,13 +92,13 @@ export default function MyAgent({
       // Only update if knowledgeBaseLinks have "existing" status items
       // (meaning they were fetched from the API, not newly added)
       const existingLinks = knowledgeBaseLinks.filter(
-        (link) => link.status === "existing"
+        (link) => link.status === "existing",
       );
 
       // Only sync if there are existing links and they differ from mappedInitial
       if (existingLinks.length > 0) {
         const currentMappedLinkUrls = new Set(
-          mappedInitial.knowledgeBaseLinks.map((l: any) => l.link)
+          mappedInitial.knowledgeBaseLinks.map((l: any) => l.link),
         );
         const fetchedLinkUrls = new Set(existingLinks.map((l) => l.link));
 
@@ -105,7 +106,7 @@ export default function MyAgent({
         const isDifferent =
           existingLinks.length !== mappedInitial.knowledgeBaseLinks.length ||
           !Array.from(fetchedLinkUrls).every((url) =>
-            currentMappedLinkUrls.has(url)
+            currentMappedLinkUrls.has(url),
           );
 
         if (isDifferent) {
@@ -125,13 +126,13 @@ export default function MyAgent({
       // Only update if knowledgeBaseFiles have "existing" status items
       // (meaning they were fetched from the API, not newly added)
       const existingFiles = knowledgeBaseFiles.filter(
-        (file) => file.status === "existing"
+        (file) => file.status === "existing",
       );
 
       // Only sync if there are existing files and they differ from mappedInitial
       if (existingFiles.length > 0) {
         const currentMappedFileNames = new Set(
-          mappedInitial.knowledgeBaseFiles.map((f: any) => f.name)
+          mappedInitial.knowledgeBaseFiles.map((f: any) => f.name),
         );
         const fetchedFileNames = new Set(existingFiles.map((f) => f.name));
 
@@ -139,7 +140,7 @@ export default function MyAgent({
         const isDifferent =
           existingFiles.length !== mappedInitial.knowledgeBaseFiles.length ||
           !Array.from(fetchedFileNames).every((name) =>
-            currentMappedFileNames.has(name)
+            currentMappedFileNames.has(name),
           );
 
         if (isDifferent) {
@@ -159,18 +160,18 @@ export default function MyAgent({
       // Only update if knowledgeBaseText have "existing" status items
       // (meaning they were fetched from the API, not newly added)
       const existingTexts = knowledgeBaseText.filter(
-        (text) => text.status === "existing"
+        (text) => text.status === "existing",
       );
 
       // Only sync if there are existing texts and they differ from mappedInitial
       if (existingTexts.length > 0) {
         const currentMappedTextAliases = new Set(
           mappedInitial.knowledgeBaseText?.map(
-            (t: any) => t.custom_text_alias
-          ) || []
+            (t: any) => t.custom_text_alias,
+          ) || [],
         );
         const fetchedTextAliases = new Set(
-          existingTexts.map((t) => t.custom_text_alias)
+          existingTexts.map((t) => t.custom_text_alias),
         );
 
         // Check if the text lists are different (different lengths or different aliases)
@@ -178,7 +179,7 @@ export default function MyAgent({
           existingTexts.length !==
             (mappedInitial.knowledgeBaseText?.length || 0) ||
           !Array.from(fetchedTextAliases).every((alias) =>
-            currentMappedTextAliases.has(alias)
+            currentMappedTextAliases.has(alias),
           );
 
         if (isDifferent) {
@@ -197,13 +198,13 @@ export default function MyAgent({
     if (mappedInitial && knowledgeBaseQnA.length > 0) {
       // Only update if knowledgeBaseQnA have "existing" status items
       const existingQnA = knowledgeBaseQnA.filter(
-        (qna) => qna.status === "existing"
+        (qna) => qna.status === "existing",
       );
 
       // Only sync if there are existing QnA and they differ from mappedInitial
       if (existingQnA.length > 0) {
         const currentMappedQnAAliases = new Set(
-          mappedInitial.knowledgeBaseQnA?.map((q: any) => q.qna_alias) || []
+          mappedInitial.knowledgeBaseQnA?.map((q: any) => q.qna_alias) || [],
         );
         const fetchedQnAAliases = new Set(existingQnA.map((q) => q.qna_alias));
 
@@ -212,7 +213,7 @@ export default function MyAgent({
           existingQnA.length !==
             (mappedInitial.knowledgeBaseQnA?.length || 0) ||
           !Array.from(fetchedQnAAliases).every((alias) =>
-            currentMappedQnAAliases.has(alias)
+            currentMappedQnAAliases.has(alias),
           );
 
         if (isDifferent) {
@@ -227,7 +228,10 @@ export default function MyAgent({
 
   const dispatch = useAppDispatch();
   const triggerGetAgentDetails = useAppSelector(
-    (state) => state.agent.triggerGetAgentDetails
+    (state) => state.agent.triggerGetAgentDetails,
+  );
+  const triggerFetchAgentUrls = useAppSelector(
+    (state) => state.agent.triggerFetchAgentUrls,
   );
   const currentAgentDetails = useCurrentAgentDetails();
 
@@ -244,7 +248,7 @@ export default function MyAgent({
   const buildUpdatePayload = (
     mappedInitial: any,
     current: any,
-    initialAgentDetails: any
+    initialAgentDetails: any,
   ) => {
     const payload: any = {
       agent_id:
@@ -348,7 +352,7 @@ export default function MyAgent({
       let payload = buildUpdatePayload(
         mappedInitial,
         current,
-        initialAgentDetails
+        initialAgentDetails,
       );
 
       // Keep track of newly uploaded files to remove after successful save
@@ -376,13 +380,13 @@ export default function MyAgent({
               headers: {
                 Authorization: `Bearer ${token}`,
               },
-            }
+            },
           );
 
           if (!presignedResponse.data.success) {
             toast.error(
               presignedResponse.data.message ||
-                "Failed to generate presigned URLs"
+                "Failed to generate presigned URLs",
             );
             return;
           }
@@ -397,7 +401,7 @@ export default function MyAgent({
                 cdn_url?: string;
               }) => {
                 const file = documentFiles.find(
-                  (df) => df.name === urlObj.filename
+                  (df) => df.name === urlObj.filename,
                 );
                 if (file) {
                   await axios.put(urlObj.upload_url, file, {
@@ -406,7 +410,7 @@ export default function MyAgent({
                     },
                   });
                 }
-              }
+              },
             );
 
           await Promise.all(uploadPromises);
@@ -415,7 +419,7 @@ export default function MyAgent({
           const updatedFiles = knowledgeBaseFiles.map((file) => {
             const presignedFile =
               presignedResponse.data.presigned_urls.files.find(
-                (f: any) => f.filename === file.name
+                (f: any) => f.filename === file.name,
               );
             if (presignedFile) {
               return {
@@ -467,7 +471,7 @@ export default function MyAgent({
       // Add new custom texts to payload if any exist
       const newCustomTexts =
         current.knowledgeBaseText?.filter(
-          (text: any) => text.status === "new"
+          (text: any) => text.status === "new",
         ) || [];
 
       if (newCustomTexts.length > 0) {
@@ -487,16 +491,17 @@ export default function MyAgent({
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.data.success) {
         toast.success(response.data.message || "Agent updated successfully");
+        dispatch(setTriggerFetchAgentUrls(triggerFetchAgentUrls + 1));
 
         // Remove new links from Redux after successful save
         if (newLinksToRemove.length > 0) {
           const updatedLinks = current.knowledgeBaseLinks.filter(
-            (link: any) => !newLinksToRemove.includes(link.link)
+            (link: any) => !newLinksToRemove.includes(link.link),
           );
           dispatch(setKnowledgeBaseLinks(updatedLinks));
         }
@@ -504,7 +509,7 @@ export default function MyAgent({
         // Remove newly uploaded files from Redux after successful save
         if (newFilesToRemove.length > 0) {
           const updatedFiles = current.knowledgeBaseFiles.filter(
-            (file: any) => !newFilesToRemove.includes(file.name)
+            (file: any) => !newFilesToRemove.includes(file.name),
           );
           dispatch(setKnowledgeBaseFiles(updatedFiles));
         }
@@ -512,7 +517,7 @@ export default function MyAgent({
         // Remove newly added custom texts from Redux after successful save
         if (newTextsToRemove.length > 0) {
           const updatedTexts = current.knowledgeBaseText.filter(
-            (text: any) => !newTextsToRemove.includes(text.custom_text_alias)
+            (text: any) => !newTextsToRemove.includes(text.custom_text_alias),
           );
           dispatch(setKnowledgeBaseText(updatedTexts));
         }
@@ -525,7 +530,7 @@ export default function MyAgent({
 
         if (newQnAToRemove.length > 0) {
           const updatedQnA = current.knowledgeBaseQnA.filter(
-            (qna: any) => !newQnAToRemove.includes(qna.qna_alias)
+            (qna: any) => !newQnAToRemove.includes(qna.qna_alias),
           );
           dispatch(setKnowledgeBaseQnA(updatedQnA));
         }
@@ -534,7 +539,7 @@ export default function MyAgent({
       } else {
         toast.error(
           "Failed to update agent: " +
-            (response.data.message || "Unknown error")
+            (response.data.message || "Unknown error"),
         );
       }
     } catch (error: any) {
@@ -591,14 +596,14 @@ export default function MyAgent({
     // Reset knowledge base data - filter out new items, keep only existing
     if (knowledgeBaseLinks !== undefined) {
       const existingLinks = knowledgeBaseLinks.filter(
-        (link) => link.status === "existing"
+        (link) => link.status === "existing",
       );
       dispatch(setKnowledgeBaseLinks(existingLinks));
     }
 
     if (knowledgeBaseFiles !== undefined) {
       const existingFiles = knowledgeBaseFiles.filter(
-        (file) => file.status === "existing"
+        (file) => file.status === "existing",
       );
       dispatch(setKnowledgeBaseFiles(existingFiles));
 
@@ -612,7 +617,7 @@ export default function MyAgent({
 
     if (knowledgeBaseText !== undefined) {
       const existingTexts = knowledgeBaseText.filter(
-        (text) => text.status === "existing"
+        (text) => text.status === "existing",
       );
       dispatch(setKnowledgeBaseText(existingTexts));
     }
@@ -621,7 +626,7 @@ export default function MyAgent({
     // but keep the existing ones that were fetched from the API
     if (knowledgeBaseQnA.length > 0) {
       const existingQnA = knowledgeBaseQnA.filter(
-        (qna) => qna.status === "existing"
+        (qna) => qna.status === "existing",
       );
       dispatch(setKnowledgeBaseQnA(existingQnA));
 

@@ -23,6 +23,7 @@ interface UserAgentState {
   welcomeMessage: string;
   llmModel: string;
   triggerGetAgentDetails: number;
+  triggerFetchAgentUrls: number;
   widget_script: string | null;
 }
 
@@ -43,6 +44,7 @@ const initialState: UserAgentState = {
   welcomeMessage: "",
   llmModel: "",
   triggerGetAgentDetails: 0,
+  triggerFetchAgentUrls: 0,
   widget_script: null,
 };
 
@@ -73,16 +75,16 @@ const agentSlice = createSlice({
     },
     setKnowledgeBaseLinks: (
       state,
-      action: PayloadAction<KnowledgeBaseLink[]>
+      action: PayloadAction<KnowledgeBaseLink[]>,
     ) => {
       state.knowledgeBaseLinks = action.payload;
     },
     addKnowledgeBaseLinks: (
       state,
-      action: PayloadAction<{ links: string[]; checked?: boolean }>
+      action: PayloadAction<{ links: string[]; checked?: boolean }>,
     ) => {
       const existingLinksSet = new Set(
-        state.knowledgeBaseLinks.map((item) => item.link)
+        state.knowledgeBaseLinks.map((item) => item.link),
       );
       const newLinks: KnowledgeBaseLink[] = action.payload.links
         .filter((link) => !existingLinksSet.has(link))
@@ -90,6 +92,7 @@ const agentSlice = createSlice({
           link,
           checked: action.payload.checked ?? true,
           status: "new",
+          updated_at: null,
         }));
       state.knowledgeBaseLinks = [...newLinks, ...state.knowledgeBaseLinks];
     },
@@ -106,7 +109,7 @@ const agentSlice = createSlice({
     },
     removeKnowledgeBaseLink: (state, action: PayloadAction<string>) => {
       state.knowledgeBaseLinks = state.knowledgeBaseLinks.filter(
-        (item) => item.link !== action.payload
+        (item) => item.link !== action.payload,
       );
     },
     setKnowledgeBaseFiles: (state, action: PayloadAction<FileMetadata[]>) => {
@@ -133,15 +136,15 @@ const agentSlice = createSlice({
     },
     removeKnowledgeBaseFile: (state, action: PayloadAction<string>) => {
       state.knowledgeBaseFiles = state.knowledgeBaseFiles.filter(
-        (item) => item.name !== action.payload
+        (item) => item.name !== action.payload,
       );
     },
     setFileChecked: (
       state,
-      action: PayloadAction<{ name: string; checked: boolean }>
+      action: PayloadAction<{ name: string; checked: boolean }>,
     ) => {
       const file = state.knowledgeBaseFiles.find(
-        (f) => f.name === action.payload.name
+        (f) => f.name === action.payload.name,
       );
       if (file) {
         file.checked = action.payload.checked;
@@ -160,7 +163,7 @@ const agentSlice = createSlice({
     },
     updateKnowledgeBaseText: (
       state,
-      action: PayloadAction<{ index: number; customText: CustomText }>
+      action: PayloadAction<{ index: number; customText: CustomText }>,
     ) => {
       if (state.knowledgeBaseText[action.payload.index]) {
         state.knowledgeBaseText[action.payload.index] = {
@@ -171,7 +174,7 @@ const agentSlice = createSlice({
     },
     removeKnowledgeBaseText: (state, action: PayloadAction<number>) => {
       state.knowledgeBaseText = state.knowledgeBaseText.filter(
-        (_, index) => index !== action.payload
+        (_, index) => index !== action.payload,
       );
     },
     setKnowledgeBaseQnA: (state, action: PayloadAction<QnA[]>) => {
@@ -187,7 +190,7 @@ const agentSlice = createSlice({
     },
     updateKnowledgeBaseQnA: (
       state,
-      action: PayloadAction<{ index: number; qna: QnA }>
+      action: PayloadAction<{ index: number; qna: QnA }>,
     ) => {
       if (state.knowledgeBaseQnA[action.payload.index]) {
         state.knowledgeBaseQnA[action.payload.index] = {
@@ -198,7 +201,7 @@ const agentSlice = createSlice({
     },
     removeKnowledgeBaseQnA: (state, action: PayloadAction<number>) => {
       state.knowledgeBaseQnA = state.knowledgeBaseQnA.filter(
-        (_, index) => index !== action.payload
+        (_, index) => index !== action.payload,
       );
     },
     setSystemPrompt: (state, action: PayloadAction<string>) => {
@@ -215,6 +218,9 @@ const agentSlice = createSlice({
     },
     setTriggerGetAgentDetails: (state, action: PayloadAction<number>) => {
       state.triggerGetAgentDetails = action.payload;
+    },
+    setTriggerFetchAgentUrls: (state, action: PayloadAction<number>) => {
+      state.triggerFetchAgentUrls = action.payload;
     },
     setWidgetScript: (state, action: PayloadAction<string | null>) => {
       state.widget_script = action.payload;
@@ -236,6 +242,7 @@ const agentSlice = createSlice({
       state.welcomeMessage = "";
       state.llmModel = "";
       state.triggerGetAgentDetails = 0;
+      state.triggerFetchAgentUrls = 0;
       state.widget_script = null;
     },
   },
@@ -273,6 +280,7 @@ export const {
   setWelcomeMessage,
   setLlmModel,
   setTriggerGetAgentDetails,
+  setTriggerFetchAgentUrls,
   setWidgetScript,
   resetUserAgent,
 } = agentSlice.actions;

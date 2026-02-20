@@ -34,7 +34,9 @@ import {
   toggleAllKnowledgeBaseLinks,
   removeKnowledgeBaseLink,
   setKnowledgeBaseLinks,
+  setTriggerFetchAgentUrls,
 } from "@/store/reducers/agentSlice";
+import { useAppSelector } from "@/store";
 import { KnowledgeBaseLink } from "@/store/types/AgentBuilderTypes";
 import CustomInput from "@/components/inputs/CustomInput";
 import { toast } from "sonner";
@@ -45,6 +47,7 @@ import Badge from "@/components/ui/Badge";
 import fastApiAxios from "@/utils/fastapi_axios";
 import Cookies from "js-cookie";
 import NProgress from "nprogress";
+import { formatDateTime12hr } from "@/utils/formatDate";
 
 const LINKS_PER_PAGE = 6; // 3 rows × 2 columns
 
@@ -60,6 +63,9 @@ export default function AgentLinksList({
     (state: RootState) => state.agent.knowledgeBaseLinks,
   );
   const agentID = useSelector((state: RootState) => state.agent.agentID);
+  const triggerFetchAgentUrls = useAppSelector(
+    (state) => state.agent.triggerFetchAgentUrls,
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
@@ -234,6 +240,7 @@ export default function AgentLinksList({
 
       if (response.data.success === true) {
         toast.success(response.data.message || "Agent updated successfully");
+        dispatch(setTriggerFetchAgentUrls(triggerFetchAgentUrls + 1));
         NProgress.done();
         return response.data;
       } else {
@@ -344,6 +351,7 @@ export default function AgentLinksList({
               link: normalizedUrl,
               checked: true,
               status: "new",
+              updated_at: null,
             };
             dispatch(setKnowledgeBaseLinks([newLink, ...knowledgeBaseLinks]));
             setManualLink("");
@@ -746,18 +754,67 @@ export default function AgentLinksList({
                         onClick={(e) => e.stopPropagation()}
                         className="shrink-0 border-2 border-gray-300 dark:border-gray-500 data-[state=checked]:border-serene-purple data-[state=checked]:bg-serene-purple data-[state=checked]:text-white dark:data-[state=checked]:text-black"
                       />
-                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="font-mono text-[12px] text-gray-700 dark:text-gray-300 truncate cursor-default">
-                              {highlightMatch(item.link, searchTerm)}
+                      <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="font-mono text-[12px] text-gray-700 dark:text-gray-300 truncate cursor-default">
+                                {highlightMatch(item.link, searchTerm)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs break-all">{item.link}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          {item.status === "new" ? (
+                            <Badge>New</Badge>
+                          ) : item.api_status &&
+                            item.api_status !== "indexed" ? (
+                            <span
+                              className={`px-2 py-0.5 text-[10px] font-semibold rounded-full shrink-0 flex items-center gap-[1px] ${
+                                item.api_status === "indexed"
+                                  ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                                  : item.api_status === "indexing"
+                                    ? "bg-serene-purple/10 text-[#6c5f8d] dark:bg-serene-purple/20 dark:text-[#c4bcd6]"
+                                    : item.api_status === "failed" ||
+                                        item.api_status === "error"
+                                      ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                                      : item.api_status === "pending"
+                                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                                        : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                              }`}
+                            >
+                              {item.api_status === "indexing" ? (
+                                <span className="inline-flex items-center gap-[2px]">
+                                  <span>Indexing</span>
+                                  <span className="inline-flex items-end gap-[2px] ml-[2px]">
+                                    {[0, 0.2, 0.4].map((delay, i) => (
+                                      <span
+                                        key={i}
+                                        style={{
+                                          display: "inline-block",
+                                          width: "3px",
+                                          height: "3px",
+                                          borderRadius: "50%",
+                                          background: "currentColor",
+                                          animation: `bounce-dot 1.2s ${delay}s infinite ease-in-out`,
+                                        }}
+                                      />
+                                    ))}
+                                  </span>
+                                </span>
+                              ) : (
+                                item.api_status.charAt(0).toUpperCase() +
+                                item.api_status.slice(1)
+                              )}
                             </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="max-w-xs break-all">{item.link}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                        {item.status === "new" && <Badge>New</Badge>}
+                          ) : null}
+                        </div>
+                        {item.updated_at && (
+                          <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                            updated at {formatDateTime12hr(item.updated_at)}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

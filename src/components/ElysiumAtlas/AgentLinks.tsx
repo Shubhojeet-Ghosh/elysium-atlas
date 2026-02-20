@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
 import {
@@ -7,6 +7,7 @@ import {
   addKnowledgeBaseLinks,
   setKnowledgeBaseLinks,
 } from "@/store/reducers/agentSlice";
+import { useAppSelector } from "@/store";
 import CustomInput from "@/components/inputs/CustomInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import Spinner from "@/components/ui/Spinner";
@@ -22,10 +23,21 @@ export default function AgentLinks() {
   const baseURL = useSelector((state: RootState) => state.agent.baseURL);
   const agentID = useSelector((state: RootState) => state.agent.agentID);
   const knowledgeBaseLinks = useSelector(
-    (state: RootState) => state.agent.knowledgeBaseLinks
+    (state: RootState) => state.agent.knowledgeBaseLinks,
+  );
+  const triggerFetchAgentUrls = useAppSelector(
+    (state) => state.agent.triggerFetchAgentUrls,
   );
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingLinks, setIsLoadingLinks] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
 
   const validateURL = (url: string): boolean => {
     if (!url || url.trim() === "") {
@@ -34,10 +46,10 @@ export default function AgentLinks() {
     return url.trim().length > 0;
   };
 
-  const fetchAgentLinks = async () => {
-    if (!agentID) return;
+  const fetchAgentLinks = async (isPolling = false): Promise<boolean> => {
+    if (!agentID) return false;
 
-    setIsLoadingLinks(true);
+    if (!isPolling) setIsLoadingLinks(true);
     const token = Cookies.get("elysium_atlas_session_token");
 
     try {
@@ -53,7 +65,7 @@ export default function AgentLinks() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.data.success === true) {
@@ -62,26 +74,50 @@ export default function AgentLinks() {
           link: urlItem.url,
           checked: false,
           status: "existing",
+          updated_at: urlItem.updated_at ?? null,
+          api_status: urlItem.status ?? undefined,
         }));
 
         dispatch(setKnowledgeBaseLinks(mappedLinks));
+
+        const hasIndexing = mappedLinks.some(
+          (l: any) => l.api_status === "indexing",
+        );
+        if (!hasIndexing) stopPolling();
+        return hasIndexing;
       }
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message ||
         error.message ||
         "Failed to fetch agent links";
-      toast.error(errorMessage);
+      if (!isPolling) toast.error(errorMessage);
+      stopPolling();
     } finally {
-      setIsLoadingLinks(false);
+      if (!isPolling) setIsLoadingLinks(false);
+    }
+    return false;
+  };
+
+  const startPollingIfNeeded = (hasIndexing: boolean) => {
+    if (hasIndexing && !pollingRef.current) {
+      pollingRef.current = setInterval(() => {
+        fetchAgentLinks(true);
+      }, 5000);
     }
   };
 
   useEffect(() => {
-    if (agentID) {
-      fetchAgentLinks();
-    }
+    if (!agentID) return;
+    fetchAgentLinks().then(startPollingIfNeeded);
+    return () => stopPolling();
   }, [agentID]);
+
+  useEffect(() => {
+    if (!agentID || triggerFetchAgentUrls === 0) return;
+    stopPolling();
+    fetchAgentLinks().then(startPollingIfNeeded);
+  }, [triggerFetchAgentUrls]);
 
   const handleExtractLinks = async () => {
     // Basic validation
@@ -104,7 +140,7 @@ export default function AgentLinks() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.data.success === true) {
@@ -118,29 +154,29 @@ export default function AgentLinks() {
 
         // Get existing links set
         const existingLinksSet = new Set(
-          knowledgeBaseLinks.map((item) => item.link)
+          knowledgeBaseLinks.map((item) => item.link),
         );
         const uniqueNewLinks = cleanedLinks.filter(
-          (link) => !existingLinksSet.has(link)
+          (link) => !existingLinksSet.has(link),
         );
 
         if (uniqueNewLinks.length > 0) {
           // Add new links with checked: true by default
           dispatch(
-            addKnowledgeBaseLinks({ links: uniqueNewLinks, checked: true })
+            addKnowledgeBaseLinks({ links: uniqueNewLinks, checked: true }),
           );
           toast.success(
             response.data.message ||
-              `Successfully extracted ${uniqueNewLinks.length} new unique links from URL`
+              `Successfully extracted ${uniqueNewLinks.length} new unique links from URL`,
           );
         } else {
           toast.info(
-            "All extracted links are already in the list or were filtered out"
+            "All extracted links are already in the list or were filtered out",
           );
         }
       } else {
         toast.error(
-          response.data.message || "Failed to extract links from URL"
+          response.data.message || "Failed to extract links from URL",
         );
       }
     } catch (error: any) {

@@ -46,7 +46,7 @@ const LINKS_PER_PAGE = 6; // 3 rows × 2 columns
 export default function KnowledgeBaseLinksList() {
   const dispatch = useDispatch();
   const knowledgeBaseLinks = useSelector(
-    (state: RootState) => state.agentBuilder.knowledgeBaseLinks
+    (state: RootState) => state.agentBuilder.knowledgeBaseLinks,
   );
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -62,7 +62,7 @@ export default function KnowledgeBaseLinksList() {
     }
     const lowerSearchTerm = searchTerm.toLowerCase();
     return knowledgeBaseLinks.filter((item) =>
-      item.link.toLowerCase().includes(lowerSearchTerm)
+      item.link.toLowerCase().includes(lowerSearchTerm),
     );
   }, [knowledgeBaseLinks, searchTerm]);
 
@@ -133,7 +133,7 @@ export default function KnowledgeBaseLinksList() {
         // Ping the URL to validate and normalize it
         const pingResponse = await fastApiAxios.post(
           "/elysium-agents/elysium-atlas/v1/ping-url",
-          { url: manualLink.trim() }
+          { url: manualLink.trim() },
         );
 
         if (pingResponse.data.success && pingResponse.data.data.reachable) {
@@ -141,7 +141,7 @@ export default function KnowledgeBaseLinksList() {
 
           // Check if the normalized URL already exists
           const exists = knowledgeBaseLinks.some(
-            (item) => item.link === normalizedUrl
+            (item) => item.link === normalizedUrl,
           );
 
           if (!exists) {
@@ -149,6 +149,7 @@ export default function KnowledgeBaseLinksList() {
               link: normalizedUrl,
               checked: true,
               status: "new",
+              updated_at: null,
             };
             dispatch(setKnowledgeBaseLinks([newLink, ...knowledgeBaseLinks]));
             setManualLink("");
@@ -158,7 +159,7 @@ export default function KnowledgeBaseLinksList() {
           }
         } else {
           toast.error(
-            "URL is not reachable. Please check the URL and try again."
+            "URL is not reachable. Please check the URL and try again.",
           );
         }
       } catch (error: any) {
@@ -402,7 +403,7 @@ export default function KnowledgeBaseLinksList() {
                       );
                     }
                     return null;
-                  }
+                  },
                 )}
               </div>
 
@@ -428,7 +429,7 @@ export default function KnowledgeBaseLinksList() {
           {currentLinks.map((item, localIndex) => {
             // Find the original index in the full knowledgeBaseLinks array
             const originalIndex = knowledgeBaseLinks.findIndex(
-              (linkItem) => linkItem.link === item.link
+              (linkItem) => linkItem.link === item.link,
             );
             return (
               <div

@@ -37,16 +37,16 @@ const agentBuilderSlice = createSlice({
     },
     setKnowledgeBaseLinks: (
       state,
-      action: PayloadAction<KnowledgeBaseLink[]>
+      action: PayloadAction<KnowledgeBaseLink[]>,
     ) => {
       state.knowledgeBaseLinks = action.payload;
     },
     addKnowledgeBaseLinks: (
       state,
-      action: PayloadAction<{ links: string[]; checked?: boolean }>
+      action: PayloadAction<{ links: string[]; checked?: boolean }>,
     ) => {
       const existingLinksSet = new Set(
-        state.knowledgeBaseLinks.map((item) => item.link)
+        state.knowledgeBaseLinks.map((item) => item.link),
       );
       const newLinks: KnowledgeBaseLink[] = action.payload.links
         .filter((link) => !existingLinksSet.has(link))
@@ -54,6 +54,7 @@ const agentBuilderSlice = createSlice({
           link,
           checked: action.payload.checked ?? true,
           status: "new",
+          updated_at: null,
         }));
       state.knowledgeBaseLinks = [...state.knowledgeBaseLinks, ...newLinks];
     },
@@ -70,7 +71,7 @@ const agentBuilderSlice = createSlice({
     },
     removeKnowledgeBaseLink: (state, action: PayloadAction<string>) => {
       state.knowledgeBaseLinks = state.knowledgeBaseLinks.filter(
-        (item) => item.link !== action.payload
+        (item) => item.link !== action.payload,
       );
     },
     setKnowledgeBaseFiles: (state, action: PayloadAction<FileMetadata[]>) => {
@@ -97,15 +98,15 @@ const agentBuilderSlice = createSlice({
     },
     removeKnowledgeBaseFile: (state, action: PayloadAction<string>) => {
       state.knowledgeBaseFiles = state.knowledgeBaseFiles.filter(
-        (item) => item.name !== action.payload
+        (item) => item.name !== action.payload,
       );
     },
     setFileChecked: (
       state,
-      action: PayloadAction<{ name: string; checked: boolean }>
+      action: PayloadAction<{ name: string; checked: boolean }>,
     ) => {
       const file = state.knowledgeBaseFiles.find(
-        (f) => f.name === action.payload.name
+        (f) => f.name === action.payload.name,
       );
       if (file) {
         file.checked = action.payload.checked;
@@ -124,7 +125,7 @@ const agentBuilderSlice = createSlice({
     },
     updateKnowledgeBaseText: (
       state,
-      action: PayloadAction<{ index: number; customText: CustomText }>
+      action: PayloadAction<{ index: number; customText: CustomText }>,
     ) => {
       if (state.knowledgeBaseText[action.payload.index]) {
         state.knowledgeBaseText[action.payload.index] = {
@@ -135,7 +136,7 @@ const agentBuilderSlice = createSlice({
     },
     removeKnowledgeBaseText: (state, action: PayloadAction<number>) => {
       state.knowledgeBaseText = state.knowledgeBaseText.filter(
-        (_, index) => index !== action.payload
+        (_, index) => index !== action.payload,
       );
     },
     setKnowledgeBaseQnA: (state, action: PayloadAction<QnA[]>) => {
@@ -151,7 +152,7 @@ const agentBuilderSlice = createSlice({
     },
     updateKnowledgeBaseQnA: (
       state,
-      action: PayloadAction<{ index: number; qna: QnA }>
+      action: PayloadAction<{ index: number; qna: QnA }>,
     ) => {
       if (state.knowledgeBaseQnA[action.payload.index]) {
         state.knowledgeBaseQnA[action.payload.index] = {
@@ -162,7 +163,7 @@ const agentBuilderSlice = createSlice({
     },
     removeKnowledgeBaseQnA: (state, action: PayloadAction<number>) => {
       state.knowledgeBaseQnA = state.knowledgeBaseQnA.filter(
-        (_, index) => index !== action.payload
+        (_, index) => index !== action.payload,
       );
     },
     setBaseURL: (state, action: PayloadAction<string>) => {
