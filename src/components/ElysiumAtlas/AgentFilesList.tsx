@@ -41,6 +41,7 @@ import Pill from "@/components/ui/Pill";
 import fastApiAxios from "@/utils/fastapi_axios";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
+import { formatDateTime12hr } from "@/utils/formatDate";
 
 const FILES_PER_PAGE = 6; // 3 rows × 2 columns
 
@@ -55,7 +56,7 @@ export default function AgentFilesList({
 }: AgentFilesListProps) {
   const dispatch = useDispatch();
   const knowledgeBaseFiles = useSelector(
-    (state: RootState) => state.agent.knowledgeBaseFiles
+    (state: RootState) => state.agent.knowledgeBaseFiles,
   );
   const agentID = useSelector((state: RootState) => state.agent.agentID);
 
@@ -73,7 +74,7 @@ export default function AgentFilesList({
     }
     const lowerSearchTerm = searchTerm.toLowerCase();
     return knowledgeBaseFiles.filter((item) =>
-      item.name.toLowerCase().includes(lowerSearchTerm)
+      item.name.toLowerCase().includes(lowerSearchTerm),
     );
   }, [knowledgeBaseFiles, searchTerm]);
 
@@ -145,7 +146,7 @@ export default function AgentFilesList({
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.data.success) {
@@ -182,7 +183,7 @@ export default function AgentFilesList({
     // Separate picked files into existing (need API delete) and new (just Redux remove)
     const filesToRemove = knowledgeBaseFiles.filter((item) => item.checked);
     const existingFilesToRemove = filesToRemove.filter(
-      (item) => item.status === "existing"
+      (item) => item.status !== "new",
     );
 
     // If there are existing files to delete, call API
@@ -206,12 +207,12 @@ export default function AgentFilesList({
             headers: {
               Authorization: `Bearer ${token}`,
             },
-          }
+          },
         );
 
         if (response.data.success) {
           toast.success(
-            `${existingFilesToRemove.length} file(s) deleted successfully`
+            `${existingFilesToRemove.length} file(s) deleted successfully`,
           );
         } else {
           // If API fails, don't remove from UI? Or try to remove just new ones?
@@ -459,7 +460,7 @@ export default function AgentFilesList({
                           );
                         }
                         return null;
-                      }
+                      },
                     )}
                   </div>
 
@@ -486,7 +487,7 @@ export default function AgentFilesList({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
               {currentFiles.map((item, localIndex) => {
                 const originalIndex = knowledgeBaseFiles.findIndex(
-                  (fileItem) => fileItem.name === item.name
+                  (fileItem) => fileItem.name === item.name,
                 );
                 return (
                   <div
@@ -523,17 +524,55 @@ export default function AgentFilesList({
                                 </p>
                               </TooltipContent>
                             </Tooltip>
-                            {item.status === "new" && <Badge>New</Badge>}
+                            {item.status === "new" ? (
+                              <Badge>New</Badge>
+                            ) : item.status !== "indexed" ? (
+                              <span
+                                className={`px-2 py-0.5 text-[10px] font-semibold rounded-full shrink-0 flex items-center gap-[1px] ${
+                                  item.status === "indexing"
+                                    ? "bg-serene-purple/10 text-[#6c5f8d] dark:bg-serene-purple/20 dark:text-[#c4bcd6]"
+                                    : item.status === "failed" ||
+                                        item.status === "error"
+                                      ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                                      : item.status === "pending"
+                                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                                        : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                }`}
+                              >
+                                {item.status === "indexing" ? (
+                                  <span className="inline-flex items-center gap-[2px]">
+                                    <span>Indexing</span>
+                                    <span className="inline-flex items-end gap-[2px] ml-[2px]">
+                                      {[0, 0.2, 0.4].map((delay, i) => (
+                                        <span
+                                          key={i}
+                                          style={{
+                                            display: "inline-block",
+                                            width: "3px",
+                                            height: "3px",
+                                            borderRadius: "50%",
+                                            background: "currentColor",
+                                            animation: `bounce-dot 1.2s ${delay}s infinite ease-in-out`,
+                                          }}
+                                        />
+                                      ))}
+                                    </span>
+                                  </span>
+                                ) : (
+                                  item.status.charAt(0).toUpperCase() +
+                                  item.status.slice(1)
+                                )}
+                              </span>
+                            ) : null}
                           </div>
                           <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                            {item.status === "existing" || item.size === 0 ? (
-                              <Pill
-                                item="Indexed"
-                                className="px-2 py-0.5 text-[10px] bg-serene-purple/10 text-serene-purple dark:bg-serene-purple/20 dark:text-pure-mist"
-                              />
-                            ) : (
+                            {item.updated_at ? (
+                              <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                                updated at {formatDateTime12hr(item.updated_at)}
+                              </span>
+                            ) : item.size > 0 ? (
                               formatFileSize(item.size)
-                            )}
+                            ) : null}
                           </span>
                         </div>
                       </div>
@@ -542,15 +581,12 @@ export default function AgentFilesList({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleRemoveFile(
-                            item.name,
-                            item.status === "existing"
-                          );
+                          handleRemoveFile(item.name, item.status !== "new");
                         }}
                         className="group/btn p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 cursor-pointer"
                         aria-label="Remove file"
                       >
-                        {item.status === "existing" ? (
+                        {item.status !== "new" ? (
                           <Trash2 className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 group-hover/btn:text-danger-red transition-colors" />
                         ) : (
                           <X className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 group-hover/btn:text-danger-red transition-colors" />

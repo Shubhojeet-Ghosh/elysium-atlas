@@ -61,27 +61,27 @@ export const deepEqualNormalized = (obj1: any, obj2: any): boolean => {
 };
 
 /**
- * Filter array items to only include those with status !== "existing"
- * Used to exclude existing/fetched items from change detection
- * For items with status="new", only include them if checked is true (for files/links)
- * For items without checked field (custom texts, QnA), include all new items
+ * Filter array items to only keep those with status="new" (user-added, unsaved items).
+ * Excludes all API-fetched items (status="existing", "indexed", "indexing", "failed", etc.)
+ * to prevent them from triggering unsaved-changes detection.
+ * For new items with a checked field (files/links), only includes them if checked is true.
+ * For new items without checked field (custom texts, QnA), includes all.
  */
 const filterNonExisting = (arr: any[]): any[] => {
   if (!Array.isArray(arr)) return arr;
   return arr.filter((item) => {
     if (typeof item === "object" && item !== null && "status" in item) {
-      // Exclude existing items
-      if (item.status === "existing") {
+      // Exclude all API-fetched items (anything that is not "new")
+      // This covers legacy "existing" as well as API statuses like
+      // "indexed", "indexing", "failed", "pending", "error", etc.
+      if (item.status !== "new") {
         return false;
       }
-      // For new items with checked field (files/links), only include if checked is true
-      if (item.status === "new" && "checked" in item) {
+      // For new items with a checked field (files/links), only include if checked is true
+      if ("checked" in item) {
         return item.checked === true;
       }
       // For new items without checked field (custom texts, QnA), include all
-      if (item.status === "new") {
-        return true;
-      }
       return true;
     }
     return true;
@@ -94,7 +94,7 @@ const filterNonExisting = (arr: any[]): any[] => {
  */
 export const deepEqualNormalizedIgnoringExisting = (
   obj1: any,
-  obj2: any
+  obj2: any,
 ): boolean => {
   // Simple deep equality check with normalization
   if (obj1 === obj2) return true;

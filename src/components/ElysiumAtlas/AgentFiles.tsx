@@ -1,12 +1,14 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
+import { useAppSelector } from "@/store";
 import {
   setKnowledgeBaseFiles,
   addKnowledgeBaseFiles,
   setFileChecked,
   removeKnowledgeBaseFile,
+  setTriggerFetchAgentFiles,
 } from "@/store/reducers/agentSlice";
 import { FileMetadata } from "@/store/types/AgentBuilderTypes";
 import { toast } from "sonner";
@@ -30,14 +32,25 @@ export default function AgentFiles({
   const dispatch = useDispatch();
   const agentID = useSelector((state: RootState) => state.agent.agentID);
   const knowledgeBaseFiles = useSelector(
-    (state: RootState) => state.agent.knowledgeBaseFiles
+    (state: RootState) => state.agent.knowledgeBaseFiles,
   );
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const triggerFetchAgentFiles = useAppSelector(
+    (state) => state.agent.triggerFetchAgentFiles,
+  );
 
-  const fetchAgentFiles = async () => {
-    if (!agentID) return;
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
 
-    setIsLoadingFiles(true);
+  const fetchAgentFiles = async (isPolling = false): Promise<boolean> => {
+    if (!agentID) return false;
+
+    if (!isPolling) setIsLoadingFiles(true);
     const token = Cookies.get("elysium_atlas_session_token");
 
     try {
@@ -53,13 +66,12 @@ export default function AgentFiles({
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.data.success === true) {
         const files = response.data.files?.data || [];
 
-        // Map files to FileMetadata format
         const mappedFiles = files.map((fileItem: any) => ({
           name: fileItem.file_name,
           size: fileItem.file_size || 0,
@@ -67,27 +79,50 @@ export default function AgentFiles({
           checked: false,
           s3_key: fileItem.file_key,
           cdn_url: fileItem.cdn_url,
-          status: "existing",
+          status: fileItem.status ?? "indexed",
+          updated_at: fileItem.updated_at ?? null,
         }));
 
         dispatch(setKnowledgeBaseFiles(mappedFiles));
+
+        const hasIndexing = mappedFiles.some(
+          (f: any) => f.status !== "indexed",
+        );
+        if (!hasIndexing) stopPolling();
+        return hasIndexing;
       }
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message ||
         error.message ||
         "Failed to fetch agent files";
-      toast.error(errorMessage);
+      if (!isPolling) toast.error(errorMessage);
+      stopPolling();
     } finally {
-      setIsLoadingFiles(false);
+      if (!isPolling) setIsLoadingFiles(false);
+    }
+    return false;
+  };
+
+  const startPollingIfNeeded = (hasIndexing: boolean) => {
+    if (hasIndexing && !pollingRef.current) {
+      pollingRef.current = setInterval(() => {
+        fetchAgentFiles(true);
+      }, 5000);
     }
   };
 
   useEffect(() => {
-    if (agentID) {
-      fetchAgentFiles();
-    }
+    if (!agentID) return;
+    fetchAgentFiles().then(startPollingIfNeeded);
+    return () => stopPolling();
   }, [agentID]);
+
+  useEffect(() => {
+    if (!agentID || triggerFetchAgentFiles === 0) return;
+    stopPolling();
+    fetchAgentFiles().then(startPollingIfNeeded);
+  }, [triggerFetchAgentFiles]);
 
   // Sync local files state with Redux store (convert File[] to FileMetadata[])
   useEffect(() => {
@@ -107,13 +142,13 @@ export default function AgentFiles({
 
       // Filter out files that are already in Redux
       const newUniqueFiles = fileMetadata.filter(
-        (f) => !existingFileNames.has(f.name)
+        (f) => !existingFileNames.has(f.name),
       );
 
       // Add only truly new files to Redux (prepend to show them first)
       if (newUniqueFiles.length > 0) {
         dispatch(
-          setKnowledgeBaseFiles([...newUniqueFiles, ...knowledgeBaseFiles])
+          setKnowledgeBaseFiles([...newUniqueFiles, ...knowledgeBaseFiles]),
         );
       }
     }
@@ -127,7 +162,7 @@ export default function AgentFiles({
 
       const reduxFileNames = new Set(knowledgeBaseFiles.map((f) => f.name));
       const filesToKeep = prevFiles.filter((file) =>
-        reduxFileNames.has(file.name)
+        reduxFileNames.has(file.name),
       );
 
       if (filesToKeep.length !== prevFiles.length) {
@@ -152,7 +187,7 @@ export default function AgentFiles({
 
             // Remove from local state
             setDocumentFiles((prev) =>
-              prev.filter((file) => file.name !== fileName)
+              prev.filter((file) => file.name !== fileName),
             );
           }}
         />
@@ -170,7 +205,7 @@ function SimpleFileUpload({
   setDocumentFiles: React.Dispatch<React.SetStateAction<File[]>>;
 }) {
   const knowledgeBaseFiles = useSelector(
-    (state: RootState) => state.agent.knowledgeBaseFiles
+    (state: RootState) => state.agent.knowledgeBaseFiles,
   );
 
   const onDrop = useCallback(
@@ -195,7 +230,7 @@ function SimpleFileUpload({
         setDocumentFiles((prev) => [...prev, ...newFiles]);
       }
     },
-    [documentFiles, knowledgeBaseFiles, setDocumentFiles]
+    [documentFiles, knowledgeBaseFiles, setDocumentFiles],
   );
 
   const onDropRejected = useCallback((fileRejections: any[]) => {
@@ -239,7 +274,7 @@ function SimpleFileUpload({
             "hover:border-serene-purple dark:hover:border-serene-purple",
             isDragActive &&
               "border-serene-purple dark:border-teal-green bg-serene-purple/5 dark:bg-teal-green/10",
-            "bg-white dark:bg-deep-onyx"
+            "bg-white dark:bg-deep-onyx",
           )}
         >
           <input {...getInputProps()} />
@@ -250,7 +285,7 @@ function SimpleFileUpload({
                 "transition-colors duration-300",
                 isDragActive
                   ? "text-serene-purple dark:text-teal-green"
-                  : "text-gray-400 dark:text-gray-500"
+                  : "text-gray-400 dark:text-gray-500",
               )}
             />
             <span className="text-[14px] font-[500] text-deep-onyx dark:text-pure-mist mt-3">

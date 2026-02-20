@@ -29,6 +29,7 @@ import {
   setKnowledgeBaseQnA,
   setTriggerGetAgentDetails,
   setTriggerFetchAgentUrls,
+  setTriggerFetchAgentFiles,
 } from "@/store/reducers/agentSlice";
 import {
   setChatSessionId,
@@ -123,10 +124,10 @@ export default function MyAgent({
   // This ensures the "Clear" button preserves existing files and prevents false unsaved changes
   useEffect(() => {
     if (mappedInitial && knowledgeBaseFiles.length > 0) {
-      // Only update if knowledgeBaseFiles have "existing" status items
-      // (meaning they were fetched from the API, not newly added)
+      // Only update if knowledgeBaseFiles have API-fetched items
+      // (status !== "new" covers "indexed", "indexing", "failed", etc.)
       const existingFiles = knowledgeBaseFiles.filter(
-        (file) => file.status === "existing",
+        (file) => file.status !== "new",
       );
 
       // Only sync if there are existing files and they differ from mappedInitial
@@ -232,6 +233,9 @@ export default function MyAgent({
   );
   const triggerFetchAgentUrls = useAppSelector(
     (state) => state.agent.triggerFetchAgentUrls,
+  );
+  const triggerFetchAgentFiles = useAppSelector(
+    (state) => state.agent.triggerFetchAgentFiles,
   );
   const currentAgentDetails = useCurrentAgentDetails();
 
@@ -355,13 +359,6 @@ export default function MyAgent({
         initialAgentDetails,
       );
 
-      // Keep track of newly uploaded files to remove after successful save
-      // This needs to be done *before* their status is changed to "existing" in Redux
-      const newFilesToRemove =
-        current.knowledgeBaseFiles
-          ?.filter((file: any) => file.checked && file.status === "new")
-          ?.map((file: any) => file.name) || [];
-
       // Handle file uploads if there are new files
       if (documentFiles.length > 0 && agentID) {
         // Generate presigned URLs for new files
@@ -426,7 +423,7 @@ export default function MyAgent({
                 ...file,
                 s3_key: presignedFile.s3_key,
                 cdn_url: presignedFile.cdn_url || null,
-                status: "existing", // Mark as existing after upload
+                status: "indexing", // Mark as indexing after upload (will be updated by polling)
               };
             }
             return file;
@@ -497,6 +494,7 @@ export default function MyAgent({
       if (response.data.success) {
         toast.success(response.data.message || "Agent updated successfully");
         dispatch(setTriggerFetchAgentUrls(triggerFetchAgentUrls + 1));
+        dispatch(setTriggerFetchAgentFiles(triggerFetchAgentFiles + 1));
 
         // Remove new links from Redux after successful save
         if (newLinksToRemove.length > 0) {
@@ -506,13 +504,11 @@ export default function MyAgent({
           dispatch(setKnowledgeBaseLinks(updatedLinks));
         }
 
-        // Remove newly uploaded files from Redux after successful save
-        if (newFilesToRemove.length > 0) {
-          const updatedFiles = current.knowledgeBaseFiles.filter(
-            (file: any) => !newFilesToRemove.includes(file.name),
-          );
-          dispatch(setKnowledgeBaseFiles(updatedFiles));
-        }
+        // Note: newly uploaded files are NOT removed from Redux here.
+        // Their status was already updated to "indexing" after S3 upload,
+        // so they are excluded from unsaved-changes comparison.
+        // The triggerFetchAgentFiles re-fetch above will replace them with
+        // fresh API data (with the correct server-side status) once it completes.
 
         // Remove newly added custom texts from Redux after successful save
         if (newTextsToRemove.length > 0) {
@@ -603,7 +599,7 @@ export default function MyAgent({
 
     if (knowledgeBaseFiles !== undefined) {
       const existingFiles = knowledgeBaseFiles.filter(
-        (file) => file.status === "existing",
+        (file) => file.status !== "new",
       );
       dispatch(setKnowledgeBaseFiles(existingFiles));
 

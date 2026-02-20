@@ -6,6 +6,7 @@ export interface FileMetadata {
   s3_key?: string | null;
   cdn_url?: string | null;
   status: string;
+  updated_at?: string | null;
 }
 
 export interface KnowledgeBaseLink {

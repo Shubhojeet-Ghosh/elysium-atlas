@@ -24,6 +24,7 @@ interface UserAgentState {
   llmModel: string;
   triggerGetAgentDetails: number;
   triggerFetchAgentUrls: number;
+  triggerFetchAgentFiles: number;
   widget_script: string | null;
 }
 
@@ -45,6 +46,7 @@ const initialState: UserAgentState = {
   llmModel: "",
   triggerGetAgentDetails: 0,
   triggerFetchAgentUrls: 0,
+  triggerFetchAgentFiles: 0,
   widget_script: null,
 };
 
@@ -222,6 +224,9 @@ const agentSlice = createSlice({
     setTriggerFetchAgentUrls: (state, action: PayloadAction<number>) => {
       state.triggerFetchAgentUrls = action.payload;
     },
+    setTriggerFetchAgentFiles: (state, action: PayloadAction<number>) => {
+      state.triggerFetchAgentFiles = action.payload;
+    },
     setWidgetScript: (state, action: PayloadAction<string | null>) => {
       state.widget_script = action.payload;
     },
@@ -243,6 +248,7 @@ const agentSlice = createSlice({
       state.llmModel = "";
       state.triggerGetAgentDetails = 0;
       state.triggerFetchAgentUrls = 0;
+      state.triggerFetchAgentFiles = 0;
       state.widget_script = null;
     },
   },
@@ -281,6 +287,7 @@ export const {
   setLlmModel,
   setTriggerGetAgentDetails,
   setTriggerFetchAgentUrls,
+  setTriggerFetchAgentFiles,
   setWidgetScript,
   resetUserAgent,
 } = agentSlice.actions;
