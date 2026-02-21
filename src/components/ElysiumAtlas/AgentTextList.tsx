@@ -484,11 +484,12 @@ export default function AgentTextList({
                                 </span>
                                 {item.status === "new" ? (
                                   <Badge>New</Badge>
-                                ) : item.status !== "indexed" ? (
+                                ) : item.status !== "indexed" &&
+                                  item.status !== "active" ? (
                                   <span
                                     className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
                                       item.status === "indexing"
-                                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400"
+                                        ? "bg-serene-purple/10 text-[#6c5f8d] dark:bg-serene-purple/20 dark:text-[#c4bcd6]"
                                         : item.status === "failed" ||
                                             item.status === "error"
                                           ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"

@@ -491,7 +491,7 @@ export default function KnowledgeBaseQnAList({
                               {item.status === "new" ? (
                                 <Badge>New</Badge>
                               ) : item.status === "indexing" ? (
-                                <span className="inline-flex items-center gap-[2px] px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400">
+                                <span className="inline-flex items-center gap-[2px] px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-serene-purple/10 text-[#6c5f8d] dark:bg-serene-purple/20 dark:text-[#c4bcd6]">
                                   <span>Indexing</span>
                                   <span className="inline-flex items-end gap-[2px] ml-[2px]">
                                     {[0, 0.2, 0.4].map((delay, i) => (
@@ -519,7 +519,7 @@ export default function KnowledgeBaseQnAList({
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
                                   Pending
                                 </span>
-                              ) : null}
+                              ) : item.status === "active" ? null : null}
                             </div>
                           </TableCell>
                           <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-2 lg:px-4 px-0 text-[12px] whitespace-nowrap">
