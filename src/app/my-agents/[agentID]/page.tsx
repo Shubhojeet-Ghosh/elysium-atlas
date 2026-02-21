@@ -28,6 +28,7 @@ import {
   setLlmModel,
   setTriggerGetAgentDetails,
   setWidgetScript,
+  setAgentIcon,
 } from "@/store/reducers/agentSlice";
 
 export default function AgentPage() {
@@ -35,7 +36,7 @@ export default function AgentPage() {
   const agentID = params.agentID as string;
   const dispatch = useAppDispatch();
   const triggerGetAgentDetails = useAppSelector(
-    (state) => state.agent.triggerGetAgentDetails
+    (state) => state.agent.triggerGetAgentDetails,
   );
   const [initialAgentDetails, setInitialAgentDetails] = useState<any>(null);
 
@@ -54,7 +55,7 @@ export default function AgentPage() {
             headers: {
               Authorization: `Bearer ${token}`,
             },
-          }
+          },
         );
         if (response.data.success === true) {
           const agentDetails = response.data.agent_details;
@@ -69,13 +70,14 @@ export default function AgentPage() {
           dispatch(setProgress(agentDetails.progress || 0));
           dispatch(
             setSystemPrompt(
-              agentDetails.system_prompt || "You are a helpful assistant."
-            )
+              agentDetails.system_prompt || "You are a helpful assistant.",
+            ),
           );
           dispatch(setTemperature(agentDetails.temperature || 0.5));
           dispatch(setWelcomeMessage(agentDetails.welcome_message));
           dispatch(setLlmModel(agentDetails.llm_model));
           dispatch(setWidgetScript(agentDetails.widget_script || null));
+          dispatch(setAgentIcon(agentDetails.agent_icon || null));
 
           // If status is not in allowedStatuses, poll again after 5 seconds
           if (!allowedStatuses.includes(agentDetails.agent_status)) {

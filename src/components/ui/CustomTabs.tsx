@@ -8,7 +8,7 @@ interface CustomTabsContextValue {
   onValueChange: (value: string) => void;
   registerTab: (
     value: string,
-    ref: React.RefObject<HTMLButtonElement | null>
+    ref: React.RefObject<HTMLButtonElement | null>,
   ) => void;
   unregisterTab: (value: string) => void;
 }
@@ -26,10 +26,10 @@ interface CustomTabsProps extends React.HTMLAttributes<HTMLDivElement> {
 const CustomTabs = React.forwardRef<HTMLDivElement, CustomTabsProps>(
   (
     { className, value, defaultValue, onValueChange, children, ...props },
-    ref
+    ref,
   ) => {
     const [internalValue, setInternalValue] = React.useState(
-      defaultValue || ""
+      defaultValue || "",
     );
     const isControlled = value !== undefined;
     const currentValue = isControlled ? value : internalValue;
@@ -44,14 +44,14 @@ const CustomTabs = React.forwardRef<HTMLDivElement, CustomTabsProps>(
         }
         onValueChange?.(newValue);
       },
-      [isControlled, onValueChange]
+      [isControlled, onValueChange],
     );
 
     const registerTab = React.useCallback(
       (tabValue: string, ref: React.RefObject<HTMLButtonElement | null>) => {
         tabRefs.current.set(tabValue, ref);
       },
-      []
+      [],
     );
 
     const unregisterTab = React.useCallback((tabValue: string) => {
@@ -65,17 +65,17 @@ const CustomTabs = React.forwardRef<HTMLDivElement, CustomTabsProps>(
         registerTab,
         unregisterTab,
       }),
-      [currentValue, handleValueChange, registerTab, unregisterTab]
+      [currentValue, handleValueChange, registerTab, unregisterTab],
     );
 
     return (
       <CustomTabsContext.Provider value={contextValue}>
-        <div ref={ref} className={cn("w-full", className)} {...props}>
+        <div ref={ref} className={cn(className)} {...props}>
           {children}
         </div>
       </CustomTabsContext.Provider>
     );
-  }
+  },
 );
 
 CustomTabs.displayName = "CustomTabs";
@@ -84,7 +84,7 @@ const useCustomTabsContext = () => {
   const context = React.useContext(CustomTabsContext);
   if (!context) {
     throw new Error(
-      "CustomTabs components must be used within a CustomTabs provider"
+      "CustomTabs components must be used within a CustomTabs provider",
     );
   }
   return context;
@@ -118,7 +118,7 @@ const CustomTabsList = React.forwardRef<HTMLDivElement, CustomTabsListProps>(
         if (!listRef.current || !selectedValue) return;
 
         const activeTab = listRef.current.querySelector(
-          `[data-tab-value="${selectedValue}"]`
+          `[data-tab-value="${selectedValue}"]`,
         ) as HTMLButtonElement;
 
         if (activeTab) {
@@ -164,7 +164,7 @@ const CustomTabsList = React.forwardRef<HTMLDivElement, CustomTabsListProps>(
         const visibleLeft = Math.max(0, left);
         const visibleRight = Math.min(
           left + width,
-          listRef.current.clientWidth
+          listRef.current.clientWidth,
         );
         const visibleWidth = Math.max(0, visibleRight - visibleLeft);
 
@@ -252,7 +252,7 @@ const CustomTabsList = React.forwardRef<HTMLDivElement, CustomTabsListProps>(
           className={cn(
             "inline-flex items-center justify-start border-b border-gray-300 dark:border-gray-700 w-full max-w-full overflow-x-auto overflow-y-hidden flex-nowrap",
             "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
-            className
+            className,
           )}
           role="tablist"
           {...props}
@@ -278,13 +278,12 @@ const CustomTabsList = React.forwardRef<HTMLDivElement, CustomTabsListProps>(
         )}
       </div>
     );
-  }
+  },
 );
 
 CustomTabsList.displayName = "CustomTabsList";
 
-interface CustomTabsTriggerProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface CustomTabsTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   value: string;
 }
 
@@ -325,7 +324,7 @@ const CustomTabsTrigger = React.forwardRef<
         isActive
           ? "text-serene-purple dark:text-serene-purple"
           : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
-        className
+        className,
       )}
       onClick={() => onValueChange(value)}
       {...props}

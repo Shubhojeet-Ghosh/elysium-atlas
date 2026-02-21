@@ -11,6 +11,7 @@ import AgentLinks from "./AgentLinks";
 import AgentFiles from "./AgentFiles";
 import AgentText from "./AgentText";
 import AgentQnA from "./AgentQnA";
+import AgentPersonality from "./AgentPersonality";
 import { useCurrentAgentDetails } from "./useAgentDetailsCompare";
 import { useAppDispatch, useAppSelector } from "@/store";
 import PrimaryButton from "../ui/PrimaryButton";
@@ -33,6 +34,7 @@ import {
   setTriggerFetchAgentFiles,
   setTriggerFetchAgentCustomTexts,
   setTriggerFetchAgentQnA,
+  setAgentIcon,
 } from "@/store/reducers/agentSlice";
 import {
   setChatSessionId,
@@ -65,6 +67,12 @@ export default function MyAgent({
 
   /* State lifted from AgentFiles to persist across tab switches */
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
+
+  /* Avatar file lifted from AgentAvatarImageTab */
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+
+  /* Signal to tell AgentAvatarRight to re-seed from Redux on clear */
+  const [avatarClearSignal, setAvatarClearSignal] = useState(0);
 
   const knowledgeBaseLinks = useAppSelector(
     (state) => state.agent.knowledgeBaseLinks,
@@ -289,6 +297,20 @@ export default function MyAgent({
       payload.welcome_message = current.welcomeMessage;
     }
 
+    if (
+      !isEquivalent(
+        mappedInitial.agent_icon ?? null,
+        current.agent_icon ?? null,
+      )
+    ) {
+      // Only send agent_icon for URL values (link tab).
+      // data: URLs from the image tab require an S3 upload first — handled separately.
+      const newIcon = current.agent_icon ?? null;
+      if (!newIcon || !newIcon.startsWith("data:")) {
+        payload.agent_icon = newIcon;
+      }
+    }
+
     if (!isEquivalent(mappedInitial.llmModel, current.llmModel)) {
       payload.llm_model = current.llmModel;
     }
@@ -463,6 +485,64 @@ export default function MyAgent({
         }
       }
 
+      // Handle avatar image upload if a file was dropped in the image tab
+      if (avatarFile && agentID) {
+        try {
+          const avatarPresignedResponse = await fastApiAxios.post(
+            "/elysium-agents/elysium-atlas/agent/v1/generate-presigned-urls",
+            {
+              files: [
+                {
+                  folder_path: `/agent_avatars/${agentID}`,
+                  filename: avatarFile.name,
+                  filetype: avatarFile.type,
+                  file_source: "local",
+                  visibility: "public",
+                },
+              ],
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+
+          if (!avatarPresignedResponse.data.success) {
+            toast.error(
+              avatarPresignedResponse.data.message ||
+                "Failed to generate presigned URL for avatar",
+            );
+            return;
+          }
+
+          const avatarUrlObj =
+            avatarPresignedResponse.data.presigned_urls.files[0];
+
+          // Upload the avatar file to S3
+          await axios.put(avatarUrlObj.upload_url, avatarFile, {
+            headers: {
+              "Content-Type": avatarFile.type,
+            },
+          });
+
+          // Store the CDN URL in Redux and include in payload
+          const avatarCdnUrl = avatarUrlObj.cdn_url;
+          dispatch(setAgentIcon(avatarCdnUrl));
+          payload.agent_icon = avatarCdnUrl;
+
+          // Clear the avatarFile since it's been uploaded
+          setAvatarFile(null);
+        } catch (error: any) {
+          const avatarErrorMessage =
+            error.response?.data?.message ||
+            error.message ||
+            "Failed to upload avatar image. Please try again.";
+          toast.error(avatarErrorMessage);
+          return;
+        }
+      }
+
       // Keep track of new links to remove after successful save
       const newLinksToRemove =
         current.knowledgeBaseLinks
@@ -604,6 +684,9 @@ export default function MyAgent({
       dispatch(setWelcomeMessage(dataToUse.welcomeMessage || ""));
     if (dataToUse.llmModel !== undefined)
       dispatch(setLlmModel(dataToUse.llmModel || ""));
+    dispatch(setAgentIcon(dataToUse.agent_icon ?? null));
+    setAvatarFile(null);
+    setAvatarClearSignal((prev) => prev + 1);
 
     // Reset knowledge base data - filter out new items, keep only existing
     if (knowledgeBaseLinks !== undefined) {
@@ -737,6 +820,15 @@ export default function MyAgent({
       {activeTab === "qna" && (
         <div className="mt-6">
           <AgentQnA />
+        </div>
+      )}
+      {activeTab === "personalize" && (
+        <div className="mt-6">
+          <AgentPersonality
+            avatarFile={avatarFile}
+            setAvatarFile={setAvatarFile}
+            clearSignal={avatarClearSignal}
+          />
         </div>
       )}
       {mappedInitial && (

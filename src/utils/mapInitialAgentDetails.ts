@@ -15,5 +15,6 @@ export function mapInitialAgentDetails(details: any) {
     knowledgeBaseFiles: [],
     knowledgeBaseText: [],
     knowledgeBaseQnA: [],
+    agent_icon: details.agent_icon ?? null,
   };
 }

@@ -8,7 +8,7 @@ export function useCurrentAgentDetails() {
   const baseURL = useAppSelector((state) => state.agent.baseURL);
   const agent_status = useAppSelector((state) => state.agent.agent_status);
   const agent_current_task = useAppSelector(
-    (state) => state.agent.agent_current_task
+    (state) => state.agent.agent_current_task,
   );
   const progress = useAppSelector((state) => state.agent.progress);
   const systemPrompt = useAppSelector((state) => state.agent.systemPrompt);
@@ -16,17 +16,18 @@ export function useCurrentAgentDetails() {
   const welcomeMessage = useAppSelector((state) => state.agent.welcomeMessage);
   const llmModel = useAppSelector((state) => state.agent.llmModel);
   const knowledgeBaseLinks = useAppSelector(
-    (state) => state.agent.knowledgeBaseLinks
+    (state) => state.agent.knowledgeBaseLinks,
   );
   const knowledgeBaseFiles = useAppSelector(
-    (state) => state.agent.knowledgeBaseFiles
+    (state) => state.agent.knowledgeBaseFiles,
   );
   const knowledgeBaseText = useAppSelector(
-    (state) => state.agent.knowledgeBaseText
+    (state) => state.agent.knowledgeBaseText,
   );
   const knowledgeBaseQnA = useAppSelector(
-    (state) => state.agent.knowledgeBaseQnA
+    (state) => state.agent.knowledgeBaseQnA,
   );
+  const agent_icon = useAppSelector((state) => state.agent.agent_icon);
 
   return useMemo(
     () => ({
@@ -44,6 +45,7 @@ export function useCurrentAgentDetails() {
       knowledgeBaseFiles,
       knowledgeBaseText,
       knowledgeBaseQnA,
+      agent_icon,
     }),
     [
       agentName,
@@ -60,6 +62,7 @@ export function useCurrentAgentDetails() {
       knowledgeBaseFiles,
       knowledgeBaseText,
       knowledgeBaseQnA,
-    ]
+      agent_icon,
+    ],
   );
 }
