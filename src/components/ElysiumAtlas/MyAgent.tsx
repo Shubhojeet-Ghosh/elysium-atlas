@@ -4,6 +4,7 @@ import Cookies from "js-cookie";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CustomTabs } from "@/components/ui/CustomTabs";
 import AgentBuilderTabs from "./AgentBuilderTabs";
+import AgentBackButton from "./AgentBackButton";
 import AgentMainContent from "./AgentMainContent";
 import UnsavedChangesBar from "./UnsavedChangesBar";
 import AgentLinks from "./AgentLinks";
@@ -662,6 +663,10 @@ export default function MyAgent({
     }
   }, [searchParams, router]);
 
+  const handleBack = () => {
+    router.push("/my-agents");
+  };
+
   const handlePreview = () => {
     // Reset chat state before opening preview
     dispatch(resetAgentChat());
@@ -682,8 +687,12 @@ export default function MyAgent({
   return (
     <>
       <div className="sticky top-[65px] z-50">
-        <div className="w-full flex flex-row items-center justify-between bg-white dark:bg-[#0a0a0a]">
-          <div className="flex  flex-row items-center justify-center w-[85%]">
+        <div className="w-full flex flex-row items-center justify-between gap-[8px] bg-white dark:bg-[#0a0a0a]">
+          <div className="flex flex-row items-center gap-2 flex-1 min-w-0 overflow-hidden lg:flex-none lg:w-[85%]">
+            <div className="mt-[10px] lg:mr-[10px] mr-[0px] shrink-0">
+              <AgentBackButton onBack={handleBack} />
+            </div>
+
             <CustomTabs value={activeTab} onValueChange={handleTabChange}>
               <AgentBuilderTabs
                 activeTab={activeTab}
