@@ -25,6 +25,8 @@ interface UserAgentState {
   triggerGetAgentDetails: number;
   triggerFetchAgentUrls: number;
   triggerFetchAgentFiles: number;
+  triggerFetchAgentCustomTexts: number;
+  triggerFetchAgentQnA: number;
   widget_script: string | null;
 }
 
@@ -47,6 +49,8 @@ const initialState: UserAgentState = {
   triggerGetAgentDetails: 0,
   triggerFetchAgentUrls: 0,
   triggerFetchAgentFiles: 0,
+  triggerFetchAgentCustomTexts: 0,
+  triggerFetchAgentQnA: 0,
   widget_script: null,
 };
 
@@ -227,6 +231,12 @@ const agentSlice = createSlice({
     setTriggerFetchAgentFiles: (state, action: PayloadAction<number>) => {
       state.triggerFetchAgentFiles = action.payload;
     },
+    setTriggerFetchAgentCustomTexts: (state, action: PayloadAction<number>) => {
+      state.triggerFetchAgentCustomTexts = action.payload;
+    },
+    setTriggerFetchAgentQnA: (state, action: PayloadAction<number>) => {
+      state.triggerFetchAgentQnA = action.payload;
+    },
     setWidgetScript: (state, action: PayloadAction<string | null>) => {
       state.widget_script = action.payload;
     },
@@ -249,6 +259,8 @@ const agentSlice = createSlice({
       state.triggerGetAgentDetails = 0;
       state.triggerFetchAgentUrls = 0;
       state.triggerFetchAgentFiles = 0;
+      state.triggerFetchAgentCustomTexts = 0;
+      state.triggerFetchAgentQnA = 0;
       state.widget_script = null;
     },
   },
@@ -288,6 +300,8 @@ export const {
   setTriggerGetAgentDetails,
   setTriggerFetchAgentUrls,
   setTriggerFetchAgentFiles,
+  setTriggerFetchAgentCustomTexts,
+  setTriggerFetchAgentQnA,
   setWidgetScript,
   resetUserAgent,
 } = agentSlice.actions;

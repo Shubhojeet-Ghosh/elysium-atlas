@@ -1,8 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
-import { setKnowledgeBaseText } from "@/store/reducers/agentSlice";
+import { useAppSelector } from "@/store";
+import {
+  setKnowledgeBaseText,
+  setTriggerFetchAgentCustomTexts,
+} from "@/store/reducers/agentSlice";
 import { CustomText } from "@/store/types/AgentBuilderTypes";
 import { toast } from "sonner";
 import fastApiAxios from "@/utils/fastapi_axios";
@@ -11,12 +15,21 @@ import Cookies from "js-cookie";
 export default function AgentKnowledgeBaseText() {
   const dispatch = useDispatch();
   const agentID = useSelector((state: RootState) => state.agent.agentID);
-  const [isLoadingTexts, setIsLoadingTexts] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const triggerFetchAgentCustomTexts = useAppSelector(
+    (state) => state.agent.triggerFetchAgentCustomTexts,
+  );
 
-  const fetchAgentCustomTexts = async () => {
-    if (!agentID) return;
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
 
-    setIsLoadingTexts(true);
+  const fetchAgentCustomTexts = async (isPolling = false): Promise<boolean> => {
+    if (!agentID) return false;
+
     const token = Cookies.get("elysium_atlas_session_token");
 
     try {
@@ -32,39 +45,59 @@ export default function AgentKnowledgeBaseText() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.data.success === true) {
         const texts = response.data.custom_texts?.data || [];
 
-        // Map texts to CustomText format with status "existing"
+        // Map texts to CustomText format
         // Note: API response only includes custom_text_alias, not the actual custom_text content
         const mappedTexts: CustomText[] = texts.map((textItem: any) => ({
           custom_text_alias: textItem.custom_text_alias,
           custom_text: "", // API doesn't return the actual text content in this endpoint
           lastUpdated: textItem.updated_at || textItem.created_at || "",
-          status: "existing",
+          status: textItem.status ?? "indexed",
         }));
 
         dispatch(setKnowledgeBaseText(mappedTexts));
+
+        const hasIndexing = mappedTexts.some(
+          (t: any) => t.status === "indexing",
+        );
+        if (!hasIndexing) stopPolling();
+        return hasIndexing;
       }
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message ||
         error.message ||
         "Failed to fetch agent custom texts";
-      toast.error(errorMessage);
-    } finally {
-      setIsLoadingTexts(false);
+      if (!isPolling) toast.error(errorMessage);
+      stopPolling();
+    }
+    return false;
+  };
+
+  const startPollingIfNeeded = (hasIndexing: boolean) => {
+    if (hasIndexing && !pollingRef.current) {
+      pollingRef.current = setInterval(() => {
+        fetchAgentCustomTexts(true);
+      }, 5000);
     }
   };
 
   useEffect(() => {
-    if (agentID) {
-      fetchAgentCustomTexts();
-    }
+    if (!agentID) return;
+    fetchAgentCustomTexts().then(startPollingIfNeeded);
+    return () => stopPolling();
   }, [agentID]);
+
+  useEffect(() => {
+    if (!agentID || triggerFetchAgentCustomTexts === 0) return;
+    stopPolling();
+    fetchAgentCustomTexts().then(startPollingIfNeeded);
+  }, [triggerFetchAgentCustomTexts]);
 
   // No JSX to render
   return null;

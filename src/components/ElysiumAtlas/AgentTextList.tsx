@@ -43,6 +43,7 @@ import fastApiAxios from "@/utils/fastapi_axios";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
 import NProgress from "nprogress";
+import { formatDateTime12hr } from "@/utils/formatDate";
 
 const TEXTS_PER_PAGE = 10;
 
@@ -59,7 +60,7 @@ export default function AgentTextList({
 }: AgentTextListProps = {}) {
   const dispatch = useDispatch();
   const knowledgeBaseText = useSelector(
-    (state: RootState) => state.agent.knowledgeBaseText
+    (state: RootState) => state.agent.knowledgeBaseText,
   );
   const agentID = useSelector((state: RootState) => state.agent.agentID);
   const [open, setOpen] = useState(false);
@@ -83,7 +84,7 @@ export default function AgentTextList({
     return knowledgeBaseText.filter(
       (item) =>
         item.custom_text_alias.toLowerCase().includes(lowerSearchTerm) ||
-        item.custom_text.toLowerCase().includes(lowerSearchTerm)
+        item.custom_text.toLowerCase().includes(lowerSearchTerm),
     );
   }, [knowledgeBaseText, searchTerm]);
 
@@ -99,7 +100,7 @@ export default function AgentTextList({
       .sort(
         (a, b) =>
           new Date(b.item.lastUpdated).getTime() -
-          new Date(a.item.lastUpdated).getTime()
+          new Date(a.item.lastUpdated).getTime(),
       );
   }, [filteredTexts]);
 
@@ -189,21 +190,11 @@ export default function AgentTextList({
     return null;
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   const handleRowClick = async (aliasName: string) => {
     // Find the item by alias name in the Redux store
     const itemIndex = knowledgeBaseText.findIndex(
-      (item) => item.custom_text_alias.toLowerCase() === aliasName.toLowerCase()
+      (item) =>
+        item.custom_text_alias.toLowerCase() === aliasName.toLowerCase(),
     );
 
     if (itemIndex !== -1) {
@@ -211,8 +202,8 @@ export default function AgentTextList({
       setSelectedIndex(itemIndex);
       setAlias(item.custom_text_alias);
 
-      // If the item is existing and doesn't have content, fetch it from API
-      if (item.status === "existing" && !item.custom_text) {
+      // If the item was fetched from the API and doesn't have content loaded yet, fetch it
+      if (item.status !== "new" && !item.custom_text) {
         try {
           NProgress.start();
           const token = Cookies.get("elysium_atlas_session_token");
@@ -227,7 +218,7 @@ export default function AgentTextList({
               headers: {
                 Authorization: `Bearer ${token}`,
               },
-            }
+            },
           );
 
           if (response.data.success && response.data.text_content) {
@@ -239,7 +230,7 @@ export default function AgentTextList({
                   ...item,
                   custom_text: response.data.text_content,
                 },
-              })
+              }),
             );
             setText(response.data.text_content);
           } else {
@@ -273,7 +264,7 @@ export default function AgentTextList({
             lastUpdated: new Date().toISOString(),
             status: "new",
           },
-        })
+        }),
       );
       setOpen(false);
       setSelectedIndex(null);
@@ -289,7 +280,7 @@ export default function AgentTextList({
       // For new texts, remove directly from Redux
       const itemIndex = knowledgeBaseText.findIndex(
         (item) =>
-          item.custom_text_alias.toLowerCase() === aliasName.toLowerCase()
+          item.custom_text_alias.toLowerCase() === aliasName.toLowerCase(),
       );
       if (itemIndex !== -1) {
         dispatch(removeKnowledgeBaseText(itemIndex));
@@ -319,17 +310,17 @@ export default function AgentTextList({
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.data.success) {
         toast.success(
-          response.data.message || "Custom text deleted successfully"
+          response.data.message || "Custom text deleted successfully",
         );
         // Remove from Redux
         const itemIndex = knowledgeBaseText.findIndex(
           (item) =>
-            item.custom_text_alias.toLowerCase() === textToDelete.toLowerCase()
+            item.custom_text_alias.toLowerCase() === textToDelete.toLowerCase(),
         );
         if (itemIndex !== -1) {
           dispatch(removeKnowledgeBaseText(itemIndex));
@@ -424,7 +415,7 @@ export default function AgentTextList({
                       );
                     }
                     return null;
-                  }
+                  },
                 )}
               </div>
 
@@ -491,11 +482,50 @@ export default function AgentTextList({
                                     ? highlightMatch(alias, searchTerm)
                                     : alias}
                                 </span>
-                                {item.status === "new" && <Badge>New</Badge>}
+                                {item.status === "new" ? (
+                                  <Badge>New</Badge>
+                                ) : item.status !== "indexed" ? (
+                                  <span
+                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                                      item.status === "indexing"
+                                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400"
+                                        : item.status === "failed" ||
+                                            item.status === "error"
+                                          ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                                          : item.status === "pending"
+                                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                                            : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                    }`}
+                                  >
+                                    {item.status === "indexing" ? (
+                                      <span className="inline-flex items-center gap-[2px]">
+                                        <span>Indexing</span>
+                                        <span className="inline-flex items-end gap-[2px] ml-[2px]">
+                                          {[0, 0.2, 0.4].map((delay, i) => (
+                                            <span
+                                              key={i}
+                                              style={{
+                                                display: "inline-block",
+                                                width: "3px",
+                                                height: "3px",
+                                                borderRadius: "50%",
+                                                background: "currentColor",
+                                                animation: `bounce-dot 1.2s ${delay}s infinite ease-in-out`,
+                                              }}
+                                            />
+                                          ))}
+                                        </span>
+                                      </span>
+                                    ) : (
+                                      item.status.charAt(0).toUpperCase() +
+                                      item.status.slice(1)
+                                    )}
+                                  </span>
+                                ) : null}
                               </div>
                             </TableCell>
                             <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-2 lg:px-4 px-0 text-[12px] whitespace-nowrap">
-                              {formatDate(item.lastUpdated)}
+                              {formatDateTime12hr(item.lastUpdated)}
                             </TableCell>
                             <TableCell className="w-[60px] md:w-[80px] text-right py-2 lg:px-4 px-0 whitespace-nowrap">
                               <button
@@ -503,7 +533,7 @@ export default function AgentTextList({
                                   e.stopPropagation();
                                   handleRemove(
                                     item.custom_text_alias,
-                                    item.status === "existing"
+                                    item.status !== "new",
                                   );
                                 }}
                                 className="p-2 rounded-[8px] text-danger-red hover:bg-danger-red hover:text-white transition-colors cursor-pointer"
@@ -513,7 +543,7 @@ export default function AgentTextList({
                             </TableCell>
                           </TableRow>
                         );
-                      }
+                      },
                     )}
                   </TableBody>
                 </Table>
@@ -582,13 +612,13 @@ export default function AgentTextList({
                 placeholder="Enter text alias"
                 className={`w-full px-[12px] py-[10px] ${
                   selectedIndex !== null &&
-                  knowledgeBaseText[selectedIndex]?.status === "existing"
+                  knowledgeBaseText[selectedIndex]?.status !== "new"
                     ? "cursor-not-allowed"
                     : ""
                 }`}
                 disabled={
                   selectedIndex !== null &&
-                  knowledgeBaseText[selectedIndex]?.status === "existing"
+                  knowledgeBaseText[selectedIndex]?.status !== "new"
                 }
               />
             </div>

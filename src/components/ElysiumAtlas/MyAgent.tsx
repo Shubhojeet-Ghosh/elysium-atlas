@@ -30,6 +30,8 @@ import {
   setTriggerGetAgentDetails,
   setTriggerFetchAgentUrls,
   setTriggerFetchAgentFiles,
+  setTriggerFetchAgentCustomTexts,
+  setTriggerFetchAgentQnA,
 } from "@/store/reducers/agentSlice";
 import {
   setChatSessionId,
@@ -158,10 +160,10 @@ export default function MyAgent({
   // This ensures the "Clear" button preserves existing texts and prevents false unsaved changes
   useEffect(() => {
     if (mappedInitial && knowledgeBaseText.length > 0) {
-      // Only update if knowledgeBaseText have "existing" status items
-      // (meaning they were fetched from the API, not newly added)
+      // Only update if knowledgeBaseText have API-fetched items
+      // (status !== "new" covers "indexed", "indexing", "failed", etc.)
       const existingTexts = knowledgeBaseText.filter(
-        (text) => text.status === "existing",
+        (text) => text.status !== "new",
       );
 
       // Only sync if there are existing texts and they differ from mappedInitial
@@ -197,9 +199,10 @@ export default function MyAgent({
   // This ensures the "Clear" button preserves existing QnA and prevents false unsaved changes
   useEffect(() => {
     if (mappedInitial && knowledgeBaseQnA.length > 0) {
-      // Only update if knowledgeBaseQnA have "existing" status items
+      // Only update if knowledgeBaseQnA have API-fetched items
+      // (status !== "new" covers "indexed", "indexing", "active", etc.)
       const existingQnA = knowledgeBaseQnA.filter(
-        (qna) => qna.status === "existing",
+        (qna) => qna.status !== "new",
       );
 
       // Only sync if there are existing QnA and they differ from mappedInitial
@@ -236,6 +239,12 @@ export default function MyAgent({
   );
   const triggerFetchAgentFiles = useAppSelector(
     (state) => state.agent.triggerFetchAgentFiles,
+  );
+  const triggerFetchAgentCustomTexts = useAppSelector(
+    (state) => state.agent.triggerFetchAgentCustomTexts,
+  );
+  const triggerFetchAgentQnA = useAppSelector(
+    (state) => state.agent.triggerFetchAgentQnA,
   );
   const currentAgentDetails = useCurrentAgentDetails();
 
@@ -313,29 +322,29 @@ export default function MyAgent({
           })) || [];
     }
 
-    // Compare arrays for custom texts
-    if (
-      JSON.stringify(mappedInitial.knowledgeBaseText) !==
-      JSON.stringify(current.knowledgeBaseText)
-    ) {
-      payload.custom_texts =
-        current.knowledgeBaseText?.map((text: any) => ({
-          custom_text_alias: text.custom_text_alias,
-          custom_text: text.custom_text,
-        })) || [];
+    // Only send custom texts that are new (not yet saved to the server)
+    const newCustomTextItems =
+      current.knowledgeBaseText?.filter((text: any) => text.status === "new") ||
+      [];
+
+    if (newCustomTextItems.length > 0) {
+      payload.custom_texts = newCustomTextItems.map((text: any) => ({
+        custom_text_alias: text.custom_text_alias,
+        custom_text: text.custom_text,
+      }));
     }
 
-    // Compare arrays for QnA pairs
-    if (
-      JSON.stringify(mappedInitial.knowledgeBaseQnA) !==
-      JSON.stringify(current.knowledgeBaseQnA)
-    ) {
-      payload.qa_pairs =
-        current.knowledgeBaseQnA?.map((qna: any) => ({
-          qna_alias: qna.qna_alias,
-          question: qna.question,
-          answer: qna.answer,
-        })) || [];
+    // Only send QnA pairs that are new (not yet saved to the server)
+    const newQnAPairs =
+      current.knowledgeBaseQnA?.filter((qna: any) => qna.status === "new") ||
+      [];
+
+    if (newQnAPairs.length > 0) {
+      payload.qa_pairs = newQnAPairs.map((qna: any) => ({
+        qna_alias: qna.qna_alias,
+        question: qna.question,
+        answer: qna.answer,
+      }));
     }
 
     return payload;
@@ -459,12 +468,6 @@ export default function MyAgent({
           ?.filter((link: any) => link.checked && link.status === "new")
           ?.map((link: any) => link.link) || [];
 
-      // Keep track of new custom texts to remove after successful save
-      const newTextsToRemove =
-        current.knowledgeBaseText
-          ?.filter((text: any) => text.status === "new")
-          ?.map((text: any) => text.custom_text_alias) || [];
-
       // Add new custom texts to payload if any exist
       const newCustomTexts =
         current.knowledgeBaseText?.filter(
@@ -495,6 +498,10 @@ export default function MyAgent({
         toast.success(response.data.message || "Agent updated successfully");
         dispatch(setTriggerFetchAgentUrls(triggerFetchAgentUrls + 1));
         dispatch(setTriggerFetchAgentFiles(triggerFetchAgentFiles + 1));
+        dispatch(
+          setTriggerFetchAgentCustomTexts(triggerFetchAgentCustomTexts + 1),
+        );
+        dispatch(setTriggerFetchAgentQnA(triggerFetchAgentQnA + 1));
 
         // Remove new links from Redux after successful save
         if (newLinksToRemove.length > 0) {
@@ -510,23 +517,31 @@ export default function MyAgent({
         // The triggerFetchAgentFiles re-fetch above will replace them with
         // fresh API data (with the correct server-side status) once it completes.
 
-        // Remove newly added custom texts from Redux after successful save
-        if (newTextsToRemove.length > 0) {
-          const updatedTexts = current.knowledgeBaseText.filter(
-            (text: any) => !newTextsToRemove.includes(text.custom_text_alias),
+        // Mark newly added custom texts as "indexing" after successful save.
+        // The triggerFetchAgentCustomTexts polling will replace them with real server status.
+        const newTextItems =
+          current.knowledgeBaseText?.filter(
+            (text: any) => text.status === "new",
+          ) || [];
+
+        if (newTextItems.length > 0) {
+          const updatedTexts = current.knowledgeBaseText.map((text: any) =>
+            text.status === "new" ? { ...text, status: "indexing" } : text,
           );
           dispatch(setKnowledgeBaseText(updatedTexts));
         }
 
-        // Remove newly added QnA from Redux after successful save
-        const newQnAToRemove =
-          current.knowledgeBaseQnA
-            ?.filter((qna: any) => qna.status === "new")
-            ?.map((qna: any) => qna.qna_alias) || [];
+        // Mark newly added QnA as "indexing" after successful save.
+        // They stay visible with the indexing pill, and the triggerFetchAgentQnA
+        // polling will replace them with the real server status once processed.
+        const newQnAItems =
+          current.knowledgeBaseQnA?.filter(
+            (qna: any) => qna.status === "new",
+          ) || [];
 
-        if (newQnAToRemove.length > 0) {
-          const updatedQnA = current.knowledgeBaseQnA.filter(
-            (qna: any) => !newQnAToRemove.includes(qna.qna_alias),
+        if (newQnAItems.length > 0) {
+          const updatedQnA = current.knowledgeBaseQnA.map((qna: any) =>
+            qna.status === "new" ? { ...qna, status: "indexing" } : qna,
           );
           dispatch(setKnowledgeBaseQnA(updatedQnA));
         }
@@ -613,16 +628,15 @@ export default function MyAgent({
 
     if (knowledgeBaseText !== undefined) {
       const existingTexts = knowledgeBaseText.filter(
-        (text) => text.status === "existing",
+        (text) => text.status !== "new",
       );
       dispatch(setKnowledgeBaseText(existingTexts));
     }
 
-    // For knowledgeBaseQnA, we want to clear ONLY the new entries
-    // but keep the existing ones that were fetched from the API
+    // For knowledgeBaseQnA, clear ONLY new entries, keep all API-fetched ones
     if (knowledgeBaseQnA.length > 0) {
       const existingQnA = knowledgeBaseQnA.filter(
-        (qna) => qna.status === "existing",
+        (qna) => qna.status !== "new",
       );
       dispatch(setKnowledgeBaseQnA(existingQnA));
 

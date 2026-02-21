@@ -42,6 +42,7 @@ import fastApiAxios from "@/utils/fastapi_axios";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
 import NProgress from "nprogress";
+import { formatDateTime12hr } from "@/utils/formatDate";
 
 const QNA_PER_PAGE = 10;
 
@@ -58,7 +59,7 @@ export default function KnowledgeBaseQnAList({
 }: KnowledgeBaseQnAListProps = {}) {
   const dispatch = useAppDispatch();
   const knowledgeBaseQnA = useAppSelector(
-    (state) => state.agent.knowledgeBaseQnA
+    (state) => state.agent.knowledgeBaseQnA,
   );
   const agentID = useAppSelector((state) => state.agent.agentID);
   const [open, setOpen] = useState(false);
@@ -83,7 +84,7 @@ export default function KnowledgeBaseQnAList({
       (item) =>
         item.qna_alias.toLowerCase().includes(lowerSearchTerm) ||
         item.question.toLowerCase().includes(lowerSearchTerm) ||
-        item.answer.toLowerCase().includes(lowerSearchTerm)
+        item.answer.toLowerCase().includes(lowerSearchTerm),
     );
   }, [knowledgeBaseQnA, searchTerm]);
 
@@ -99,7 +100,7 @@ export default function KnowledgeBaseQnAList({
       .sort(
         (a, b) =>
           new Date(b.item.lastUpdated).getTime() -
-          new Date(a.item.lastUpdated).getTime()
+          new Date(a.item.lastUpdated).getTime(),
       );
   }, [filteredQnA]);
 
@@ -189,21 +190,10 @@ export default function KnowledgeBaseQnAList({
     return null;
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   const handleRowClick = async (aliasName: string) => {
     // Find the item by alias name in the Redux store
     const itemIndex = knowledgeBaseQnA.findIndex(
-      (item) => item.qna_alias.toLowerCase() === aliasName.toLowerCase()
+      (item) => item.qna_alias.toLowerCase() === aliasName.toLowerCase(),
     );
 
     if (itemIndex !== -1) {
@@ -211,8 +201,8 @@ export default function KnowledgeBaseQnAList({
       setSelectedIndex(itemIndex);
       setAlias(item.qna_alias);
 
-      // If the item is existing and doesn't have content, fetch it from API
-      if (item.status === "existing" && !item.question && !item.answer) {
+      // If the item was fetched from the API and doesn't have content loaded yet, fetch it
+      if (item.status !== "new" && !item.question && !item.answer) {
         try {
           NProgress.start();
           const token = Cookies.get("elysium_atlas_session_token");
@@ -227,7 +217,7 @@ export default function KnowledgeBaseQnAList({
               headers: {
                 Authorization: `Bearer ${token}`,
               },
-            }
+            },
           );
 
           if (
@@ -244,7 +234,7 @@ export default function KnowledgeBaseQnAList({
                   question: response.data.question,
                   answer: response.data.answer,
                 },
-              })
+              }),
             );
             setQuestion(response.data.question);
             setAnswer(response.data.answer);
@@ -283,7 +273,7 @@ export default function KnowledgeBaseQnAList({
             lastUpdated: new Date().toISOString(),
             status: "new",
           },
-        })
+        }),
       );
       setOpen(false);
       setSelectedIndex(null);
@@ -293,7 +283,7 @@ export default function KnowledgeBaseQnAList({
   const handleRemove = (aliasName: string) => {
     // Find the item by alias name in the Redux store
     const itemIndex = knowledgeBaseQnA.findIndex(
-      (item) => item.qna_alias.toLowerCase() === aliasName.toLowerCase()
+      (item) => item.qna_alias.toLowerCase() === aliasName.toLowerCase(),
     );
 
     if (itemIndex !== -1) {
@@ -329,17 +319,17 @@ export default function KnowledgeBaseQnAList({
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.data.success) {
         toast.success(
-          response.data.message || "QnA entry deleted successfully"
+          response.data.message || "QnA entry deleted successfully",
         );
 
         // Remove from Redux
         const itemIndex = knowledgeBaseQnA.findIndex(
-          (item) => item.qna_alias.toLowerCase() === qnaToDelete.toLowerCase()
+          (item) => item.qna_alias.toLowerCase() === qnaToDelete.toLowerCase(),
         );
         if (itemIndex !== -1) {
           dispatch(removeKnowledgeBaseQnA(itemIndex));
@@ -437,7 +427,7 @@ export default function KnowledgeBaseQnAList({
                       );
                     }
                     return null;
-                  }
+                  },
                 )}
               </div>
 
@@ -498,11 +488,42 @@ export default function KnowledgeBaseQnAList({
                                   ? highlightMatch(alias, searchTerm)
                                   : alias}
                               </span>
-                              {item.status === "new" && <Badge>New</Badge>}
+                              {item.status === "new" ? (
+                                <Badge>New</Badge>
+                              ) : item.status === "indexing" ? (
+                                <span className="inline-flex items-center gap-[2px] px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400">
+                                  <span>Indexing</span>
+                                  <span className="inline-flex items-end gap-[2px] ml-[2px]">
+                                    {[0, 0.2, 0.4].map((delay, i) => (
+                                      <span
+                                        key={i}
+                                        style={{
+                                          display: "inline-block",
+                                          width: "3px",
+                                          height: "3px",
+                                          borderRadius: "50%",
+                                          background: "currentColor",
+                                          animation: `bounce-dot 1.2s ${delay}s infinite ease-in-out`,
+                                        }}
+                                      />
+                                    ))}
+                                  </span>
+                                </span>
+                              ) : item.status === "failed" ||
+                                item.status === "error" ? (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400">
+                                  {item.status.charAt(0).toUpperCase() +
+                                    item.status.slice(1)}
+                                </span>
+                              ) : item.status === "pending" ? (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+                                  Pending
+                                </span>
+                              ) : null}
                             </div>
                           </TableCell>
                           <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-2 lg:px-4 px-0 text-[12px] whitespace-nowrap">
-                            {formatDate(item.lastUpdated)}
+                            {formatDateTime12hr(item.lastUpdated)}
                           </TableCell>
                           <TableCell className="w-[60px] md:w-[80px] text-right py-2 lg:px-4 px-0 whitespace-nowrap">
                             <button
@@ -561,13 +582,13 @@ export default function KnowledgeBaseQnAList({
                 placeholder="Enter QnA alias"
                 className={`w-full px-[12px] py-[10px] ${
                   selectedIndex !== null &&
-                  knowledgeBaseQnA[selectedIndex]?.status === "existing"
+                  knowledgeBaseQnA[selectedIndex]?.status !== "new"
                     ? "cursor-not-allowed"
                     : ""
                 }`}
                 disabled={
                   selectedIndex !== null &&
-                  knowledgeBaseQnA[selectedIndex]?.status === "existing"
+                  knowledgeBaseQnA[selectedIndex]?.status !== "new"
                 }
               />
             </div>
