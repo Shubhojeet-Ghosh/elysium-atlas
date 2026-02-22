@@ -43,7 +43,7 @@ export default function PlanBadge() {
         <TooltipTrigger asChild>
           <span className="cursor-default">
             <button className="text-[11px] font-medium px-2 py-0.5 rounded bg-serene-purple text-pure-mist transition-colors hover:opacity-90 pointer-events-none">
-              Upgrade
+              Plans
             </button>
           </span>
         </TooltipTrigger>
