@@ -96,7 +96,7 @@ export default function AgentAvatarRight({
   };
 
   return (
-    <div className="lg:w-[60%] w-full flex flex-col items-center p-[24px] gap-[20px]">
+    <div className="lg:w-[60%] w-full flex flex-col items-start lg:items-center p-[24px] gap-[20px]">
       <CustomTabs value={activeTab} onValueChange={setActiveTab}>
         <CustomTabsList className="w-fit">
           <CustomTabsTrigger

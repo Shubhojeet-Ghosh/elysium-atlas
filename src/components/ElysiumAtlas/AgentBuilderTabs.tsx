@@ -25,7 +25,7 @@ export default function AgentBuilderTabs({
   onTabChange,
 }: AgentBuilderTabsProps) {
   return (
-    <div className="shrink-0 mt-[8px] bg-white dark:bg-[#0a0a0a]">
+    <div className="mt-[8px] bg-white dark:bg-[#0a0a0a]">
       <CustomTabsList className="lg:w-full">
         <CustomTabsTrigger
           value="agent"

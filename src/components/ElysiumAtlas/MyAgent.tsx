@@ -776,7 +776,7 @@ export default function MyAgent({
               <AgentBackButton onBack={handleBack} />
             </div>
 
-            <CustomTabs value={activeTab} onValueChange={handleTabChange}>
+            <CustomTabs value={activeTab} onValueChange={handleTabChange} className="flex-1 min-w-0">
               <AgentBuilderTabs
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
