@@ -22,6 +22,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/store";
 import { setTheme } from "@/store/reducers/settingsSlice";
 import Logout from "@/components/ElysiumAtlas/Logout";
+import PlanBadge from "@/components/ElysiumAtlas/PlanBadge";
 import Link from "next/link";
 interface DropdownProps {
   open?: boolean;
@@ -99,6 +100,7 @@ export default function Dropdown({ open, onOpenChange }: DropdownProps) {
           </TooltipTrigger>
           <TooltipContent>Coming Soon</TooltipContent>
         </Tooltip>
+        <PlanBadge />
       </div>
 
       {/* Separator */}

@@ -7,6 +7,7 @@ import packageJson from "../../../package.json";
 import Dropdown from "@/components/ElysiumAtlas/Dropdown";
 import UserAvatar from "@/components/ElysiumAtlas/UserAvatar";
 import CompleteProfile from "@/components/ElysiumAtlas/CompleteProfile";
+import { fetchUserPlan } from "@/utils/planApi";
 
 export default function TopNav() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -19,6 +20,11 @@ export default function TopNav() {
     if (version) {
       dispatch(setAppVersion(version));
     }
+  }, [dispatch]);
+
+  // Fetch user plan info
+  useEffect(() => {
+    fetchUserPlan(dispatch);
   }, [dispatch]);
 
   // Close dropdown when clicking outside
