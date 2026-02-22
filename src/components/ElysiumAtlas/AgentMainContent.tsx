@@ -6,6 +6,7 @@ import AgentRightSide from "./AgentRightSide";
 import AgentReadyCard from "./AgentReadyCard";
 import AgentEmbedCard from "./AgentEmbedCard";
 import AgentProgressCard from "./AgentProgressCard";
+import DeleteAgentCard from "./DeleteAgentCard";
 import { useAppSelector } from "../../store";
 
 interface AgentMainContentProps {
@@ -21,7 +22,7 @@ export default function AgentMainContent({
   const agentName = useAppSelector((state) => state.agent.agentName);
   const agentStatus = useAppSelector((state) => state.agent.agent_status);
   const agentCurrentTask = useAppSelector(
-    (state) => state.agent.agent_current_task
+    (state) => state.agent.agent_current_task,
   );
   const progress = useAppSelector((state) => state.agent.progress);
 
@@ -48,6 +49,9 @@ export default function AgentMainContent({
         <div className="flex lg:flex-row flex-col gap-[30px] mt-[30px]">
           <AgentLeftSide />
           <AgentRightSide />
+        </div>
+        <div className="flex lg:flex-row md:flex-row flex-col mt-[40px] mb-[10px] lg:justify-start md:justify-start justify-center items-start">
+          <DeleteAgentCard />
         </div>
       </div>
     </>

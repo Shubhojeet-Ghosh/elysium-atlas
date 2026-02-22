@@ -29,6 +29,9 @@ import {
   setTriggerGetAgentDetails,
   setWidgetScript,
   setAgentIcon,
+  setPrimaryColor,
+  setSecondaryColor,
+  setTextColor,
 } from "@/store/reducers/agentSlice";
 
 export default function AgentPage() {
@@ -78,6 +81,9 @@ export default function AgentPage() {
           dispatch(setLlmModel(agentDetails.llm_model));
           dispatch(setWidgetScript(agentDetails.widget_script || null));
           dispatch(setAgentIcon(agentDetails.agent_icon || null));
+          dispatch(setPrimaryColor(agentDetails.primary_color || "#fff"));
+          dispatch(setSecondaryColor(agentDetails.secondary_color || "#fff"));
+          dispatch(setTextColor(agentDetails.text_color || "#111"));
 
           // If status is not in allowedStatuses, poll again after 5 seconds
           if (!allowedStatuses.includes(agentDetails.agent_status)) {

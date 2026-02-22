@@ -29,6 +29,9 @@ interface UserAgentState {
   triggerFetchAgentQnA: number;
   widget_script: string | null;
   agent_icon: string | null;
+  primary_color: string;
+  secondary_color: string;
+  text_color: string;
 }
 
 const initialState: UserAgentState = {
@@ -54,6 +57,9 @@ const initialState: UserAgentState = {
   triggerFetchAgentQnA: 0,
   widget_script: null,
   agent_icon: null,
+  primary_color: "#fff",
+  secondary_color: "#fff",
+  text_color: "#111",
 };
 
 const agentSlice = createSlice({
@@ -245,6 +251,15 @@ const agentSlice = createSlice({
     setAgentIcon: (state, action: PayloadAction<string | null>) => {
       state.agent_icon = action.payload;
     },
+    setPrimaryColor: (state, action: PayloadAction<string>) => {
+      state.primary_color = action.payload;
+    },
+    setSecondaryColor: (state, action: PayloadAction<string>) => {
+      state.secondary_color = action.payload;
+    },
+    setTextColor: (state, action: PayloadAction<string>) => {
+      state.text_color = action.payload;
+    },
     resetUserAgent: (state) => {
       state.agentName = "";
       state.agentID = "";
@@ -268,6 +283,9 @@ const agentSlice = createSlice({
       state.triggerFetchAgentQnA = 0;
       state.widget_script = null;
       state.agent_icon = null;
+      state.primary_color = "#fff";
+      state.secondary_color = "#fff";
+      state.text_color = "#111";
     },
   },
 });
@@ -310,6 +328,9 @@ export const {
   setTriggerFetchAgentQnA,
   setWidgetScript,
   setAgentIcon,
+  setPrimaryColor,
+  setSecondaryColor,
+  setTextColor,
   resetUserAgent,
 } = agentSlice.actions;
 

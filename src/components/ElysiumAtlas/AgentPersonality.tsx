@@ -1,6 +1,7 @@
 "use client";
 
 import AgentAvatar from "./AgentAvatar";
+import AgentColors from "./AgentColors";
 
 interface AgentPersonalityProps {
   avatarFile: File | null;
@@ -20,6 +21,7 @@ export default function AgentPersonality({
         setAvatarFile={setAvatarFile}
         clearSignal={clearSignal}
       />
+      <AgentColors />
     </div>
   );
 }

@@ -8,12 +8,18 @@ import {
   FileText,
   Type,
   MessagesSquare,
+  BarChart3,
 } from "lucide-react";
 import {
   CustomTabs,
   CustomTabsList,
   CustomTabsTrigger,
 } from "@/components/ui/CustomTabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface AgentBuilderTabsProps {
   activeTab: string;
@@ -69,13 +75,32 @@ export default function AgentBuilderTabs({
           <Palette size={16} />
           Personalize
         </CustomTabsTrigger>
-        <CustomTabsTrigger
-          value="advanced"
-          className="flex items-center gap-2 font-[600]"
-        >
-          <Settings size={16} />
-          Advanced
-        </CustomTabsTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <CustomTabsTrigger
+              value="analytics"
+              className="flex items-center gap-2 font-[600] cursor-not-allowed"
+              onClick={(e) => e.preventDefault()}
+            >
+              <BarChart3 size={16} />
+              Analytics
+            </CustomTabsTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Coming Soon</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <CustomTabsTrigger
+              value="advanced"
+              className="flex items-center gap-2 font-[600] cursor-not-allowed"
+              onClick={(e) => e.preventDefault()}
+            >
+              <Settings size={16} />
+              Advanced
+            </CustomTabsTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Coming Soon</TooltipContent>
+        </Tooltip>
       </CustomTabsList>
     </div>
   );

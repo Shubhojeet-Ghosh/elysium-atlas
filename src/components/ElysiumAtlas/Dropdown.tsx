@@ -40,8 +40,8 @@ export default function Dropdown({ open, onOpenChange }: DropdownProps) {
     firstName && lastName
       ? `${firstName}-${lastName}`.toLowerCase()
       : firstName
-      ? firstName.toLowerCase()
-      : "unnamed user";
+        ? firstName.toLowerCase()
+        : "unnamed user";
 
   const handleThemeChange = (theme: "light" | "dark" | "system") => {
     dispatch(setTheme(theme));
@@ -52,7 +52,7 @@ export default function Dropdown({ open, onOpenChange }: DropdownProps) {
     } else {
       // System theme - use system preference
       const prefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)"
+        "(prefers-color-scheme: dark)",
       ).matches;
       if (prefersDark) {
         document.documentElement.classList.add("dark");
@@ -90,10 +90,15 @@ export default function Dropdown({ open, onOpenChange }: DropdownProps) {
             <span>Dashboard</span>
           </div>
         </Link>
-        <div className="flex items-center px-2 py-1.5 text-deep-onyx dark:text-pure-mist hover:bg-serene-purple dark:hover:bg-serene-purple hover:text-pure-mist rounded-sm cursor-pointer">
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Account Settings</span>
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center px-2 py-1.5 text-deep-onyx dark:text-pure-mist rounded-sm cursor-not-allowed">
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Account Settings</span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>Coming Soon</TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Separator */}

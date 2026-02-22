@@ -35,6 +35,9 @@ import {
   setTriggerFetchAgentCustomTexts,
   setTriggerFetchAgentQnA,
   setAgentIcon,
+  setPrimaryColor,
+  setSecondaryColor,
+  setTextColor,
 } from "@/store/reducers/agentSlice";
 import {
   setChatSessionId,
@@ -309,6 +312,18 @@ export default function MyAgent({
       if (!newIcon || !newIcon.startsWith("data:")) {
         payload.agent_icon = newIcon;
       }
+    }
+
+    if (!isEquivalent(mappedInitial.primary_color, current.primary_color)) {
+      payload.primary_color = current.primary_color;
+    }
+
+    if (!isEquivalent(mappedInitial.secondary_color, current.secondary_color)) {
+      payload.secondary_color = current.secondary_color;
+    }
+
+    if (!isEquivalent(mappedInitial.text_color, current.text_color)) {
+      payload.text_color = current.text_color;
     }
 
     if (!isEquivalent(mappedInitial.llmModel, current.llmModel)) {
@@ -685,6 +700,9 @@ export default function MyAgent({
     if (dataToUse.llmModel !== undefined)
       dispatch(setLlmModel(dataToUse.llmModel || ""));
     dispatch(setAgentIcon(dataToUse.agent_icon ?? null));
+    dispatch(setPrimaryColor(dataToUse.primary_color || "#fff"));
+    dispatch(setSecondaryColor(dataToUse.secondary_color || "#fff"));
+    dispatch(setTextColor(dataToUse.text_color || "#111"));
     setAvatarFile(null);
     setAvatarClearSignal((prev) => prev + 1);
 
@@ -776,7 +794,11 @@ export default function MyAgent({
               <AgentBackButton onBack={handleBack} />
             </div>
 
-            <CustomTabs value={activeTab} onValueChange={handleTabChange} className="flex-1 min-w-0">
+            <CustomTabs
+              value={activeTab}
+              onValueChange={handleTabChange}
+              className="flex-1 min-w-0"
+            >
               <AgentBuilderTabs
                 activeTab={activeTab}
                 onTabChange={handleTabChange}

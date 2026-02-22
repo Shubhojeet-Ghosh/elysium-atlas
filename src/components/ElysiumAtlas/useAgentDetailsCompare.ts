@@ -28,6 +28,11 @@ export function useCurrentAgentDetails() {
     (state) => state.agent.knowledgeBaseQnA,
   );
   const agent_icon = useAppSelector((state) => state.agent.agent_icon);
+  const primary_color = useAppSelector((state) => state.agent.primary_color);
+  const secondary_color = useAppSelector(
+    (state) => state.agent.secondary_color,
+  );
+  const text_color = useAppSelector((state) => state.agent.text_color);
 
   return useMemo(
     () => ({
@@ -46,6 +51,9 @@ export function useCurrentAgentDetails() {
       knowledgeBaseText,
       knowledgeBaseQnA,
       agent_icon,
+      primary_color,
+      secondary_color,
+      text_color,
     }),
     [
       agentName,
@@ -63,6 +71,9 @@ export function useCurrentAgentDetails() {
       knowledgeBaseText,
       knowledgeBaseQnA,
       agent_icon,
+      primary_color,
+      secondary_color,
+      text_color,
     ],
   );
 }

@@ -16,5 +16,8 @@ export function mapInitialAgentDetails(details: any) {
     knowledgeBaseText: [],
     knowledgeBaseQnA: [],
     agent_icon: details.agent_icon ?? null,
+    primary_color: details.primary_color || "#fff",
+    secondary_color: details.secondary_color || "#fff",
+    text_color: details.text_color || "#111",
   };
 }
