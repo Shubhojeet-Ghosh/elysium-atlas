@@ -1,10 +1,10 @@
 "use client";
 import { forwardRef } from "react";
 
-interface CustomTextareaPrimaryProps
-  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+interface CustomTextareaPrimaryProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   inputClassName?: string;
   rows?: number;
+  resizable?: boolean;
 }
 
 const CustomTextareaPrimary = forwardRef<
@@ -20,9 +20,10 @@ const CustomTextareaPrimary = forwardRef<
       className = "",
       inputClassName = "",
       rows,
+      resizable = false,
       ...props
     },
-    ref
+    ref,
   ) => (
     <textarea
       ref={ref}
@@ -34,11 +35,11 @@ const CustomTextareaPrimary = forwardRef<
       className={`border-gray-300 dark:border-deep-onyx font-[600] border-[2px] rounded-[10px] px-[12px] py-[12px]
         placeholder-gray-400 focus:outline-none focus:border-serene-purple dark:focus:border-serene-purple
         transition duration-300 ease-in-out block w-full text-[12px] bg-white dark:bg-deep-onyx  
-        ${rows ? "resize-none" : ""} ${inputClassName} ${className}
+        ${resizable ? "resize-y" : "resize-none"} ${inputClassName} ${className}
       `}
       {...props}
     />
-  )
+  ),
 );
 
 CustomTextareaPrimary.displayName = "CustomTextareaPrimary";

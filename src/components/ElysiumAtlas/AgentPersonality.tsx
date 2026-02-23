@@ -2,6 +2,7 @@
 
 import AgentAvatar from "./AgentAvatar";
 import AgentColors from "./AgentColors";
+import AgentWelcomeMessage from "./AgentWelcomeMessage";
 
 interface AgentPersonalityProps {
   avatarFile: File | null;
@@ -22,6 +23,7 @@ export default function AgentPersonality({
         clearSignal={clearSignal}
       />
       <AgentColors />
+      <AgentWelcomeMessage />
     </div>
   );
 }
