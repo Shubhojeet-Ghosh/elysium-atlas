@@ -14,7 +14,7 @@ import { set } from "nprogress";
 
 export default function AgentChatSpace() {
   const { agent_id, chat_session_id, visitor_at } = useAppSelector(
-    (state) => state.agentChat
+    (state) => state.agentChat,
   );
 
   const dispatch = useAppDispatch();
@@ -43,7 +43,7 @@ export default function AgentChatSpace() {
 
         const response = await fastApiAxios.post(
           "/elysium-agents/elysium-atlas/agent/v1/get-agent-fields",
-          payload
+          payload,
         );
 
         const agentData = response.data;
@@ -65,7 +65,7 @@ export default function AgentChatSpace() {
               text_color: agentFields.text_color || "",
               quick_prompts: agentFields.quick_prompts || [],
               agent_status: agentFields.agent_status || "",
-            })
+            }),
           );
 
           if (Array.isArray(sessionMessages) && sessionMessages.length > 0) {

@@ -4,12 +4,7 @@ import { useAppSelector, useAppDispatch } from "@/store";
 import Image from "next/image";
 import { X } from "lucide-react";
 import { setIsAgentOpen } from "@/store/reducers/agentChatSlice";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import ChatMoreOptions from "@/components/ElysiumAtlas/ChatMoreOptions";
 
 export default function ChatHeader() {
   const {
@@ -63,21 +58,13 @@ export default function ChatHeader() {
         )}
       </div>
       <div className="flex gap-1">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                className="p-1.5 text-gray-400 hover:outline-[2px] outline-gray-100 rounded-full transition-colors cursor-pointer"
-                onClick={handleClose}
-              >
-                <X size={14} color={text_color} />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              <p>minimize agent</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <ChatMoreOptions textColor={text_color} />
+        <button
+          className="p-1.5 text-gray-400 hover:outline-[2px] outline-gray-100 rounded-full transition-colors cursor-pointer"
+          onClick={handleClose}
+        >
+          <X size={14} color={text_color} />
+        </button>
       </div>
     </div>
   );
