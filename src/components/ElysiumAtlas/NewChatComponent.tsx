@@ -14,9 +14,10 @@ interface NewChatComponentProps {
 }
 
 export default function NewChatComponent({ onNewChat }: NewChatComponentProps) {
-  const { agent_id, chat_session_id } = useAppSelector(
+  const { agent_id, chat_session_id, conversation_chain } = useAppSelector(
     (state) => state.agentChat,
   );
+  const isDisabled = !conversation_chain || conversation_chain.length === 0;
   const dispatch = useAppDispatch();
 
   const handleNewChat = async () => {
@@ -52,7 +53,8 @@ export default function NewChatComponent({ onNewChat }: NewChatComponentProps) {
       <div className="p-1.5">
         <button
           onClick={handleNewChat}
-          className="flex items-center w-full px-3 py-2 text-[13px] font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg cursor-pointer transition-all duration-200"
+          disabled={isDisabled}
+          className="flex items-center w-full px-3 py-2 text-[13px] font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg cursor-pointer transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
         >
           <Plus className="mr-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
           <span>New Chat</span>

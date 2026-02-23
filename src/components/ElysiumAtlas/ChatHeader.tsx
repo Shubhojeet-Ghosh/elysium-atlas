@@ -23,10 +23,10 @@ export default function ChatHeader() {
   };
   return (
     <div
-      className="flex items-center justify-between px-[16px] py-[8px] lg:rounded-t-[16px] md:rounded-t-none rounded-t-none"
+      className="flex items-center justify-between px-[16px] py-[8px] lg:rounded-t-[16px] md:rounded-t-none rounded-t-none w-full"
       style={{ backgroundColor: primary_color }}
     >
-      <div className="flex items-center gap-[10px]">
+      <div className="flex items-center gap-[10px] min-w-0 flex-1">
         {isFetching ? (
           <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse"></div>
         ) : agent_icon ? (
@@ -35,12 +35,12 @@ export default function ChatHeader() {
             alt={agent_name || "Agent"}
             width={32}
             height={32}
-            className="rounded-full w-[30px] h-[30px] object-cover"
+            className="rounded-full w-[30px] h-[30px] object-cover flex-shrink-0"
             quality={100}
           />
         ) : (
           <div
-            className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white font-semibold text-sm shadow-sm"
+            className="w-8 h-8 rounded-full bg-black flex-shrink-0 flex items-center justify-center text-white font-semibold text-sm shadow-sm"
             style={{ backgroundColor: primary_color, color: text_color }}
           >
             {agent_name?.charAt(0)?.toUpperCase() || "A"}
@@ -50,14 +50,14 @@ export default function ChatHeader() {
           <div className="h-4 w-24 bg-gray-200 animate-pulse rounded"></div>
         ) : (
           <span
-            className="font-semibold text-gray-700 text-sm"
+            className="font-semibold text-gray-700 text-sm truncate"
             style={{ color: text_color }}
           >
             {agent_name || "Agent"}
           </span>
         )}
       </div>
-      <div className="flex gap-1">
+      <div className="flex gap-1 flex-shrink-0">
         <ChatMoreOptions textColor={text_color} />
         <button
           className="p-1.5 text-gray-400 hover:outline-[2px] outline-gray-100 rounded-full transition-colors cursor-pointer"
