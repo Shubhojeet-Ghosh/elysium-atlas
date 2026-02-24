@@ -18,12 +18,12 @@ const userAgentsSlice = createSlice({
     },
     removeAgent: (state, action: PayloadAction<string>) => {
       state.myAgents = state.myAgents.filter(
-        (agent) => agent.id !== action.payload
+        (agent) => agent.id !== action.payload,
       );
     },
     updateAgent: (state, action: PayloadAction<Agent>) => {
       const idx = state.myAgents.findIndex(
-        (agent) => agent.id === action.payload.id
+        (agent) => agent.id === action.payload.id,
       );
       if (idx !== -1) {
         state.myAgents[idx] = action.payload;
@@ -31,6 +31,21 @@ const userAgentsSlice = createSlice({
     },
     resetMyAgents: (state) => {
       state.myAgents = [];
+    },
+    updateVisitorCounts: (
+      state,
+      action: PayloadAction<Record<string, number>>,
+    ) => {
+      state.myAgents = state.myAgents.map((agent: any) => {
+        const agentId = agent.agent_id;
+        if (
+          agentId &&
+          Object.prototype.hasOwnProperty.call(action.payload, agentId)
+        ) {
+          return { ...agent, live_visitors: action.payload[agentId] };
+        }
+        return agent;
+      });
     },
     triggerFetchAgents: (state) => {
       state.trigger_fetch_agents += 1;
@@ -44,6 +59,7 @@ export const {
   removeAgent,
   updateAgent,
   resetMyAgents,
+  updateVisitorCounts,
   triggerFetchAgents,
 } = userAgentsSlice.actions;
 

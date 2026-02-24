@@ -39,6 +39,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import PrimaryButton from "@/components/ui/PrimaryButton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function MyAgentsTable() {
   const agents = useAppSelector((state) => state.userAgents.myAgents);
@@ -200,7 +205,7 @@ export default function MyAgentsTable() {
               <Table className="min-w-[600px] lg:min-w-full ">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent ">
-                    <TableHead className="min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] font-[600] py-2 px-[10px] text-[14px] whitespace-nowrap">
+                    <TableHead className="w-[200px] lg:w-[300px] font-[600] py-2 px-[10px] text-[14px] whitespace-nowrap">
                       Name
                     </TableHead>
                     <TableHead className="min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] font-[600] py-2 px-[10px] text-[14px] whitespace-nowrap">
@@ -219,8 +224,28 @@ export default function MyAgentsTable() {
                       className="cursor-pointer border-b border-gray-100 dark:border-deep-onyx hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 hover:text-serene-purple dark:hover:text-serene-purple transition-all duration-200"
                       onClick={() => handleAgentClick(agent.agent_id)}
                     >
-                      <TableCell className="font-medium min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] py-2 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist">
-                        <div className="truncate">{agent.agent_name}</div>
+                      <TableCell className="font-medium w-[300px] py-2 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist">
+                        <div className="flex items-center gap-2">
+                          {agent.agent_name.length > 20 ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="truncate cursor-default">
+                                  {`${agent.agent_name.slice(0, 20)}...`}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {agent.agent_name}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <div className="truncate">{agent.agent_name}</div>
+                          )}
+                          {agent.live_visitors > 0 && (
+                            <span className="inline-flex items-center shrink-0 rounded-full bg-serene-purple/15 text-serene-purple px-2 py-0.5 text-[10px] font-semibold">
+                              {agent.live_visitors} online
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="font-medium min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] py-2 px-[10px] text-[14px] whitespace-nowrap">
                         <AgentStatusPill

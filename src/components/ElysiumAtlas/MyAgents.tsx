@@ -3,7 +3,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import fastApiAxios from "@/utils/fastapi_axios";
 import { useAppDispatch, useAppSelector } from "@/store";
-import { setMyAgents } from "@/store/reducers/userAgentsSlice";
+import {
+  setMyAgents,
+  updateVisitorCounts,
+} from "@/store/reducers/userAgentsSlice";
 import Cookies from "js-cookie";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import { Plus } from "lucide-react";
@@ -28,27 +31,62 @@ export default function MyAgents() {
   };
 
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const visitorPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     let isMounted = true;
     const allowedStatuses = ["active", "failed", "inactive"];
 
+    async function fetchVisitorCounts(token: string) {
+      try {
+        const visitorRes = await fastApiAxios.post(
+          "/elysium-agents/atlas-visitors/get-visitor-counts",
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+        if (visitorRes.data.success === true && isMounted) {
+          dispatch(updateVisitorCounts(visitorRes.data.visitor_counts));
+        }
+      } catch (_err) {
+        // Silently ignore visitor count errors
+      }
+    }
+
     async function fetchAgentsAndMaybePoll() {
       try {
         const token = Cookies.get("elysium_atlas_session_token");
+        if (!token) return;
         const res = await fastApiAxios.post(
           "/elysium-agents/elysium-atlas/agent/v1/list-agents",
           {},
-          token
-            ? {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              }
-            : undefined,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
         );
-        if (res.data && res.data.success && Array.isArray(res.data.agents)) {
+        if (
+          res.data &&
+          res.data.success &&
+          Array.isArray(res.data.agents) &&
+          res.data.agents.length > 0
+        ) {
           if (isMounted) dispatch(setMyAgents(res.data.agents));
+
+          // Fetch visitor counts right after agents are loaded
+          await fetchVisitorCounts(token);
+
+          // Start polling visitor counts every 10 seconds (only once)
+          if (!visitorPollingRef.current) {
+            visitorPollingRef.current = setInterval(() => {
+              if (isMounted) fetchVisitorCounts(token);
+            }, 10000);
+          }
+
           // Check if any agent_status is not in allowedStatuses
           const hasPending = res.data.agents.some(
             (agent: any) => !allowedStatuses.includes(agent.agent_status),
@@ -68,6 +106,10 @@ export default function MyAgents() {
       isMounted = false;
       if (pollingRef.current) {
         clearTimeout(pollingRef.current);
+      }
+      if (visitorPollingRef.current) {
+        clearInterval(visitorPollingRef.current);
+        visitorPollingRef.current = null;
       }
     };
   }, [dispatch, triggerFetch]);
