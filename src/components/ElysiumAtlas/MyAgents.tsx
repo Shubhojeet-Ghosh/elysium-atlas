@@ -8,6 +8,8 @@ import {
   updateVisitorCounts,
 } from "@/store/reducers/userAgentsSlice";
 import Cookies from "js-cookie";
+import aiSocket from "@/lib/aiSocket";
+import type { Socket } from "socket.io-client";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import { Plus } from "lucide-react";
 import MyAgentsTable from "./MyAgentsTable";
@@ -22,6 +24,9 @@ export default function MyAgents() {
   const triggerFetch = useAppSelector(
     (state) => state.userAgents.trigger_fetch_agents,
   );
+  const teamID = useAppSelector((state) => state.userProfile.teamID);
+  const userID = useAppSelector((state) => state.userProfile.userID);
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   // Placeholder handler for button
   const handleBuildNewAgent = () => {
@@ -31,30 +36,10 @@ export default function MyAgents() {
   };
 
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
-  const visitorPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     let isMounted = true;
     const allowedStatuses = ["active", "failed", "inactive"];
-
-    async function fetchVisitorCounts(token: string) {
-      try {
-        const visitorRes = await fastApiAxios.post(
-          "/elysium-agents/atlas-visitors/get-visitor-counts",
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
-        if (visitorRes.data.success === true && isMounted) {
-          dispatch(updateVisitorCounts(visitorRes.data.visitor_counts));
-        }
-      } catch (_err) {
-        // Silently ignore visitor count errors
-      }
-    }
 
     async function fetchAgentsAndMaybePoll() {
       try {
@@ -76,16 +61,6 @@ export default function MyAgents() {
           if (isMounted) dispatch(setMyAgents(agentsList));
 
           if (agentsList.length > 0) {
-            // Fetch visitor counts right after agents are loaded
-            await fetchVisitorCounts(token);
-
-            // Start polling visitor counts every 10 seconds (only once)
-            if (!visitorPollingRef.current) {
-              visitorPollingRef.current = setInterval(() => {
-                if (isMounted) fetchVisitorCounts(token);
-              }, 10000);
-            }
-
             // Check if any agent_status is not in allowedStatuses
             const hasPending = agentsList.some(
               (agent: any) => !allowedStatuses.includes(agent.agent_status),
@@ -107,12 +82,52 @@ export default function MyAgents() {
       if (pollingRef.current) {
         clearTimeout(pollingRef.current);
       }
-      if (visitorPollingRef.current) {
-        clearInterval(visitorPollingRef.current);
-        visitorPollingRef.current = null;
-      }
     };
   }, [dispatch, triggerFetch]);
+
+  useEffect(() => {
+    setSocket(aiSocket);
+
+    const emitConnected = () => {
+      aiSocket.emit("atlas-team-member-connected", {
+        team_id: teamID,
+        user_id: userID,
+      });
+    };
+
+    if (aiSocket.connected) {
+      emitConnected();
+    } else {
+      aiSocket.once("connect", emitConnected);
+    }
+
+    const handleVisitorCounts = (data: {
+      success: boolean;
+      visitor_counts: Record<string, number>;
+    }) => {
+      if (data.success && data.visitor_counts) {
+        dispatch(updateVisitorCounts(data.visitor_counts));
+      }
+    };
+
+    const handleVisitorCountUpdated = (data: {
+      agent_id: string;
+      visitor_count: number;
+    }) => {
+      if (data.agent_id !== undefined && data.visitor_count !== undefined) {
+        dispatch(updateVisitorCounts({ [data.agent_id]: data.visitor_count }));
+      }
+    };
+
+    aiSocket.on("agents_visitor_counts", handleVisitorCounts);
+    aiSocket.on("agent_visitor_count_updated", handleVisitorCountUpdated);
+
+    return () => {
+      aiSocket.off("connect", emitConnected);
+      aiSocket.off("agents_visitor_counts", handleVisitorCounts);
+      aiSocket.off("agent_visitor_count_updated", handleVisitorCountUpdated);
+    };
+  }, [teamID, userID]);
 
   if (agents.length === 0) {
     return null;
