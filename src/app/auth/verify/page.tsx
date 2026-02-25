@@ -15,6 +15,7 @@ import {
   setProfilePicture,
   setIsProfileComplete,
   setUserID,
+  setTeamID,
   setUserEmail,
 } from "@/store/reducers/userProfileSlice";
 export default function VerifyPage() {
@@ -35,7 +36,7 @@ export default function VerifyPage() {
           "elysium-atlas/v1/auth/verify",
           {
             token,
-          }
+          },
         );
         const { success } = res.data;
         if (success) {
@@ -44,6 +45,7 @@ export default function VerifyPage() {
           setVerificationSuccess(true);
           dispatch(setProfilePicture(res.data?.user?.profile_image_url || ""));
           dispatch(setUserID(res.data?.user?.user_id || ""));
+          dispatch(setTeamID(res.data?.user?.team_id || ""));
           dispatch(setUserEmail(res.data?.user?.email || ""));
           dispatch(setFirstName(res.data?.user?.first_name || ""));
           dispatch(setLastName(res.data?.user?.last_name || ""));

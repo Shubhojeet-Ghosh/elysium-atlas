@@ -14,6 +14,7 @@ import {
   setIsProfileComplete,
   resetUserProfile,
   setUserID,
+  setTeamID,
   setUserEmail,
 } from "@/store/reducers/userProfileSlice";
 
@@ -53,7 +54,7 @@ export default function LoginBox() {
       }
       const res = await nodeExpressAxios.post(
         "/elysium-atlas/v1/auth/magic-link",
-        loginPayload
+        loginPayload,
       );
       // console.log(res);
       const response_data = res.data;
@@ -65,18 +66,19 @@ export default function LoginBox() {
             {
               path: "/",
               expires: 1,
-            }
+            },
           );
 
           dispatch(
-            setProfilePicture(response_data?.user?.profile_image_url || "")
+            setProfilePicture(response_data?.user?.profile_image_url || ""),
           );
           dispatch(setUserID(response_data?.user?.user_id || ""));
+          dispatch(setTeamID(response_data?.user?.team_id || ""));
           dispatch(setUserEmail(response_data?.user?.email || ""));
           dispatch(setFirstName(response_data?.user?.first_name || ""));
           dispatch(setLastName(response_data?.user?.last_name || ""));
           dispatch(
-            setIsProfileComplete(response_data?.is_profile_complete ?? true)
+            setIsProfileComplete(response_data?.is_profile_complete ?? true),
           );
 
           toast.success("Logged in successfully!", {
@@ -120,7 +122,7 @@ export default function LoginBox() {
             "/elysium-atlas/v1/auth/verify-google-login",
             {
               access_token: accessToken,
-            }
+            },
           );
           const response_data = res.data;
           if (response_data.success) {
@@ -130,18 +132,19 @@ export default function LoginBox() {
               {
                 path: "/",
                 expires: 1,
-              }
+              },
             );
 
             dispatch(
-              setProfilePicture(response_data?.user?.profile_image_url || "")
+              setProfilePicture(response_data?.user?.profile_image_url || ""),
             );
             dispatch(setUserID(response_data?.user?.user_id || ""));
+            dispatch(setTeamID(response_data?.user?.team_id || ""));
             dispatch(setUserEmail(response_data?.user?.email || ""));
             dispatch(setFirstName(response_data?.user?.first_name || ""));
             dispatch(setLastName(response_data?.user?.last_name || ""));
             dispatch(
-              setIsProfileComplete(response_data?.is_profile_complete ?? true)
+              setIsProfileComplete(response_data?.is_profile_complete ?? true),
             );
             toast.success("Logged in successfully!", {
               position: "top-center",

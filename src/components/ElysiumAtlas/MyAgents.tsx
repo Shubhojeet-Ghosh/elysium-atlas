@@ -69,30 +69,30 @@ export default function MyAgents() {
             },
           },
         );
-        if (
-          res.data &&
-          res.data.success &&
-          Array.isArray(res.data.agents) &&
-          res.data.agents.length > 0
-        ) {
-          if (isMounted) dispatch(setMyAgents(res.data.agents));
+        if (res.data && res.data.success) {
+          const agentsList = Array.isArray(res.data.agents)
+            ? res.data.agents
+            : [];
+          if (isMounted) dispatch(setMyAgents(agentsList));
 
-          // Fetch visitor counts right after agents are loaded
-          await fetchVisitorCounts(token);
+          if (agentsList.length > 0) {
+            // Fetch visitor counts right after agents are loaded
+            await fetchVisitorCounts(token);
 
-          // Start polling visitor counts every 10 seconds (only once)
-          if (!visitorPollingRef.current) {
-            visitorPollingRef.current = setInterval(() => {
-              if (isMounted) fetchVisitorCounts(token);
-            }, 10000);
-          }
+            // Start polling visitor counts every 10 seconds (only once)
+            if (!visitorPollingRef.current) {
+              visitorPollingRef.current = setInterval(() => {
+                if (isMounted) fetchVisitorCounts(token);
+              }, 10000);
+            }
 
-          // Check if any agent_status is not in allowedStatuses
-          const hasPending = res.data.agents.some(
-            (agent: any) => !allowedStatuses.includes(agent.agent_status),
-          );
-          if (hasPending && isMounted) {
-            pollingRef.current = setTimeout(fetchAgentsAndMaybePoll, 5000);
+            // Check if any agent_status is not in allowedStatuses
+            const hasPending = agentsList.some(
+              (agent: any) => !allowedStatuses.includes(agent.agent_status),
+            );
+            if (hasPending && isMounted) {
+              pollingRef.current = setTimeout(fetchAgentsAndMaybePoll, 5000);
+            }
           }
         }
       } catch (err) {

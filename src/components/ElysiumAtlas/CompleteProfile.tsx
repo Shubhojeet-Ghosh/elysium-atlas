@@ -19,17 +19,19 @@ import {
 export default function CompleteProfile() {
   const dispatch = useAppDispatch();
   const isProfileComplete = useAppSelector(
-    (state: any) => state.userProfile.isProfileComplete
+    (state: any) => state.userProfile.isProfileComplete,
   );
   const userID = useAppSelector((state: any) => state.userProfile.userID);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
+  const [teamName, setTeamName] = useState("");
   const [errors, setErrors] = useState({
     firstName: "",
     lastName: "",
     password: "",
+    teamName: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -43,6 +45,7 @@ export default function CompleteProfile() {
       firstName: "",
       lastName: "",
       password: "",
+      teamName: "",
     };
 
     const trimmedFirstName = firstName.trim();
@@ -76,6 +79,16 @@ export default function CompleteProfile() {
       return false;
     }
 
+    const trimmedTeamName = teamName.trim();
+    if (!trimmedTeamName) {
+      newErrors.teamName = "Team name is required";
+      setErrors(newErrors);
+      toast.error("Team name is required", {
+        position: "top-center",
+      });
+      return false;
+    }
+
     setErrors(newErrors);
     return true;
   };
@@ -93,6 +106,7 @@ export default function CompleteProfile() {
     const trimmedFirstName = firstName.trim();
     const trimmedLastName = lastName.trim();
     const trimmedPassword = password.trim();
+    const trimmedTeamName = teamName.trim();
 
     try {
       const updatePayload = {
@@ -100,6 +114,7 @@ export default function CompleteProfile() {
         last_name: trimmedLastName,
         password: trimmedPassword,
         profile_image_url: "",
+        team_name: trimmedTeamName,
       };
 
       // Get token from cookies
@@ -112,7 +127,7 @@ export default function CompleteProfile() {
           headers: {
             Authorization: `Bearer ${sessionToken || ""}`,
           },
-        }
+        },
       );
 
       const response_data = res.data;
@@ -130,17 +145,19 @@ export default function CompleteProfile() {
         dispatch(setFirstNameAction(response_data?.user?.first_name || ""));
         dispatch(setLastNameAction(response_data?.user?.last_name || ""));
         dispatch(
-          setProfilePictureAction(response_data?.user?.profile_image_url || "")
+          setProfilePictureAction(response_data?.user?.profile_image_url || ""),
         );
         dispatch(
-          setIsProfileCompleteAction(response_data?.is_profile_complete ?? true)
+          setIsProfileCompleteAction(
+            response_data?.is_profile_complete ?? true,
+          ),
         );
 
         toast.success(
           response_data.message || "Profile updated successfully!",
           {
             position: "top-center",
-          }
+          },
         );
       } else {
         toast.error(response_data.message || "Failed to update profile", {
@@ -154,7 +171,7 @@ export default function CompleteProfile() {
           "We are facing some issues, please try again later",
         {
           position: "top-center",
-        }
+        },
       );
     } finally {
       setIsSubmitting(false);
@@ -262,6 +279,34 @@ export default function CompleteProfile() {
                 />
                 Show password
               </label>
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-gray-700 my-4" />
+            <div>
+              <label
+                htmlFor="teamName"
+                className="block text-[13px] font-medium text-deep-onyx dark:text-pure-mist mb-1"
+              >
+                Team Name <span className="text-danger-red">*</span>
+              </label>
+              <CustomInput
+                id="teamName"
+                type="text"
+                placeholder="Enter your team name"
+                value={teamName}
+                onChange={(e) => {
+                  setTeamName(e.target.value);
+                  if (errors.teamName) {
+                    setErrors({ ...errors, teamName: "" });
+                  }
+                }}
+                className={
+                  errors.teamName
+                    ? "border-danger-red min-h-[45px] "
+                    : "min-h-[45px] "
+                }
+                autoComplete="off"
+              />
             </div>
 
             <button

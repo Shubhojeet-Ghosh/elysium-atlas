@@ -3,6 +3,7 @@ import { UserProfileState } from "../types/UserProfileTypes";
 
 const initialState: UserProfileState = {
   userID: "",
+  teamID: "",
   firstName: "",
   lastName: "",
   userEmail: "",
@@ -16,6 +17,9 @@ const userProfileSlice = createSlice({
   reducers: {
     setUserID: (state, action: PayloadAction<string>) => {
       state.userID = action.payload;
+    },
+    setTeamID: (state, action: PayloadAction<string>) => {
+      state.teamID = action.payload;
     },
     setUserEmail: (state, action: PayloadAction<string>) => {
       state.userEmail = action.payload;
@@ -34,6 +38,7 @@ const userProfileSlice = createSlice({
     },
     resetUserProfile: (state) => {
       state.userID = "";
+      state.teamID = "";
       state.firstName = "";
       state.lastName = "";
       state.userEmail = "";
@@ -49,6 +54,7 @@ export const {
   setIsProfileComplete,
   resetUserProfile,
   setUserID,
+  setTeamID,
   setUserEmail,
 } = userProfileSlice.actions;
 
