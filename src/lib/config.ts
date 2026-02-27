@@ -2,6 +2,10 @@
  * Application configuration constants
  */
 
+// ─── Pagination ───────────────────────────────────────────────────────────────
+export const VISITORS_PER_PAGE = 100;
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const config = {
   images: {
     background: {

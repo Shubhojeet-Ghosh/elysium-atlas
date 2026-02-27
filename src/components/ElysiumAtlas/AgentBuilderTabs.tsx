@@ -9,6 +9,7 @@ import {
   Type,
   MessagesSquare,
   BarChart3,
+  Radio,
 } from "lucide-react";
 import {
   CustomTabs,
@@ -101,6 +102,13 @@ export default function AgentBuilderTabs({
           </TooltipTrigger>
           <TooltipContent>Coming Soon</TooltipContent>
         </Tooltip>
+        <CustomTabsTrigger
+          value="live-visitors"
+          className="flex items-center gap-2 font-[600]"
+        >
+          <Radio className="w-4 h-4 shrink-0" />
+          <span className="whitespace-nowrap">Live Visitors</span>
+        </CustomTabsTrigger>
       </CustomTabsList>
     </div>
   );

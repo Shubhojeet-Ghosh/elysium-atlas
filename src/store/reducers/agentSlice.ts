@@ -6,6 +6,16 @@ import {
   QnA,
 } from "../types/AgentBuilderTypes";
 
+export interface ActiveVisitor {
+  agent_id: string;
+  chat_session_id: string;
+  created_at: string;
+  last_message_at: string | null;
+  last_connected_at: string;
+  sid: string;
+  alias_name: string | null;
+}
+
 interface UserAgentState {
   agentName: string;
   agentID: string;
@@ -32,6 +42,7 @@ interface UserAgentState {
   primary_color: string;
   secondary_color: string;
   text_color: string;
+  active_visitors: ActiveVisitor[];
 }
 
 const initialState: UserAgentState = {
@@ -60,6 +71,7 @@ const initialState: UserAgentState = {
   primary_color: "#fff",
   secondary_color: "#fff",
   text_color: "#111",
+  active_visitors: [],
 };
 
 const agentSlice = createSlice({
@@ -260,6 +272,14 @@ const agentSlice = createSlice({
     setTextColor: (state, action: PayloadAction<string>) => {
       state.text_color = action.payload;
     },
+    setActiveVisitors: (state, action: PayloadAction<ActiveVisitor[]>) => {
+      state.active_visitors = action.payload;
+    },
+    removeActiveVisitor: (state, action: PayloadAction<string>) => {
+      state.active_visitors = state.active_visitors.filter(
+        (v) => v.chat_session_id !== action.payload,
+      );
+    },
     resetUserAgent: (state) => {
       state.agentName = "";
       state.agentID = "";
@@ -286,6 +306,7 @@ const agentSlice = createSlice({
       state.primary_color = "#fff";
       state.secondary_color = "#fff";
       state.text_color = "#111";
+      state.active_visitors = [];
     },
   },
 });
@@ -331,6 +352,8 @@ export const {
   setPrimaryColor,
   setSecondaryColor,
   setTextColor,
+  setActiveVisitors,
+  removeActiveVisitor,
   resetUserAgent,
 } = agentSlice.actions;
 

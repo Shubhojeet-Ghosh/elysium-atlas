@@ -12,6 +12,7 @@ import AgentFiles from "./AgentFiles";
 import AgentText from "./AgentText";
 import AgentQnA from "./AgentQnA";
 import AgentPersonality from "./AgentPersonality";
+import LiveVisitors from "./LiveVisitors";
 import { useCurrentAgentDetails } from "./useAgentDetailsCompare";
 import { useAppDispatch, useAppSelector } from "@/store";
 import PrimaryButton from "../ui/PrimaryButton";
@@ -851,6 +852,11 @@ export default function MyAgent({
             setAvatarFile={setAvatarFile}
             clearSignal={avatarClearSignal}
           />
+        </div>
+      )}
+      {activeTab === "live-visitors" && (
+        <div>
+          <LiveVisitors />
         </div>
       )}
       {mappedInitial && (

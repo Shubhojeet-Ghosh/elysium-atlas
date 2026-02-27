@@ -9,10 +9,21 @@ export const formatDate = (dateString: string) => {
 
 // Formats UTC date string with microseconds to local 12-hour format with AM/PM
 export const formatDateTime12hr = (dateString: string) => {
-  // Remove microseconds if present and ensure UTC parsing
+  // Remove microseconds if present
   // Example: "2025-12-25T16:03:40.203000" => "2025-12-25T16:03:40.203Z"
-  let cleaned = dateString.replace(/\.(\d{3})\d+$/, ".$1");
-  if (!cleaned.endsWith("Z")) cleaned += "Z";
+  // Also handles timezone offsets like "+00:00" or "+05:30"
+  let cleaned = dateString.replace(
+    /\.?(\d{3})\d*(?=[Z+-]|$)/,
+    (match, ms, offset, str) => {
+      // keep only 3ms digits
+      return "." + ms;
+    },
+  );
+  // Strip trailing microseconds more reliably
+  cleaned = dateString.replace(/\.(\d{3})\d+/, ".$1");
+  // Only append Z if there is no existing timezone info
+  const hasTimezone = /[Z]$|(\+|-)\d{2}:\d{2}$/.test(cleaned);
+  if (!hasTimezone) cleaned += "Z";
   const utcDate = new Date(cleaned);
   return utcDate.toLocaleString(undefined, {
     year: "numeric",
@@ -36,7 +47,7 @@ export const formatChatTimestamp = (dateString: string) => {
   const messageDate = new Date(
     utcDate.getFullYear(),
     utcDate.getMonth(),
-    utcDate.getDate()
+    utcDate.getDate(),
   );
 
   const diffTime = today.getTime() - messageDate.getTime();
