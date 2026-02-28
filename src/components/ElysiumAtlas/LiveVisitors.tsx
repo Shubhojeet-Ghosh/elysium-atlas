@@ -5,6 +5,7 @@ import aiSocket from "@/lib/aiSocket";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
   setActiveVisitors,
+  addActiveVisitor,
   removeActiveVisitor,
 } from "@/store/reducers/agentSlice";
 import { VISITORS_PER_PAGE } from "@/lib/config";
@@ -78,10 +79,18 @@ export default function LiveVisitors() {
 
     aiSocket.on("agent_visitor_disconnected", handleVisitorDisconnected);
 
+    const handleNewVisitor = (data: { agent_id: string; visitor: any }) => {
+      dispatch(addActiveVisitor(data.visitor));
+      setTotal((prev) => prev + 1);
+    };
+
+    aiSocket.on("agent_new_visitor", handleNewVisitor);
+
     return () => {
       aiSocket.off("connect", emitConnected);
       aiSocket.off("agent_visitors_list", handleVisitorsList);
       aiSocket.off("agent_visitor_disconnected", handleVisitorDisconnected);
+      aiSocket.off("agent_new_visitor", handleNewVisitor);
     };
   }, [teamID, userID, agentID, dispatch]);
 

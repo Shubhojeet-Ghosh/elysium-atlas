@@ -230,16 +230,23 @@ export default function VisitorsList({
                       >
                         {/* Visitor name / alias */}
                         <TableCell className="font-medium py-4 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist w-[260px] min-w-[180px] max-w-[260px]">
-                          <span className="truncate max-w-[240px] block overflow-hidden text-ellipsis">
-                            {matchesName
-                              ? highlightMatch(displayName, searchTerm)
-                              : displayName}
+                          <span className="flex items-center gap-2">
+                            <span className="truncate max-w-[240px] overflow-hidden text-ellipsis">
+                              {matchesName
+                                ? highlightMatch(displayName, searchTerm)
+                                : displayName}
+                            </span>
+                            {visitor.newly_joined && (
+                              <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-teal-green/15 text-teal-green dark:bg-teal-green/20 dark:text-teal-green">
+                                new
+                              </span>
+                            )}
                           </span>
                         </TableCell>
 
                         {/* Status pill */}
                         <TableCell className="min-w-[120px] py-4 px-[10px] text-[14px] whitespace-nowrap">
-                          <Badge>Active</Badge>
+                          <Badge>online</Badge>
                         </TableCell>
 
                         {/* Connected since */}

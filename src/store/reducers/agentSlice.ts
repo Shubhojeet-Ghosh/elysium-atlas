@@ -14,6 +14,7 @@ export interface ActiveVisitor {
   last_connected_at: string;
   sid: string;
   alias_name: string | null;
+  newly_joined: boolean;
 }
 
 interface UserAgentState {
@@ -272,8 +273,17 @@ const agentSlice = createSlice({
     setTextColor: (state, action: PayloadAction<string>) => {
       state.text_color = action.payload;
     },
+    addActiveVisitor: (state, action: PayloadAction<ActiveVisitor>) => {
+      state.active_visitors = [
+        ...state.active_visitors,
+        { ...action.payload, newly_joined: true },
+      ];
+    },
     setActiveVisitors: (state, action: PayloadAction<ActiveVisitor[]>) => {
-      state.active_visitors = action.payload;
+      state.active_visitors = action.payload.map((v) => ({
+        ...v,
+        newly_joined: v.newly_joined ?? false,
+      }));
     },
     removeActiveVisitor: (state, action: PayloadAction<string>) => {
       state.active_visitors = state.active_visitors.filter(
@@ -352,6 +362,7 @@ export const {
   setPrimaryColor,
   setSecondaryColor,
   setTextColor,
+  addActiveVisitor,
   setActiveVisitors,
   removeActiveVisitor,
   resetUserAgent,
