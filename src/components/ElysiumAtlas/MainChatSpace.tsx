@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, memo } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { ArrowUp, ArrowDown } from "lucide-react";
-import { addMessage, setIsTyping } from "@/store/reducers/agentChatSlice";
+import {
+  addMessage,
+  setIsTyping,
+  setInConversationWith,
+} from "@/store/reducers/agentChatSlice";
 import { connectAiSocket, disconnectAiSocket } from "@/lib/aiSocket";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -16,6 +20,8 @@ import ChatMessage from "./ChatMessage";
 import MessageActions from "./MessageActions";
 import { formatChatTimestamp } from "@/utils/formatDate";
 import { markdownComponents } from "@/utils/markdownComponents";
+import { getUserGeoLocationDetails } from "@/utils/geoLocationUtils";
+import { setGeoData } from "@/store/reducers/agentChatSlice";
 
 export default function MainChatSpace() {
   const {
@@ -29,6 +35,7 @@ export default function MainChatSpace() {
     isFetching,
     chatMode,
     isTyping,
+    geoData,
   } = useAppSelector((state) => state.agentChat);
 
   const dispatch = useAppDispatch();
@@ -37,6 +44,7 @@ export default function MainChatSpace() {
   const [socket, setSocket] = useState<any>(null);
   const [streamingMessage, setStreamingMessage] = useState("");
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isGeoDataReady, setIsGeoDataReady] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -51,7 +59,7 @@ export default function MainChatSpace() {
         e.preventDefault();
         window.parent.postMessage(
           { type: "navigate_link", url: link.href },
-          "*" // Use specific origin in production
+          "*", // Use specific origin in production
         );
       }
     };
@@ -60,7 +68,58 @@ export default function MainChatSpace() {
     return () => document.removeEventListener("click", handleClick, true);
   }, []);
 
-  // Connect socket on mount, disconnect on unmount, and handle visitor connection
+  useEffect(() => {
+    // Already in redux (same session), mark ready and skip
+    if (geoData) {
+      setIsGeoDataReady(true);
+      return;
+    }
+
+    const GEO_CACHE_KEY = "elysium_geo_data";
+
+    // Try to restore from localStorage before hitting the API
+    try {
+      const cached = localStorage.getItem(GEO_CACHE_KEY);
+      if (cached) {
+        dispatch(setGeoData(JSON.parse(cached)));
+        setIsGeoDataReady(true);
+        return;
+      }
+    } catch (_) {
+      // localStorage unavailable or corrupt — fall through to API
+    }
+
+    const fetchGeoData = async () => {
+      try {
+        const result = await getUserGeoLocationDetails();
+        if (result?.status && result.data) {
+          const d = result.data;
+          const parsed = {
+            country_name: d.country_name ?? null,
+            country_flag: d.country_flag ?? null,
+            district: d.district ?? null,
+            ip: d.ip ?? null,
+            time_zone: d.time_zone?.name ?? null,
+          };
+          dispatch(setGeoData(parsed));
+          try {
+            localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(parsed));
+          } catch (_) {
+            // Ignore storage quota/unavailability errors
+          }
+        }
+      } catch (_) {
+        // API failed — geo_data will be null, but socket emit must not be blocked
+      } finally {
+        // Always mark ready so the socket emit is never blocked
+        setIsGeoDataReady(true);
+      }
+    };
+
+    fetchGeoData();
+  }, []);
+
+  // Connect socket on mount, disconnect on unmount, and set up response listeners
   useEffect(() => {
     // Only connect socket after API processing is complete
     if (isFetching) {
@@ -70,19 +129,6 @@ export default function MainChatSpace() {
     // Connect the AI socket and store the instance
     const socketInstance = connectAiSocket();
     setSocket(socketInstance);
-
-    const handleConnect = () => {
-      // Send atlas-visitor-connected event if both agent_id and chat_session_id are truthy
-      if (agent_id && chat_session_id) {
-        socketInstance.emit("atlas-visitor-connected", {
-          agent_id,
-          chat_session_id,
-        });
-      }
-    };
-
-    // Listen for connection event
-    socketInstance.on("connect", handleConnect);
 
     // Listen for response chunks
     const handleResponseChunk = (data: {
@@ -113,22 +159,58 @@ export default function MainChatSpace() {
 
     socketInstance.on("atlas_response_chunk", handleResponseChunk);
 
-    // If socket is already connected, emit the event
-    if (socketInstance.connected && agent_id && chat_session_id) {
-      socketInstance.emit("atlas-visitor-connected", {
-        agent_id,
-        chat_session_id,
-      });
-    }
+    // Listen for conversation_started event
+    const handleConversationStarted = (data: {
+      agent_id: string;
+      chat_session_id: string;
+      in_conversation_with: string;
+    }) => {
+      dispatch(setInConversationWith(data.in_conversation_with));
+    };
+
+    // Listen for conversation_ended event
+    const handleConversationEnded = (data: {
+      agent_id: string;
+      chat_session_id: string;
+      in_conversation_with: string;
+    }) => {
+      dispatch(setInConversationWith(null));
+    };
+
+    socketInstance.on("conversation_started", handleConversationStarted);
+    socketInstance.on("conversation_ended", handleConversationEnded);
 
     // Cleanup: disconnect socket when component unmounts
     return () => {
-      socketInstance.off("connect", handleConnect);
       socketInstance.off("atlas_response_chunk", handleResponseChunk);
+      socketInstance.off("conversation_started", handleConversationStarted);
+      socketInstance.off("conversation_ended", handleConversationEnded);
       disconnectAiSocket();
       setSocket(null);
     };
   }, [agent_id, chat_session_id, isFetching]);
+
+  // Emit atlas-visitor-connected only after both socket is ready AND geo data is resolved
+  useEffect(() => {
+    if (!isGeoDataReady || !socket || !agent_id || !chat_session_id) return;
+
+    const payload = {
+      agent_id,
+      chat_session_id,
+      geo_data: geoData ?? null,
+    };
+    // console.log("Emitting atlas-visitor-connected with payload:", payload);
+    const emitVisitorConnected = (socketInstance: any) => {
+      socketInstance.emit("atlas-visitor-connected", payload);
+    };
+
+    if (socket.connected) {
+      emitVisitorConnected(socket);
+    } else {
+      // Wait for the socket to connect, then emit
+      socket.once("connect", () => emitVisitorConnected(socket));
+    }
+  }, [isGeoDataReady, socket, agent_id, chat_session_id]);
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     messagesEndRef.current?.scrollIntoView({ behavior });
@@ -204,7 +286,7 @@ export default function MainChatSpace() {
         } else {
           // Socket is disconnected, reconnect first then emit
           console.log(
-            "Socket disconnected, reconnecting before sending message..."
+            "Socket disconnected, reconnecting before sending message...",
           );
           const reconnectedSocket = connectAiSocket();
 
@@ -234,7 +316,7 @@ export default function MainChatSpace() {
         textareaRef.current.style.height = "40px";
       }
     },
-    [inputValue, socket, agent_id, chat_session_id, chatMode, dispatch]
+    [inputValue, socket, agent_id, chat_session_id, chatMode, dispatch],
   );
 
   const handleKeyDown = useCallback(
@@ -244,7 +326,7 @@ export default function MainChatSpace() {
         handleSendMessage();
       }
     },
-    [handleSendMessage]
+    [handleSendMessage],
   );
 
   const handleInputChange = useCallback(
@@ -260,11 +342,11 @@ export default function MainChatSpace() {
 
         textareaRef.current.style.height = `${Math.min(
           scrollHeight,
-          maxHeight
+          maxHeight,
         )}px`;
       }
     },
-    []
+    [],
   );
 
   return (

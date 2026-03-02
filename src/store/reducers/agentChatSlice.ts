@@ -7,6 +7,14 @@ interface Message {
   created_at: string;
 }
 
+interface GeoData {
+  country_name: string | null;
+  country_flag: string | null;
+  district: string | null;
+  ip: string | null;
+  time_zone: string | null;
+}
+
 interface AgentChatState {
   chat_session_id: string;
   agent_id: string;
@@ -26,6 +34,8 @@ interface AgentChatState {
   conversation_chain: Message[];
   chatMode: "human" | "ai";
   isTyping: boolean;
+  in_conversation_with: string | null;
+  geoData: GeoData | null;
 }
 
 const initialState: AgentChatState = {
@@ -47,6 +57,8 @@ const initialState: AgentChatState = {
   conversation_chain: [],
   chatMode: "ai",
   isTyping: false,
+  in_conversation_with: null,
+  geoData: null,
 };
 
 const agentChatSlice = createSlice({
@@ -74,7 +86,7 @@ const agentChatSlice = createSlice({
         text_color: string;
         quick_prompts: string[];
         agent_status: string;
-      }>
+      }>,
     ) => {
       state.agent_name = action.payload.agent_name;
       state.agent_icon = action.payload.agent_icon;
@@ -107,6 +119,12 @@ const agentChatSlice = createSlice({
     setIsTyping: (state, action: PayloadAction<boolean>) => {
       state.isTyping = action.payload;
     },
+    setInConversationWith: (state, action: PayloadAction<string | null>) => {
+      state.in_conversation_with = action.payload;
+    },
+    setGeoData: (state, action: PayloadAction<GeoData | null>) => {
+      state.geoData = action.payload;
+    },
     resetAgentChat: (state) => {
       state.chat_session_id = "";
       state.agent_id = "";
@@ -126,6 +144,8 @@ const agentChatSlice = createSlice({
       state.conversation_chain = [];
       state.chatMode = "ai";
       state.isTyping = false;
+      state.in_conversation_with = null;
+      state.geoData = null;
     },
   },
 });
@@ -142,6 +162,8 @@ export const {
   addMessage,
   setChatMode,
   setIsTyping,
+  setInConversationWith,
+  setGeoData,
   resetAgentChat,
 } = agentChatSlice.actions;
 

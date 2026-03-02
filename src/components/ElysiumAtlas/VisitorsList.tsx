@@ -19,9 +19,11 @@ import {
 } from "@/components/ui/table";
 import CustomInput from "@/components/inputs/CustomInput";
 import { ChevronLeft, ChevronRight, Search, Radio } from "lucide-react";
-import { useAppSelector } from "@/store";
+import { useAppSelector, useAppDispatch } from "@/store";
 import { formatDateTime12hr } from "@/utils/formatDate";
 import Badge from "@/components/ui/Badge";
+import { addCapturedSession } from "@/store/reducers/agentSlice";
+import aiSocket from "@/lib/aiSocket";
 
 export default function VisitorsList({
   currentPage,
@@ -32,6 +34,8 @@ export default function VisitorsList({
   onPageChange,
 }: VisitorsListProps) {
   const activeVisitors = useAppSelector((state) => state.agent.active_visitors);
+  const agentID = useAppSelector((state) => state.agent.agentID);
+  const dispatch = useAppDispatch();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [showRightGradient, setShowRightGradient] = useState(true);
@@ -86,6 +90,19 @@ export default function VisitorsList({
         {text.substring(idx + term.length)}
       </>
     );
+  };
+
+  const handleVisitorClick = (chat_session_id: string) => {
+    dispatch(
+      addCapturedSession({
+        chat_session_id,
+        captured_at: new Date().toISOString(),
+      }),
+    );
+    aiSocket.emit("atlas-team-member-start-conversation", {
+      agent_id: agentID,
+      chat_session_id,
+    });
   };
 
   const handlePreviousPage = () => {
@@ -226,6 +243,9 @@ export default function VisitorsList({
                     return (
                       <TableRow
                         key={visitor.sid || visitor.chat_session_id || index}
+                        onClick={() =>
+                          handleVisitorClick(visitor.chat_session_id)
+                        }
                         className="cursor-pointer border-b border-gray-100 dark:border-deep-onyx hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 hover:text-serene-purple dark:hover:text-serene-purple transition-all duration-200"
                       >
                         {/* Visitor name / alias */}
@@ -246,7 +266,14 @@ export default function VisitorsList({
 
                         {/* Status pill */}
                         <TableCell className="min-w-[120px] py-4 px-[10px] text-[14px] whitespace-nowrap">
-                          <Badge>online</Badge>
+                          {visitor.status === "online" && (
+                            <Badge>{visitor.status}</Badge>
+                          )}
+                          {visitor.status === "offline" && (
+                            <Badge className="bg-transparent border border-serene-purple !text-serene-purple dark:border-pure-mist dark:!text-pure-mist">
+                              {visitor.status}
+                            </Badge>
+                          )}
                         </TableCell>
 
                         {/* Connected since */}

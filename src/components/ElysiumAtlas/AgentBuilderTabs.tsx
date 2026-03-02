@@ -76,7 +76,7 @@ export default function AgentBuilderTabs({
           <Palette size={16} />
           Personalize
         </CustomTabsTrigger>
-        <Tooltip>
+        {/* <Tooltip>
           <TooltipTrigger asChild>
             <CustomTabsTrigger
               value="analytics"
@@ -101,7 +101,7 @@ export default function AgentBuilderTabs({
             </CustomTabsTrigger>
           </TooltipTrigger>
           <TooltipContent>Coming Soon</TooltipContent>
-        </Tooltip>
+        </Tooltip> */}
         <CustomTabsTrigger
           value="live-visitors"
           className="flex items-center gap-2 font-[600]"

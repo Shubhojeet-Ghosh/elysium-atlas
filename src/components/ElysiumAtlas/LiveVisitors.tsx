@@ -7,9 +7,12 @@ import {
   setActiveVisitors,
   addActiveVisitor,
   removeActiveVisitor,
+  updateActiveVisitorStatus,
+  upsertActiveVisitor,
 } from "@/store/reducers/agentSlice";
 import { VISITORS_PER_PAGE } from "@/lib/config";
 import VisitorsList from "./VisitorsList";
+import TeamMemberConversationsPanel from "./TeamMemberConversationsPanel";
 
 export default function LiveVisitors() {
   const dispatch = useAppDispatch();
@@ -73,14 +76,19 @@ export default function LiveVisitors() {
       chat_session_id: string;
       sid: string;
     }) => {
-      dispatch(removeActiveVisitor(data.chat_session_id));
+      dispatch(
+        updateActiveVisitorStatus({
+          chat_session_id: data.chat_session_id,
+          status: "offline",
+        }),
+      );
       setTotal((prev) => Math.max(0, prev - 1));
     };
 
     aiSocket.on("agent_visitor_disconnected", handleVisitorDisconnected);
 
     const handleNewVisitor = (data: { agent_id: string; visitor: any }) => {
-      dispatch(addActiveVisitor(data.visitor));
+      dispatch(upsertActiveVisitor(data.visitor));
       setTotal((prev) => prev + 1);
     };
 
@@ -120,6 +128,7 @@ export default function LiveVisitors() {
           onPageChange={handlePageChange}
         />
       </div>
+      <TeamMemberConversationsPanel />
     </div>
   );
 }

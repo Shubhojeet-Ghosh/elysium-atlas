@@ -15,6 +15,7 @@ export interface ActiveVisitor {
   sid: string;
   alias_name: string | null;
   newly_joined: boolean;
+  status: string;
 }
 
 interface UserAgentState {
@@ -44,6 +45,11 @@ interface UserAgentState {
   secondary_color: string;
   text_color: string;
   active_visitors: ActiveVisitor[];
+  captured_sessions: {
+    chat_session_id: string;
+    captured_at: string;
+    is_expanded: boolean;
+  }[];
 }
 
 const initialState: UserAgentState = {
@@ -73,6 +79,7 @@ const initialState: UserAgentState = {
   secondary_color: "#fff",
   text_color: "#111",
   active_visitors: [],
+  captured_sessions: [],
 };
 
 const agentSlice = createSlice({
@@ -276,19 +283,89 @@ const agentSlice = createSlice({
     addActiveVisitor: (state, action: PayloadAction<ActiveVisitor>) => {
       state.active_visitors = [
         ...state.active_visitors,
-        { ...action.payload, newly_joined: true },
+        { ...action.payload, newly_joined: true, status: "online" },
       ];
+    },
+    upsertActiveVisitor: (state, action: PayloadAction<ActiveVisitor>) => {
+      const existing = state.active_visitors.find(
+        (v) => v.chat_session_id === action.payload.chat_session_id,
+      );
+      if (existing) {
+        existing.status = "online";
+      } else {
+        state.active_visitors = [
+          ...state.active_visitors,
+          { ...action.payload, newly_joined: true, status: "online" },
+        ];
+      }
     },
     setActiveVisitors: (state, action: PayloadAction<ActiveVisitor[]>) => {
       state.active_visitors = action.payload.map((v) => ({
         ...v,
         newly_joined: v.newly_joined ?? false,
+        status: v.status ?? "online",
       }));
+    },
+    updateActiveVisitorStatus: (
+      state,
+      action: PayloadAction<{ chat_session_id: string; status: string }>,
+    ) => {
+      const visitor = state.active_visitors.find(
+        (v) => v.chat_session_id === action.payload.chat_session_id,
+      );
+      if (visitor) {
+        visitor.status = action.payload.status;
+      }
     },
     removeActiveVisitor: (state, action: PayloadAction<string>) => {
       state.active_visitors = state.active_visitors.filter(
         (v) => v.chat_session_id !== action.payload,
       );
+    },
+    addCapturedSession: (
+      state,
+      action: PayloadAction<{ chat_session_id: string; captured_at: string }>,
+    ) => {
+      const existing = state.captured_sessions.find(
+        (s) => s.chat_session_id === action.payload.chat_session_id,
+      );
+      if (existing) {
+        // Already captured — just re-expand, collapse others, keep original captured_at
+        state.captured_sessions.forEach((s) => {
+          s.is_expanded = false;
+        });
+        existing.is_expanded = true;
+      } else {
+        // New session — collapse all existing, add expanded
+        state.captured_sessions.forEach((s) => {
+          s.is_expanded = false;
+        });
+        state.captured_sessions.push({ ...action.payload, is_expanded: true });
+      }
+    },
+    expandCapturedSession: (state, action: PayloadAction<string>) => {
+      state.captured_sessions.forEach((s) => {
+        s.is_expanded = s.chat_session_id === action.payload;
+      });
+    },
+    collapseCapturedSession: (state, action: PayloadAction<string>) => {
+      const session = state.captured_sessions.find(
+        (s) => s.chat_session_id === action.payload,
+      );
+      if (session) session.is_expanded = false;
+    },
+    removeCapturedSession: (state, action: PayloadAction<string>) => {
+      state.captured_sessions = state.captured_sessions.filter(
+        (s) => s.chat_session_id !== action.payload,
+      );
+    },
+    setCapturedSessions: (
+      state,
+      action: PayloadAction<
+        { chat_session_id: string; captured_at: string; is_expanded: boolean }[]
+      >,
+    ) => {
+      state.captured_sessions = action.payload;
     },
     resetUserAgent: (state) => {
       state.agentName = "";
@@ -317,6 +394,7 @@ const agentSlice = createSlice({
       state.secondary_color = "#fff";
       state.text_color = "#111";
       state.active_visitors = [];
+      state.captured_sessions = [];
     },
   },
 });
@@ -363,8 +441,15 @@ export const {
   setSecondaryColor,
   setTextColor,
   addActiveVisitor,
+  upsertActiveVisitor,
   setActiveVisitors,
+  updateActiveVisitorStatus,
   removeActiveVisitor,
+  addCapturedSession,
+  removeCapturedSession,
+  setCapturedSessions,
+  expandCapturedSession,
+  collapseCapturedSession,
   resetUserAgent,
 } = agentSlice.actions;
 
