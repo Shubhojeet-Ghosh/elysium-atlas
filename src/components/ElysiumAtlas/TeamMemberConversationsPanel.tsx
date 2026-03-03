@@ -9,131 +9,12 @@ import {
 } from "@/store/reducers/agentSlice";
 import aiSocket from "@/lib/aiSocket";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-
-type CapturedSession = {
-  chat_session_id: string;
-  captured_at: string;
-  is_expanded: boolean;
-};
+import ConversationChatHeader, {
+  type CapturedSession,
+} from "@/components/ElysiumAtlas/ConversationChatHeader";
+import ConversationChatBody from "@/components/ElysiumAtlas/ConversationChatBody";
 
 const MAX_VISIBLE = 3;
-
-// ─── Icons ────────────────────────────────────────────────────────────────────
-
-function ChevronIcon({ isExpanded }: { isExpanded: boolean }) {
-  return (
-    <svg
-      className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? "" : "rotate-180"}`}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg
-      className="w-4 h-4"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M18 6L6 18M6 6l12 12"
-      />
-    </svg>
-  );
-}
-
-// ─── Shared header bar ────────────────────────────────────────────────────────
-
-function ChatHeader({
-  session,
-  isExpanded,
-  onToggle,
-  onClose,
-}: {
-  session: CapturedSession;
-  isExpanded: boolean;
-  onToggle: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className="flex items-center gap-2 px-3 h-12 shrink-0 cursor-pointer select-none hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 transition-colors border-b border-gray-100 dark:border-deep-onyx"
-      onClick={onToggle}
-    >
-      <div className="shrink-0 w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-        <svg
-          viewBox="0 0 40 40"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-full"
-        >
-          <rect width="40" height="40" fill="#e5e7eb" />
-          <circle cx="20" cy="16" r="7" fill="#9ca3af" />
-          <ellipse cx="20" cy="34" rx="12" ry="8" fill="#9ca3af" />
-        </svg>
-      </div>
-
-      <span className="flex-1 text-sm font-semibold truncate text-gray-800 dark:text-gray-100">
-        {session.chat_session_id.length > 18
-          ? `${session.chat_session_id.slice(0, 18)}…`
-          : session.chat_session_id}
-      </span>
-
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggle();
-        }}
-        className="p-1 rounded-full cursor-pointer text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-        aria-label={isExpanded ? "Minimise chat" : "Expand chat"}
-      >
-        <ChevronIcon isExpanded={isExpanded} />
-      </button>
-
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
-        className="p-1 rounded-full cursor-pointer text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-        aria-label="Close chat"
-      >
-        <XIcon />
-      </button>
-    </div>
-  );
-}
-
-// ─── Chat body ────────────────────────────────────────────────────────────────
-
-function ChatBody() {
-  return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4 flex items-center justify-center">
-        <span className="text-sm text-gray-400 dark:text-gray-500 text-center">
-          Connecting to visitor…
-        </span>
-      </div>
-      <div className="px-3 py-2 border-t border-gray-100 dark:border-deep-onyx shrink-0">
-        <input
-          type="text"
-          placeholder="Type a message…"
-          className="w-full text-sm bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2 outline-none focus:ring-2 focus:ring-serene-purple/40 text-gray-800 dark:text-gray-100 placeholder:text-gray-400"
-        />
-      </div>
-    </div>
-  );
-}
 
 // ─── Single chat box ──────────────────────────────────────────────────────────
 
@@ -142,15 +23,18 @@ function ChatBox({
   isExpanded,
   onToggle,
   onClose,
+  agentID,
 }: {
   session: CapturedSession;
   isExpanded: boolean;
   onToggle: () => void;
   onClose: () => void;
+  agentID: string;
 }) {
   const [isDesktop, setIsDesktop] = useState(false);
   // Always start collapsed so the CSS transition fires on first mount too
   const [visuallyExpanded, setVisuallyExpanded] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
@@ -163,9 +47,17 @@ function ChatBox({
   // Sync visuallyExpanded with isExpanded, but one RAF later so the
   // browser paints the collapsed state first → transition always animates
   useEffect(() => {
+    if (isClosing) return;
     const raf = requestAnimationFrame(() => setVisuallyExpanded(isExpanded));
     return () => cancelAnimationFrame(raf);
-  }, [isExpanded]);
+  }, [isExpanded, isClosing]);
+
+  const handleClose = () => {
+    // Collapse first, then remove after transition
+    setIsClosing(true);
+    setVisuallyExpanded(false);
+    setTimeout(() => onClose(), 310);
+  };
 
   // ── Desktop: inline animated box, no Dialog ──
   if (isDesktop) {
@@ -175,13 +67,18 @@ function ChatBox({
           visuallyExpanded ? "w-[480px] h-[580px]" : "w-72 h-12"
         }`}
       >
-        <ChatHeader
+        <ConversationChatHeader
           session={session}
           isExpanded={visuallyExpanded}
-          onToggle={onToggle}
-          onClose={onClose}
+          onToggle={isClosing ? () => {} : onToggle}
+          onClose={handleClose}
         />
-        {visuallyExpanded && <ChatBody />}
+        {visuallyExpanded && (
+          <ConversationChatBody
+            chat_session_id={session.chat_session_id}
+            agent_id={agentID}
+          />
+        )}
       </div>
     );
   }
@@ -190,7 +87,7 @@ function ChatBox({
   return (
     <>
       <Dialog
-        open={isExpanded}
+        open={isExpanded && !isClosing}
         onOpenChange={(open) => {
           if (!open) onToggle();
         }}
@@ -202,13 +99,16 @@ function ChatBox({
           <DialogTitle className="sr-only">
             Chat with {session.chat_session_id}
           </DialogTitle>
-          <ChatHeader
+          <ConversationChatHeader
             session={session}
             isExpanded={true}
             onToggle={onToggle}
-            onClose={onClose}
+            onClose={handleClose}
           />
-          <ChatBody />
+          <ConversationChatBody
+            chat_session_id={session.chat_session_id}
+            agent_id={agentID}
+          />
         </DialogContent>
       </Dialog>
 
@@ -259,6 +159,7 @@ export default function TeamMemberConversationsPanel() {
           key={session.chat_session_id}
           session={session}
           isExpanded={session.is_expanded}
+          agentID={agentID}
           onToggle={() =>
             toggleExpand(session.chat_session_id, session.is_expanded)
           }

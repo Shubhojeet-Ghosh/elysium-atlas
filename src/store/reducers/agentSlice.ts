@@ -6,6 +6,21 @@ import {
   QnA,
 } from "../types/AgentBuilderTypes";
 
+export interface GeoData {
+  country_name: string | null;
+  country_flag: string | null;
+  district: string | null;
+  ip: string | null;
+  time_zone: string | null;
+}
+
+export interface ConversationMessage {
+  message_id: string;
+  role: "user" | "agent" | "human";
+  content: string;
+  created_at: string;
+}
+
 export interface ActiveVisitor {
   agent_id: string;
   chat_session_id: string;
@@ -16,6 +31,9 @@ export interface ActiveVisitor {
   alias_name: string | null;
   newly_joined: boolean;
   status: string;
+  geo_data: GeoData | null;
+  visitor_at: string | null;
+  color: string;
 }
 
 interface UserAgentState {
@@ -45,11 +63,11 @@ interface UserAgentState {
   secondary_color: string;
   text_color: string;
   active_visitors: ActiveVisitor[];
-  captured_sessions: {
-    chat_session_id: string;
+  captured_sessions: (ActiveVisitor & {
     captured_at: string;
     is_expanded: boolean;
-  }[];
+    conversation_chain: ConversationMessage[];
+  })[];
 }
 
 const initialState: UserAgentState = {
@@ -283,7 +301,12 @@ const agentSlice = createSlice({
     addActiveVisitor: (state, action: PayloadAction<ActiveVisitor>) => {
       state.active_visitors = [
         ...state.active_visitors,
-        { ...action.payload, newly_joined: true, status: "online" },
+        {
+          ...action.payload,
+          newly_joined: true,
+          status: "online",
+          color: action.payload.color || "",
+        },
       ];
     },
     upsertActiveVisitor: (state, action: PayloadAction<ActiveVisitor>) => {
@@ -295,7 +318,12 @@ const agentSlice = createSlice({
       } else {
         state.active_visitors = [
           ...state.active_visitors,
-          { ...action.payload, newly_joined: true, status: "online" },
+          {
+            ...action.payload,
+            newly_joined: true,
+            status: "online",
+            color: action.payload.color || "",
+          },
         ];
       }
     },
@@ -304,6 +332,7 @@ const agentSlice = createSlice({
         ...v,
         newly_joined: v.newly_joined ?? false,
         status: v.status ?? "online",
+        color: v.color || "",
       }));
     },
     updateActiveVisitorStatus: (
@@ -335,12 +364,43 @@ const agentSlice = createSlice({
           s.is_expanded = false;
         });
         existing.is_expanded = true;
+        // mark active visitor as in-conversation
+        const av = state.active_visitors.find(
+          (v) => v.chat_session_id === action.payload.chat_session_id,
+        );
+        if (av) av.status = "in-conversation";
       } else {
-        // New session — collapse all existing, add expanded
+        // Look up full visitor from active_visitors
+        const visitor = state.active_visitors.find(
+          (v) => v.chat_session_id === action.payload.chat_session_id,
+        );
+        // New session — collapse all existing, add expanded with full visitor data
         state.captured_sessions.forEach((s) => {
           s.is_expanded = false;
         });
-        state.captured_sessions.push({ ...action.payload, is_expanded: true });
+        state.captured_sessions.push({
+          ...(visitor ?? {
+            agent_id: "",
+            chat_session_id: action.payload.chat_session_id,
+            created_at: "",
+            last_message_at: null,
+            last_connected_at: "",
+            sid: "",
+            alias_name: null,
+            newly_joined: false,
+            status: "online",
+            geo_data: null,
+            visitor_at: null,
+            color: "",
+          }),
+          captured_at: action.payload.captured_at,
+          is_expanded: true,
+          conversation_chain: [],
+        });
+        // mark the active visitor as in-conversation when we capture them
+        if (visitor) {
+          visitor.status = "in-conversation";
+        }
       }
     },
     expandCapturedSession: (state, action: PayloadAction<string>) => {
@@ -358,14 +418,37 @@ const agentSlice = createSlice({
       state.captured_sessions = state.captured_sessions.filter(
         (s) => s.chat_session_id !== action.payload,
       );
+      // when a captured session is removed, reset active visitor status back to online
+      const visitor = state.active_visitors.find(
+        (v) => v.chat_session_id === action.payload,
+      );
+      if (visitor) visitor.status = "online";
     },
     setCapturedSessions: (
       state,
       action: PayloadAction<
-        { chat_session_id: string; captured_at: string; is_expanded: boolean }[]
+        (ActiveVisitor & {
+          captured_at: string;
+          is_expanded: boolean;
+          conversation_chain: ConversationMessage[];
+        })[]
       >,
     ) => {
       state.captured_sessions = action.payload;
+    },
+    addMessageToCapturedSession: (
+      state,
+      action: PayloadAction<{
+        chat_session_id: string;
+        message: ConversationMessage;
+      }>,
+    ) => {
+      const session = state.captured_sessions.find(
+        (s) => s.chat_session_id === action.payload.chat_session_id,
+      );
+      if (session) {
+        session.conversation_chain.push(action.payload.message);
+      }
     },
     resetUserAgent: (state) => {
       state.agentName = "";
@@ -448,6 +531,7 @@ export const {
   addCapturedSession,
   removeCapturedSession,
   setCapturedSessions,
+  addMessageToCapturedSession,
   expandCapturedSession,
   collapseCapturedSession,
   resetUserAgent,

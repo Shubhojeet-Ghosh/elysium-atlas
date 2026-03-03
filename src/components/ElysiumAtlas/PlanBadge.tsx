@@ -11,7 +11,8 @@ import {
 const statusPill: Record<string, { label: string; className: string }> = {
   trialing: {
     label: "Trial",
-    className: "bg-teal-green/10 text-teal-green",
+    className:
+      "bg-teal-green/10 text-teal-green dark:bg-teal-green dark:text-pure-mist",
   },
   expired: {
     label: "Expired",

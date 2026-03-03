@@ -24,6 +24,11 @@ import { formatDateTime12hr } from "@/utils/formatDate";
 import Badge from "@/components/ui/Badge";
 import { addCapturedSession } from "@/store/reducers/agentSlice";
 import aiSocket from "@/lib/aiSocket";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function VisitorsList({
   currentPage,
@@ -35,6 +40,9 @@ export default function VisitorsList({
 }: VisitorsListProps) {
   const activeVisitors = useAppSelector((state) => state.agent.active_visitors);
   const agentID = useAppSelector((state) => state.agent.agentID);
+  const capturedSessions = useAppSelector(
+    (state) => state.agent.captured_sessions,
+  );
   const dispatch = useAppDispatch();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -54,6 +62,39 @@ export default function VisitorsList({
 
   // currentVisitors is the full filtered set — server already returns one page
   const currentVisitors = filteredVisitors;
+
+  const truncateMiddle = (s?: string) => {
+    if (!s) return "";
+    const start = 6;
+    const end = 4;
+    if (s.length <= start + end) return s;
+    return `${s.slice(0, start)}.....${s.slice(-end)}`;
+  };
+
+  const truncateVisitorAt = (s?: string) => {
+    if (!s) return "";
+    const end = 20;
+    if (s.length <= end) return s;
+    return `...${s.slice(-end)}`;
+  };
+
+  const highlightTruncated = (full: string, term: string) => {
+    const t = truncateMiddle(full);
+    if (!term.trim()) return t;
+    const lower = t.toLowerCase();
+    const lowerTerm = term.toLowerCase();
+    const idx = lower.indexOf(lowerTerm);
+    if (idx === -1) return t;
+    return (
+      <>
+        {t.substring(0, idx)}
+        <span className="bg-serene-purple/80 text-white font-semibold">
+          {t.substring(idx, idx + term.length)}
+        </span>
+        {t.substring(idx + term.length)}
+      </>
+    );
+  };
 
   // Horizontal scroll gradient
   useEffect(() => {
@@ -225,6 +266,9 @@ export default function VisitorsList({
                     <TableHead className="min-w-[120px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
                       Status
                     </TableHead>
+                    <TableHead className="w-[260px] max-w-[260px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
+                      Visitor At
+                    </TableHead>
                     <TableHead className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
                       Connected Since
                     </TableHead>
@@ -240,24 +284,67 @@ export default function VisitorsList({
                         ?.toLowerCase()
                         .includes(searchTerm.toLowerCase());
 
+                    const isCaptured = capturedSessions.some(
+                      (s) => s.chat_session_id === visitor.chat_session_id,
+                    );
+
                     return (
                       <TableRow
                         key={visitor.sid || visitor.chat_session_id || index}
                         onClick={() =>
                           handleVisitorClick(visitor.chat_session_id)
                         }
-                        className="cursor-pointer border-b border-gray-100 dark:border-deep-onyx hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 hover:text-serene-purple dark:hover:text-serene-purple transition-all duration-200"
+                        className={`cursor-pointer border-b border-gray-100 dark:border-deep-onyx transition-all duration-200 ${
+                          isCaptured
+                            ? "bg-serene-purple/10 dark:bg-serene-purple/20"
+                            : "hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 hover:text-serene-purple dark:hover:text-serene-purple"
+                        }`}
                       >
                         {/* Visitor name / alias */}
-                        <TableCell className="font-medium py-4 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist w-[260px] min-w-[180px] max-w-[260px]">
-                          <span className="flex items-center gap-2">
-                            <span className="truncate max-w-[240px] overflow-hidden text-ellipsis">
-                              {matchesName
-                                ? highlightMatch(displayName, searchTerm)
-                                : displayName}
-                            </span>
+                        <TableCell className="font-medium py-4 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist w-[260px] min-w-[320px] max-w-[260px]">
+                          <span className="flex items-center gap-6">
+                            {/* Circular flag avatar */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="shrink-0 w-[34px] h-[34px] rounded-full overflow-hidden block cursor-pointer shadow-sm">
+                                  {visitor.geo_data?.country_flag ? (
+                                    <img
+                                      src={visitor.geo_data.country_flag}
+                                      alt={visitor.geo_data.country_name ?? ""}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <span className="w-full h-full flex items-center justify-center text-[11px] font-semibold text-black bg-pure-mist">
+                                      {visitor.chat_session_id
+                                        .slice(-2)
+                                        .toUpperCase()}
+                                    </span>
+                                  )}
+                                </span>
+                              </TooltipTrigger>
+                              {visitor.geo_data?.country_name && (
+                                <TooltipContent side="top">
+                                  {visitor.geo_data.country_name}
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="truncate max-w-[220px] overflow-hidden text-ellipsis">
+                                  {matchesName
+                                    ? highlightTruncated(
+                                        displayName,
+                                        searchTerm,
+                                      )
+                                    : truncateMiddle(displayName)}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                {displayName}
+                              </TooltipContent>
+                            </Tooltip>
                             {visitor.newly_joined && (
-                              <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-teal-green/15 text-teal-green dark:bg-teal-green/20 dark:text-teal-green">
+                              <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-teal-green/10 text-teal-green dark:bg-teal-green dark:text-pure-mist">
                                 new
                               </span>
                             )}
@@ -266,6 +353,11 @@ export default function VisitorsList({
 
                         {/* Status pill */}
                         <TableCell className="min-w-[120px] py-4 px-[10px] text-[14px] whitespace-nowrap">
+                          {visitor.status === "in-conversation" && (
+                            <Badge className="bg-serene-purple text-white">
+                              in conversation
+                            </Badge>
+                          )}
                           {visitor.status === "online" && (
                             <Badge>{visitor.status}</Badge>
                           )}
@@ -273,6 +365,24 @@ export default function VisitorsList({
                             <Badge className="bg-transparent border border-serene-purple !text-serene-purple dark:border-pure-mist dark:!text-pure-mist">
                               {visitor.status}
                             </Badge>
+                          )}
+                        </TableCell>
+
+                        {/* Visitor At (first 10 ... last 6, tooltip full url) */}
+                        <TableCell className="font-medium py-4 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist w-[260px] max-w-[260px]">
+                          {visitor.visitor_at ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-block truncate max-w-[220px]">
+                                  {truncateVisitorAt(visitor.visitor_at)}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                {visitor.visitor_at}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-gray-400">-</span>
                           )}
                         </TableCell>
 
