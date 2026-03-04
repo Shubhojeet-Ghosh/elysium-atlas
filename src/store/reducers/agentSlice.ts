@@ -37,6 +37,21 @@ export interface ActiveVisitor {
   color: string;
 }
 
+export interface TeamMemberConversationLog {
+  chat_session_id: string;
+  alias_name: string | null;
+  agent_id: string;
+  last_message: string | null;
+  last_message_at: string | null;
+  captured_at: string;
+  ended_at: string | null;
+  /** "live" = currently in captured_sessions, "ended" = conversation closed */
+  status: "live" | "ended";
+  unread_count: number;
+  color: string;
+  geo_data: GeoData | null;
+}
+
 interface UserAgentState {
   agentName: string;
   agentID: string;
@@ -69,6 +84,7 @@ interface UserAgentState {
     is_expanded: boolean;
     conversation_chain: ConversationMessage[];
   })[];
+  team_member_conversation_logs: TeamMemberConversationLog[];
 }
 
 const initialState: UserAgentState = {
@@ -99,6 +115,7 @@ const initialState: UserAgentState = {
   text_color: "#111",
   active_visitors: [],
   captured_sessions: [],
+  team_member_conversation_logs: [],
 };
 
 const agentSlice = createSlice({
@@ -475,6 +492,68 @@ const agentSlice = createSlice({
         session.conversation_chain = action.payload.conversation_chain;
       }
     },
+    setTeamMemberConversationLogs: (
+      state,
+      action: PayloadAction<TeamMemberConversationLog[]>,
+    ) => {
+      state.team_member_conversation_logs = action.payload;
+    },
+    addOrUpdateConversationLog: (
+      state,
+      action: PayloadAction<TeamMemberConversationLog>,
+    ) => {
+      const idx = state.team_member_conversation_logs.findIndex(
+        (l) => l.chat_session_id === action.payload.chat_session_id,
+      );
+      if (idx !== -1) {
+        state.team_member_conversation_logs[idx] = action.payload;
+      } else {
+        state.team_member_conversation_logs.unshift(action.payload);
+      }
+    },
+    updateConversationLogLastMessage: (
+      state,
+      action: PayloadAction<{
+        chat_session_id: string;
+        last_message: string | null;
+        last_message_at: string | null;
+      }>,
+    ) => {
+      const log = state.team_member_conversation_logs.find(
+        (l) => l.chat_session_id === action.payload.chat_session_id,
+      );
+      if (log) {
+        log.last_message = action.payload.last_message;
+        log.last_message_at = action.payload.last_message_at;
+      }
+    },
+    markConversationLogAsRead: (state, action: PayloadAction<string>) => {
+      const log = state.team_member_conversation_logs.find(
+        (l) => l.chat_session_id === action.payload,
+      );
+      if (log) log.unread_count = 0;
+    },
+    setCapturedSessionAlias: (
+      state,
+      action: PayloadAction<{
+        chat_session_id: string;
+        alias_name: string | null;
+      }>,
+    ) => {
+      const { chat_session_id, alias_name } = action.payload;
+      const session = state.captured_sessions.find(
+        (s) => s.chat_session_id === chat_session_id,
+      );
+      if (session) {
+        session.alias_name = alias_name;
+      }
+      const visitor = state.active_visitors.find(
+        (v) => v.chat_session_id === chat_session_id,
+      );
+      if (visitor) {
+        visitor.alias_name = alias_name;
+      }
+    },
     resetUserAgent: (state) => {
       state.agentName = "";
       state.agentID = "";
@@ -503,6 +582,7 @@ const agentSlice = createSlice({
       state.text_color = "#111";
       state.active_visitors = [];
       state.captured_sessions = [];
+      state.team_member_conversation_logs = [];
     },
   },
 });
@@ -559,8 +639,13 @@ export const {
   addMessageToCapturedSession,
   markSessionMessagesAsRead,
   setConversationChainForSession,
+  setCapturedSessionAlias,
   expandCapturedSession,
   collapseCapturedSession,
+  setTeamMemberConversationLogs,
+  addOrUpdateConversationLog,
+  updateConversationLogLastMessage,
+  markConversationLogAsRead,
   resetUserAgent,
 } = agentSlice.actions;
 

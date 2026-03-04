@@ -160,7 +160,13 @@ function ChatBox({
 
 // ─── Panel ────────────────────────────────────────────────────────────────────
 
-export default function TeamMemberConversationsPanel() {
+/** When `inline` is true the component renders chat boxes only,
+ *  without its own fixed wrapper — the parent owns the positioning. */
+export default function TeamMemberConversationsPanel({
+  inline = false,
+}: {
+  inline?: boolean;
+}) {
   const dispatch = useAppDispatch();
   const capturedSessions = useAppSelector(
     (state) => state.agent.captured_sessions,
@@ -190,22 +196,29 @@ export default function TeamMemberConversationsPanel() {
     dispatch(removeCapturedSession(id));
   };
 
+  const boxes = displayed.map((session) => (
+    <ChatBox
+      key={session.chat_session_id}
+      session={session}
+      isExpanded={session.is_expanded}
+      agentID={agentID}
+      onToggle={() =>
+        toggleExpand(session.chat_session_id, session.is_expanded)
+      }
+      onClose={() => handleClose(session.chat_session_id)}
+    />
+  ));
+
+  if (inline) {
+    // Render boxes as a fragment — parent owns the layout
+    return <>{boxes}</>;
+  }
+
   if (displayed.length === 0) return null;
 
   return (
     <div className="fixed bottom-0 right-6 flex flex-row-reverse items-end gap-3 z-50 pointer-events-none">
-      {displayed.map((session) => (
-        <ChatBox
-          key={session.chat_session_id}
-          session={session}
-          isExpanded={session.is_expanded}
-          agentID={agentID}
-          onToggle={() =>
-            toggleExpand(session.chat_session_id, session.is_expanded)
-          }
-          onClose={() => handleClose(session.chat_session_id)}
-        />
-      ))}
+      {boxes}
     </div>
   );
 }

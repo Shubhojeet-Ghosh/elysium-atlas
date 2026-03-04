@@ -35,6 +35,45 @@ export const formatDateTime12hr = (dateString: string) => {
   });
 };
 
+// Formats a UTC date string (possibly with microseconds) as a smart relative date:
+// today → time only (e.g. "2:45 PM"), yesterday → "Yesterday", older → "04 Mar 26"
+export const formatSmartDateUTC = (dateString: string): string => {
+  let cleaned = dateString.replace(/\.(\d{3})\d+/, ".\$1");
+  const hasTimezone = /[Z]$|(\+|-)\d{2}:\d{2}$/.test(cleaned);
+  if (!hasTimezone) cleaned += "Z";
+
+  const date = new Date(cleaned);
+  const now = new Date();
+
+  const isSameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  if (isSameDay) {
+    return date.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    date.getFullYear() === yesterday.getFullYear() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getDate() === yesterday.getDate();
+
+  if (isYesterday) return "Yesterday";
+
+  return date.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "2-digit",
+  });
+};
+
 // Formats timestamp for chat messages with relative dates
 export const formatChatTimestamp = (dateString: string) => {
   let cleaned = dateString.replace(/\.(\d{3})\d+$/, ".$1");

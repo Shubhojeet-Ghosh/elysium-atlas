@@ -14,6 +14,7 @@ import {
 import { VISITORS_PER_PAGE } from "@/lib/config";
 import VisitorsList from "./VisitorsList";
 import TeamMemberConversationsPanel from "./TeamMemberConversationsPanel";
+import ConversationsHistoryPanel from "./ConversationsHistoryPanel";
 
 export default function LiveVisitors() {
   const dispatch = useAppDispatch();
@@ -157,7 +158,7 @@ export default function LiveVisitors() {
 
   return (
     <div className="flex flex-col">
-      <div className="mt-[10px]">
+      <div className="mt-2.5">
         <VisitorsList
           currentPage={currentPage}
           totalPages={totalPages}
@@ -167,7 +168,14 @@ export default function LiveVisitors() {
           onPageChange={handlePageChange}
         />
       </div>
-      <TeamMemberConversationsPanel />
+
+      {/* Shared bottom-right panel area:
+          ConversationsHistoryPanel is always the rightmost element.
+          Active chat boxes (TeamMemberConversationsPanel) grow to its left. */}
+      <div className="fixed bottom-0 right-0.5 lg:right-6 z-50 flex flex-row-reverse items-end gap-3 pointer-events-none">
+        <ConversationsHistoryPanel />
+        <TeamMemberConversationsPanel inline />
+      </div>
     </div>
   );
 }

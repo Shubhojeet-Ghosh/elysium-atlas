@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { SquarePen, Save } from "lucide-react";
+import aiSocket from "@/lib/aiSocket";
 import {
   Tooltip,
   TooltipTrigger,
@@ -10,7 +12,8 @@ import {
   type ActiveVisitor,
   type ConversationMessage,
 } from "@/store/reducers/agentSlice";
-import { useAppSelector } from "@/store";
+import { useAppSelector, useAppDispatch } from "@/store";
+import { setCapturedSessionAlias } from "@/store/reducers/agentSlice";
 
 export type CapturedSession = ActiveVisitor & {
   captured_at: string;
@@ -74,6 +77,53 @@ export default function ConversationChatHeader({
   };
 
   const displayName = session.alias_name ?? session.chat_session_id;
+  const dispatch = useAppDispatch();
+  const [isEditing, setIsEditing] = useState(false);
+  const [inputValue, setInputValue] = useState<string>(
+    session.alias_name ?? session.chat_session_id,
+  );
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setInputValue(session.alias_name ?? session.chat_session_id);
+    }
+  }, [session.alias_name, isEditing]);
+
+  useEffect(() => {
+    if (isEditing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [isEditing]);
+  const commitAlias = () => {
+    const newAlias = inputValue.trim() || null;
+    const prevAlias = session.alias_name ?? null;
+    if (newAlias === prevAlias) {
+      setIsEditing(false);
+      return;
+    }
+
+    dispatch(
+      setCapturedSessionAlias({
+        chat_session_id: session.chat_session_id,
+        alias_name: newAlias,
+      }),
+    );
+
+    try {
+      aiSocket.emit("atlas-set-visitor-alias", {
+        agent_id: session.agent_id ?? "",
+        chat_session_id: session.chat_session_id,
+        alias_name: newAlias ?? "",
+      });
+    } catch (e) {
+      // ignore socket errors
+    }
+
+    setIsEditing(false);
+  };
+
   const [flagLoadError, setFlagLoadError] = useState(false);
   const flagSrc = session.geo_data?.country_flag;
   const showFlag = !!flagSrc && !flagLoadError;
@@ -121,18 +171,71 @@ export default function ConversationChatHeader({
       </Tooltip>
 
       <span className="flex-1 flex items-center">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span
-              className={`inline-block text-sm font-semibold truncate max-w-[200px] ${
-                hasUnread ? "text-white" : "text-gray-800 dark:text-gray-100"
-              }`}
+        <div className="group flex items-center w-full">
+          {!isEditing ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className={`inline-block text-sm font-semibold truncate max-w-[200px] ${
+                    hasUnread
+                      ? "text-white"
+                      : "text-gray-800 dark:text-gray-100"
+                  }`}
+                >
+                  {truncateMiddle(displayName)}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">{displayName}</TooltipContent>
+            </Tooltip>
+          ) : (
+            <input
+              ref={inputRef}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="text-sm font-semibold truncate max-w-[200px] bg-transparent border-b border-gray-300 dark:border-gray-700 outline-none px-1 py-0"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitAlias();
+                } else if (e.key === "Escape") {
+                  setIsEditing(false);
+                }
+              }}
+              onBlur={commitAlias}
+            />
+          )}
+
+          {isEditing ? (
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                commitAlias();
+              }}
+              aria-label="Save alias"
+              className="ml-2 p-1 rounded-full cursor-pointer transition-colors text-serene-purple hover:text-serene-purple/80 dark:text-pure-mist"
             >
-              {truncateMiddle(displayName)}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="top">{displayName}</TooltipContent>
-        </Tooltip>
+              <Save className="w-4 h-4" />
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(true);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              aria-label="Edit alias"
+              className="ml-2 p-1 rounded-full cursor-pointer transition-opacity opacity-0 group-hover:opacity-100 text-gray-500 hover:text-gray-700 dark:hover:text-pure-mist"
+            >
+              <SquarePen className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </span>
 
       <div className="flex items-center gap-1">
