@@ -10,6 +10,7 @@ import {
   type ActiveVisitor,
   type ConversationMessage,
 } from "@/store/reducers/agentSlice";
+import { useAppSelector } from "@/store";
 
 export type CapturedSession = ActiveVisitor & {
   captured_at: string;
@@ -77,9 +78,22 @@ export default function ConversationChatHeader({
   const flagSrc = session.geo_data?.country_flag;
   const showFlag = !!flagSrc && !flagLoadError;
 
+  // Derive unread state from Redux (live) — only show indicator when collapsed
+  const hasUnread = useAppSelector((state) => {
+    if (isExpanded) return false;
+    const s = state.agent.captured_sessions.find(
+      (cs) => cs.chat_session_id === session.chat_session_id,
+    );
+    return s?.conversation_chain.some((m) => m.is_read === false) ?? false;
+  });
+
   return (
     <div
-      className="flex items-center gap-4 px-3 py-3.5 shrink-0 cursor-pointer select-none hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 transition-colors border-b border-gray-100 dark:border-deep-onyx"
+      className={`flex items-center gap-4 px-3 py-3.5 shrink-0 cursor-pointer select-none transition-colors border-b ${
+        hasUnread
+          ? "bg-serene-purple hover:bg-serene-purple/90 border-serene-purple/30"
+          : "hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 border-gray-100 dark:border-pure-mist"
+      }`}
       onClick={onToggle}
     >
       <Tooltip>
@@ -109,7 +123,11 @@ export default function ConversationChatHeader({
       <span className="flex-1 flex items-center">
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="inline-block text-sm font-semibold truncate text-gray-800 dark:text-gray-100 max-w-[200px]">
+            <span
+              className={`inline-block text-sm font-semibold truncate max-w-[200px] ${
+                hasUnread ? "text-white" : "text-gray-800 dark:text-gray-100"
+              }`}
+            >
               {truncateMiddle(displayName)}
             </span>
           </TooltipTrigger>
@@ -123,7 +141,9 @@ export default function ConversationChatHeader({
             e.stopPropagation();
             onToggle();
           }}
-          className="p-1 rounded-full cursor-pointer text-gray-500 transition-colors hover:ring-2 hover:ring-serene-purple/60 hover:ring-offset-0 dark:hover:ring-pure-mist/60"
+          className={`p-1 rounded-full cursor-pointer transition-colors hover:ring-2 hover:ring-serene-purple/60 hover:ring-offset-0 dark:hover:ring-pure-mist/60 ${
+            hasUnread ? "text-white" : "text-gray-500"
+          }`}
           aria-label={isExpanded ? "Minimise chat" : "Expand chat"}
         >
           <ChevronIcon isExpanded={isExpanded} />
@@ -134,7 +154,9 @@ export default function ConversationChatHeader({
             e.stopPropagation();
             onClose();
           }}
-          className="p-1 rounded-full cursor-pointer text-gray-500 transition-colors hover:ring-2 hover:ring-serene-purple/60 hover:ring-offset-0 dark:hover:ring-pure-mist/60"
+          className={`p-1 rounded-full cursor-pointer transition-colors hover:ring-2 hover:ring-serene-purple/60 hover:ring-offset-0 dark:hover:ring-pure-mist/60 ${
+            hasUnread ? "text-white" : "text-gray-500"
+          }`}
           aria-label="Close chat"
         >
           <XIcon />

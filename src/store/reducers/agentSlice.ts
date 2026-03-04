@@ -19,6 +19,7 @@ export interface ConversationMessage {
   role: "user" | "agent" | "human";
   content: string;
   created_at: string;
+  is_read?: boolean;
 }
 
 export interface ActiveVisitor {
@@ -450,6 +451,30 @@ const agentSlice = createSlice({
         session.conversation_chain.push(action.payload.message);
       }
     },
+    markSessionMessagesAsRead: (state, action: PayloadAction<string>) => {
+      const session = state.captured_sessions.find(
+        (s) => s.chat_session_id === action.payload,
+      );
+      if (session) {
+        session.conversation_chain.forEach((m) => {
+          if (m.is_read === false) m.is_read = true;
+        });
+      }
+    },
+    setConversationChainForSession: (
+      state,
+      action: PayloadAction<{
+        chat_session_id: string;
+        conversation_chain: ConversationMessage[];
+      }>,
+    ) => {
+      const session = state.captured_sessions.find(
+        (s) => s.chat_session_id === action.payload.chat_session_id,
+      );
+      if (session) {
+        session.conversation_chain = action.payload.conversation_chain;
+      }
+    },
     resetUserAgent: (state) => {
       state.agentName = "";
       state.agentID = "";
@@ -532,6 +557,8 @@ export const {
   removeCapturedSession,
   setCapturedSessions,
   addMessageToCapturedSession,
+  markSessionMessagesAsRead,
+  setConversationChainForSession,
   expandCapturedSession,
   collapseCapturedSession,
   resetUserAgent,

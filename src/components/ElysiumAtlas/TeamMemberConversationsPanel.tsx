@@ -6,7 +6,9 @@ import {
   removeCapturedSession,
   expandCapturedSession,
   collapseCapturedSession,
+  setConversationChainForSession,
 } from "@/store/reducers/agentSlice";
+import fastApiAxios from "@/utils/fastapi_axios";
 import aiSocket from "@/lib/aiSocket";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import ConversationChatHeader, {
@@ -36,6 +38,37 @@ function ChatBox({
   const [visuallyExpanded, setVisuallyExpanded] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
 
+  const dispatch = useAppDispatch();
+
+  // Fetch existing conversation messages once when this session box mounts
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        const response = await fastApiAxios.post(
+          "/elysium-agents/elysium-atlas/agent/v1/get-agent-fields",
+          {
+            agent_id: agentID,
+            fields: ["agent_name"],
+            chat_session_id: session.chat_session_id,
+          },
+        );
+        const data = response.data;
+        if (data.success === true) {
+          const messages = data.chat_session_data?.messages ?? [];
+          dispatch(
+            setConversationChainForSession({
+              chat_session_id: session.chat_session_id,
+              conversation_chain: Array.isArray(messages) ? messages : [],
+            }),
+          );
+        }
+      } catch (e) {
+        // fail silently — existing empty chain stays
+      }
+    };
+    fetchMessages();
+  }, []);
+
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
     setIsDesktop(mq.matches);
@@ -64,7 +97,7 @@ function ChatBox({
     return (
       <div
         className={`pointer-events-auto bg-white dark:bg-deep-onyx border border-gray-100 dark:border-deep-onyx rounded-t-xl shadow-xl flex flex-col overflow-hidden transition-[height,width] duration-300 ease-in-out ${
-          visuallyExpanded ? "w-[480px] h-[580px]" : "w-72 h-12"
+          visuallyExpanded ? "w-[480px] h-[520px]" : "w-72 h-12"
         }`}
       >
         <ConversationChatHeader
@@ -73,12 +106,19 @@ function ChatBox({
           onToggle={isClosing ? () => {} : onToggle}
           onClose={handleClose}
         />
-        {visuallyExpanded && (
+        <div
+          className={
+            visuallyExpanded
+              ? "flex flex-col flex-1 min-h-0 overflow-hidden"
+              : "hidden"
+          }
+        >
           <ConversationChatBody
             chat_session_id={session.chat_session_id}
             agent_id={agentID}
+            isVisible={visuallyExpanded}
           />
-        )}
+        </div>
       </div>
     );
   }

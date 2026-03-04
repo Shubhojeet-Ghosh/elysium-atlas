@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import type { Socket } from "socket.io-client";
 import aiSocket from "@/lib/aiSocket";
 import { useAppDispatch, useAppSelector } from "../../store";
@@ -8,6 +8,7 @@ import {
   addActiveVisitor,
   removeActiveVisitor,
   updateActiveVisitorStatus,
+  setCapturedSessions,
   upsertActiveVisitor,
 } from "@/store/reducers/agentSlice";
 import { VISITORS_PER_PAGE } from "@/lib/config";
@@ -20,6 +21,9 @@ export default function LiveVisitors() {
   const agentID = useAppSelector((state) => state.agent.agentID);
   const teamID = useAppSelector((state) => state.userProfile.teamID);
   const userID = useAppSelector((state) => state.userProfile.userID);
+  const capturedSessions = useAppSelector(
+    (state) => state.agent.captured_sessions,
+  );
   const [socket, setSocket] = useState<Socket | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -31,6 +35,34 @@ export default function LiveVisitors() {
   useEffect(() => {
     setCurrentPage(1);
   }, [agentID]);
+
+  // Re-establish conversations for any previously captured sessions on mount
+  const _startedCapturedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!capturedSessions || capturedSessions.length === 0) return;
+
+    const emitForCaptured = () => {
+      capturedSessions.forEach((s) => {
+        const cid = s.chat_session_id;
+        if (!cid || _startedCapturedRef.current.has(cid)) return;
+        aiSocket.emit("atlas-team-member-start-conversation", {
+          agent_id: agentID,
+          chat_session_id: cid,
+        });
+        _startedCapturedRef.current.add(cid);
+      });
+    };
+
+    if (aiSocket.connected) {
+      emitForCaptured();
+    } else {
+      const onConnect = () => emitForCaptured();
+      aiSocket.once("connect", onConnect);
+      return () => {
+        aiSocket.off("connect", onConnect);
+      };
+    }
+  }, [capturedSessions, agentID]);
 
   useEffect(() => {
     setSocket(aiSocket);
@@ -95,10 +127,20 @@ export default function LiveVisitors() {
     aiSocket.on("agent_new_visitor", handleNewVisitor);
 
     return () => {
+      // notify server that this team member disconnected
+      aiSocket.emit("atlas-team-member-disconnected", {
+        team_id: teamID,
+        user_id: userID,
+        agent_id: agentID,
+      });
       aiSocket.off("connect", emitConnected);
       aiSocket.off("agent_visitors_list", handleVisitorsList);
       aiSocket.off("agent_visitor_disconnected", handleVisitorDisconnected);
       aiSocket.off("agent_new_visitor", handleNewVisitor);
+      // clear visitors and captured sessions from redux when leaving this view
+      dispatch(setActiveVisitors([]));
+      dispatch(setCapturedSessions([]));
+      setSocket(null);
     };
   }, [teamID, userID, agentID, dispatch]);
 
@@ -114,11 +156,8 @@ export default function LiveVisitors() {
   );
 
   return (
-    <div className="flex flex-col lg:px-[40px] px-0">
-      <div className="lg:mt-[40px] mt-[20px] flex items-center justify-between">
-        <p className="text-[24px] font-[700]">{agentName || "Agent"}</p>
-      </div>
-      <div className="mt-[30px]">
+    <div className="flex flex-col">
+      <div className="mt-[10px]">
         <VisitorsList
           currentPage={currentPage}
           totalPages={totalPages}

@@ -36,6 +36,7 @@ export default function MainChatSpace() {
     chatMode,
     isTyping,
     geoData,
+    in_conversation_with,
   } = useAppSelector((state) => state.agentChat);
 
   const dispatch = useAppDispatch();
@@ -159,6 +160,31 @@ export default function MainChatSpace() {
 
     socketInstance.on("atlas_response_chunk", handleResponseChunk);
 
+    // Listen for a visitor_message event and append it to chain
+    const handleVisitorMessage = (data: {
+      agent_id: string;
+      chat_session_id: string;
+      message: string;
+      sender: string;
+      in_conversation_with: string;
+    }) => {
+      // map sender string to a valid Message.role value
+      const role: "user" | "agent" | "human" =
+        data.sender === "team_member" ? "human" : "user";
+
+      const newMsg = {
+        message_id: uuidv4(),
+        role,
+        content: data.message,
+        created_at: new Date().toISOString(),
+      };
+      dispatch(addMessage(newMsg));
+      // update current in_conversation_with if provided
+      dispatch(setInConversationWith(data.in_conversation_with));
+    };
+
+    socketInstance.on("visitor_message", handleVisitorMessage);
+
     // Listen for conversation_started event
     const handleConversationStarted = (data: {
       agent_id: string;
@@ -183,6 +209,7 @@ export default function MainChatSpace() {
     // Cleanup: disconnect socket when component unmounts
     return () => {
       socketInstance.off("atlas_response_chunk", handleResponseChunk);
+      socketInstance.off("visitor_message", handleVisitorMessage);
       socketInstance.off("conversation_started", handleConversationStarted);
       socketInstance.off("conversation_ended", handleConversationEnded);
       disconnectAiSocket();
@@ -220,7 +247,8 @@ export default function MainChatSpace() {
     if (!conversation_chain.length) return;
 
     const lastRole = conversation_chain[conversation_chain.length - 1]?.role;
-    if (lastRole === "user") {
+    // scroll when visitor (user) or team-member/human sends a message
+    if (lastRole === "user" || lastRole === "human") {
       scrollToBottom();
     }
   }, [conversation_chain]);
@@ -271,9 +299,10 @@ export default function MainChatSpace() {
           message: msg,
           chat_session_id,
           created_at: user_message_created_at,
+          ...(in_conversation_with ? { in_conversation_with } : {}),
         });
 
-        if (chatMode === "ai") {
+        if (chatMode === "ai" && !in_conversation_with) {
           dispatch(setIsTyping(true));
         }
       };
@@ -316,7 +345,15 @@ export default function MainChatSpace() {
         textareaRef.current.style.height = "40px";
       }
     },
-    [inputValue, socket, agent_id, chat_session_id, chatMode, dispatch],
+    [
+      inputValue,
+      socket,
+      agent_id,
+      chat_session_id,
+      chatMode,
+      dispatch,
+      in_conversation_with,
+    ],
   );
 
   const handleKeyDown = useCallback(
@@ -379,7 +416,7 @@ export default function MainChatSpace() {
                 />
               ))}
 
-              {isTyping && (
+              {isTyping && !in_conversation_with && (
                 <div className="mt-[4px]">
                   <Thinking />
                 </div>
