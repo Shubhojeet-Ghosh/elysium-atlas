@@ -3,8 +3,11 @@
 import { useState, useRef, useEffect } from "react";
 import { SquarePen, Save } from "lucide-react";
 import type { TeamMemberConversationLog } from "@/store/reducers/agentSlice";
-import { addOrUpdateConversationLog } from "@/store/reducers/agentSlice";
-import { useAppDispatch } from "@/store";
+import {
+  addOrUpdateConversationLog,
+  addCapturedSession,
+} from "@/store/reducers/agentSlice";
+import { useAppDispatch, useAppSelector } from "@/store";
 import aiSocket from "@/lib/aiSocket";
 import { formatSmartDateUTC } from "@/utils/formatDate";
 import {
@@ -23,6 +26,38 @@ function truncateMiddle(s?: string) {
   const end = 4;
   if (s.length <= start + end) return s;
   return `${s.slice(0, start)}.....${s.slice(-end)}`;
+}
+
+function stripMarkdown(text: string): string {
+  return (
+    text
+      // fenced code blocks
+      .replace(/```[\s\S]*?```/g, "[code]")
+      // inline code
+      .replace(/`[^`]*`/g, "[code]")
+      // images
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+      // links
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+      // headings
+      .replace(/^#{1,6}\s+/gm, "")
+      // bold + italic
+      .replace(/\*{1,3}([^*]+)\*{1,3}/g, "$1")
+      .replace(/_{1,3}([^_]+)_{1,3}/g, "$1")
+      // strikethrough
+      .replace(/~~([^~]+)~~/g, "$1")
+      // blockquotes
+      .replace(/^>+\s*/gm, "")
+      // horizontal rules
+      .replace(/^[-*_]{3,}\s*$/gm, "")
+      // unordered list bullets
+      .replace(/^[\s]*[-*+]\s+/gm, "")
+      // ordered list numbers
+      .replace(/^[\s]*\d+\.\s+/gm, "")
+      // collapse multiple newlines / spaces
+      .replace(/\n+/g, " ")
+      .trim()
+  );
 }
 
 export default function ConversationsHistoryItem({
@@ -59,6 +94,29 @@ export default function ConversationsHistoryItem({
     }
   }, [isEditing]);
 
+  // True when the chat box for this session is collapsed but has unread messages
+  const hasUnread = useAppSelector((state) => {
+    const session = state.agent.captured_sessions.find(
+      (s) => s.chat_session_id === log.chat_session_id,
+    );
+    if (!session || session.is_expanded) return false;
+    return session.conversation_chain.some((m) => m.is_read === false);
+  });
+
+  const handleItemClick = () => {
+    if (isEditing) return;
+    dispatch(
+      addCapturedSession({
+        chat_session_id: log.chat_session_id,
+        captured_at: new Date().toISOString(),
+      }),
+    );
+    aiSocket.emit("atlas-team-member-start-conversation", {
+      agent_id: log.agent_id,
+      chat_session_id: log.chat_session_id,
+    });
+  };
+
   const commitAlias = () => {
     const newAlias = inputValue.trim() || null;
     const prevAlias = log.alias_name ?? null;
@@ -83,7 +141,10 @@ export default function ConversationsHistoryItem({
   };
 
   return (
-    <div className="group flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer transition-colors">
+    <div
+      className="group flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer transition-colors"
+      onClick={handleItemClick}
+    >
       {/* Avatar — flag if available, else initials */}
       <Tooltip>
         <TooltipTrigger asChild>
@@ -185,14 +246,14 @@ export default function ConversationsHistoryItem({
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-1 mt-0.5">
-          <p className="text-[13px] text-gray-500 dark:text-gray-400 truncate">
-            {log.last_message ?? "No messages yet"}
+        <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+          <p className="text-[13px] text-gray-500 dark:text-gray-400 truncate flex-1 min-w-0">
+            {log.last_message
+              ? stripMarkdown(log.last_message)
+              : "No messages yet"}
           </p>
-          {log.unread_count > 0 && (
-            <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-serene-purple text-white text-[10px] font-bold flex items-center justify-center shrink-0">
-              {log.unread_count > 99 ? "99+" : log.unread_count}
-            </span>
+          {hasUnread && (
+            <span className="shrink-0 w-2 h-2 rounded-full bg-serene-purple" />
           )}
         </div>
       </div>

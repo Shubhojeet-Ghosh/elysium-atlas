@@ -16,6 +16,13 @@ export default function ConversationsHistoryPanel() {
     0,
   );
 
+  const hasCollapsedUnread = useAppSelector((state) =>
+    state.agent.captured_sessions.some(
+      (s) =>
+        !s.is_expanded && s.conversation_chain.some((m) => m.is_read === false),
+    ),
+  );
+
   return (
     <div
       className={`pointer-events-auto bg-white dark:bg-deep-onyx border border-serene-purple dark:border-pure-mist rounded-t-xl shadow-2xl flex flex-col overflow-hidden transition-[height,width] duration-300 ease-in-out ${
@@ -25,6 +32,7 @@ export default function ConversationsHistoryPanel() {
       <ConversationsHistoryHeader
         isExpanded={isExpanded}
         totalUnread={totalUnread}
+        hasCollapsedUnread={hasCollapsedUnread}
         onToggle={() => setIsExpanded((v) => !v)}
       />
 

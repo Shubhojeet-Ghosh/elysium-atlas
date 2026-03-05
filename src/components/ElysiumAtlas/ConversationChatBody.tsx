@@ -8,6 +8,7 @@ import { useAppSelector, useAppDispatch } from "@/store";
 import {
   addMessageToCapturedSession,
   markSessionMessagesAsRead,
+  updateConversationLogLastMessage,
   type ConversationMessage,
 } from "@/store/reducers/agentSlice";
 import { formatChatTimestamp } from "@/utils/formatDate";
@@ -97,6 +98,8 @@ export default function ConversationChatBody({
     }) => {
       if (data.chat_session_id !== chat_session_id) return;
 
+      const visitorMsgAt = new Date().toISOString();
+
       dispatch(
         addMessageToCapturedSession({
           chat_session_id,
@@ -104,9 +107,17 @@ export default function ConversationChatBody({
             message_id: uuidv4(),
             role: "user",
             content: data.message,
-            created_at: new Date().toISOString(),
+            created_at: visitorMsgAt,
             is_read: isVisibleRef.current,
           },
+        }),
+      );
+
+      dispatch(
+        updateConversationLogLastMessage({
+          chat_session_id,
+          last_message: data.message,
+          last_message_at: visitorMsgAt,
         }),
       );
 
@@ -149,6 +160,14 @@ export default function ConversationChatBody({
         chat_session_id,
         message: msg,
       });
+
+      dispatch(
+        updateConversationLogLastMessage({
+          chat_session_id,
+          last_message: msg,
+          last_message_at: newMessage.created_at,
+        }),
+      );
 
       setInputValue("");
       if (textareaRef.current) {

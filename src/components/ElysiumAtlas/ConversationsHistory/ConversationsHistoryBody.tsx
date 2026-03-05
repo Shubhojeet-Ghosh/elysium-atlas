@@ -27,6 +27,12 @@ interface ApiResponseItem {
     ip: string | null;
     time_zone: string | null;
   } | null;
+  last_message: {
+    message_id: string;
+    role: string;
+    content: string;
+    created_at: string;
+  } | null;
 }
 
 function mapToLog(
@@ -37,7 +43,7 @@ function mapToLog(
     chat_session_id: item.chat_session_id,
     alias_name: item.alias_name,
     agent_id: agentId,
-    last_message: null,
+    last_message: item.last_message?.content ?? null,
     last_message_at: item.last_message_at,
     captured_at: item.last_connected_at,
     ended_at: null,

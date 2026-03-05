@@ -6,12 +6,14 @@ import UserAvatar from "@/components/ElysiumAtlas/UserAvatar";
 interface ConversationsHistoryHeaderProps {
   isExpanded: boolean;
   totalUnread: number;
+  hasCollapsedUnread: boolean;
   onToggle: () => void;
 }
 
 export default function ConversationsHistoryHeader({
   isExpanded,
   totalUnread,
+  hasCollapsedUnread,
   onToggle,
 }: ConversationsHistoryHeaderProps) {
   return (
@@ -27,6 +29,9 @@ export default function ConversationsHistoryHeader({
         <span className="text-[13px] font-semibold text-deep-onyx dark:text-pure-mist">
           Messaging
         </span>
+        {!isExpanded && hasCollapsedUnread && (
+          <span className="w-2 h-2 rounded-full bg-serene-purple shrink-0" />
+        )}
         {totalUnread > 0 && (
           <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-serene-purple text-white text-[10px] font-bold flex items-center justify-center">
             {totalUnread > 99 ? "99+" : totalUnread}
