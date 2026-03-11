@@ -7,6 +7,9 @@ import {
   expandCapturedSession,
   collapseCapturedSession,
   setConversationChainForSession,
+  addMessageToCapturedSession,
+  updateConversationLogLastMessage,
+  incrementConversationLogUnread,
 } from "@/store/reducers/agentSlice";
 import fastApiAxios from "@/utils/fastapi_axios";
 import aiSocket from "@/lib/aiSocket";
@@ -195,6 +198,58 @@ export default function TeamMemberConversationsPanel({
     });
     dispatch(removeCapturedSession(id));
   };
+
+  // On mobile, chat bodies unmount when a session is collapsed. To ensure we
+  // still receive incoming messages and update unread indicators, listen for
+  // visitor messages here and update Redux for collapsed sessions.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    // Desktop is fully handled inside ConversationChatBody instances.
+    if (mq.matches) return;
+
+    const handleMessageFromVisitor = (data: {
+      agent_id: string;
+      chat_session_id: string;
+      message: string;
+      sender: string;
+    }) => {
+      const session = capturedSessions.find(
+        (s) => s.chat_session_id === data.chat_session_id,
+      );
+      if (!session || session.is_expanded) return;
+
+      const visitorMsgAt = new Date().toISOString();
+
+      dispatch(
+        addMessageToCapturedSession({
+          chat_session_id: data.chat_session_id,
+          message: {
+            message_id: `${data.chat_session_id}-${visitorMsgAt}`,
+            role: "user",
+            content: data.message,
+            created_at: visitorMsgAt,
+            is_read: false,
+          },
+        }),
+      );
+
+      dispatch(
+        updateConversationLogLastMessage({
+          chat_session_id: data.chat_session_id,
+          last_message: data.message,
+          last_message_at: visitorMsgAt,
+        }),
+      );
+
+      dispatch(incrementConversationLogUnread(data.chat_session_id));
+    };
+
+    aiSocket.on("message_from_visitor", handleMessageFromVisitor);
+    return () => {
+      aiSocket.off("message_from_visitor", handleMessageFromVisitor);
+    };
+  }, [capturedSessions, dispatch]);
 
   const boxes = displayed.map((session) => (
     <ChatBox

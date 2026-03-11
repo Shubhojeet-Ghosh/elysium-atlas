@@ -32,11 +32,6 @@ export default function ConversationsHistoryHeader({
         {!isExpanded && hasCollapsedUnread && (
           <span className="w-2 h-2 rounded-full bg-serene-purple shrink-0" />
         )}
-        {totalUnread > 0 && (
-          <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-serene-purple text-white text-[10px] font-bold flex items-center justify-center">
-            {totalUnread > 99 ? "99+" : totalUnread}
-          </span>
-        )}
       </div>
 
       <span className="p-1 rounded-full hover:ring-2 hover:ring-serene-purple/60 hover:ring-offset-0 dark:hover:ring-pure-mist/60 transition-colors text-gray-500 dark:text-gray-400">

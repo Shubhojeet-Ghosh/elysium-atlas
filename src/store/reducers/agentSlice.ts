@@ -533,6 +533,14 @@ const agentSlice = createSlice({
       );
       if (log) log.unread_count = 0;
     },
+    incrementConversationLogUnread: (state, action: PayloadAction<string>) => {
+      const log = state.team_member_conversation_logs.find(
+        (l) => l.chat_session_id === action.payload,
+      );
+      if (log) {
+        log.unread_count = (log.unread_count ?? 0) + 1;
+      }
+    },
     setCapturedSessionAlias: (
       state,
       action: PayloadAction<{
@@ -646,6 +654,7 @@ export const {
   addOrUpdateConversationLog,
   updateConversationLogLastMessage,
   markConversationLogAsRead,
+  incrementConversationLogUnread,
   resetUserAgent,
 } = agentSlice.actions;
 

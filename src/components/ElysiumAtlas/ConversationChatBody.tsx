@@ -9,6 +9,7 @@ import {
   addMessageToCapturedSession,
   markSessionMessagesAsRead,
   updateConversationLogLastMessage,
+  markConversationLogAsRead,
   type ConversationMessage,
 } from "@/store/reducers/agentSlice";
 import { formatChatTimestamp } from "@/utils/formatDate";
@@ -82,6 +83,7 @@ export default function ConversationChatBody({
       setSeparatorIndex(firstUnread); // -1 if no unread → no separator
       messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
       dispatch(markSessionMessagesAsRead(chat_session_id));
+      dispatch(markConversationLogAsRead(chat_session_id));
     } else {
       // Clear separator when panel collapses so next re-open gets a fresh one
       setSeparatorIndex(-1);

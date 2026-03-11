@@ -230,7 +230,7 @@ export default function ConversationChatHeader({
               }}
               onMouseDown={(e) => e.stopPropagation()}
               aria-label="Edit alias"
-              className="ml-2 p-1 rounded-full cursor-pointer transition-opacity opacity-0 group-hover:opacity-100 text-gray-500 hover:text-gray-700 dark:hover:text-pure-mist"
+              className="ml-2 p-1 rounded-full cursor-pointer text-gray-500 hover:text-gray-700 dark:hover:text-pure-mist transition-opacity opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
             >
               <SquarePen className="w-4 h-4" />
             </button>
