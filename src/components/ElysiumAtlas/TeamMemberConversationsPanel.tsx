@@ -19,7 +19,7 @@ import ConversationChatHeader, {
 } from "@/components/ElysiumAtlas/ConversationChatHeader";
 import ConversationChatBody from "@/components/ElysiumAtlas/ConversationChatBody";
 
-const MAX_VISIBLE = 3;
+const MAX_VISIBLE = 2;
 
 // ─── Single chat box ──────────────────────────────────────────────────────────
 

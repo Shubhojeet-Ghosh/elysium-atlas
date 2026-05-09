@@ -16,17 +16,9 @@ export default function ConversationsHistoryPanel() {
     0,
   );
 
-  // Legacy desktop behavior: look at collapsed live chat sessions.
-  const hasCollapsedUnreadFromCaptured = useAppSelector((state) =>
-    state.agent.captured_sessions.some(
-      (s) =>
-        !s.is_expanded && s.conversation_chain.some((m) => m.is_read === false),
-    ),
-  );
-
-  // Also consider unread_count on logs so mobile (where chat dialogs unmount
-  // when minimized) still shows the purple dot based on server log state.
-  const hasCollapsedUnread = hasCollapsedUnreadFromCaptured || totalUnread > 0;
+  // Drive header unread indicator purely from logs so it persists even if
+  // captured session entries are removed.
+  const hasCollapsedUnread = totalUnread > 0;
 
   return (
     <div

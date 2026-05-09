@@ -48,6 +48,8 @@ export interface TeamMemberConversationLog {
   /** "live" = currently in captured_sessions, "ended" = conversation closed */
   status: "live" | "ended";
   unread_count: number;
+  /** true when there are unread messages for this log */
+  is_unread: boolean;
   color: string;
   geo_data: GeoData | null;
 }
@@ -388,15 +390,22 @@ const agentSlice = createSlice({
         );
         if (av) av.status = "in-conversation";
       } else {
-        // Look up full visitor from active_visitors
+        // Prefer full visitor data from active_visitors when present, but
+        // also merge in geo/color/name from team_member_conversation_logs
+        // since many historical conversations won't be in active_visitors.
         const visitor = state.active_visitors.find(
           (v) => v.chat_session_id === action.payload.chat_session_id,
         );
+        const log = state.team_member_conversation_logs.find(
+          (l) => l.chat_session_id === action.payload.chat_session_id,
+        );
+
+        // New session — collapse all existing, add expanded with merged data
         // New session — collapse all existing, add expanded with full visitor data
         state.captured_sessions.forEach((s) => {
           s.is_expanded = false;
         });
-        state.captured_sessions.push({
+        const baseVisitor: ActiveVisitor = {
           ...(visitor ?? {
             agent_id: "",
             chat_session_id: action.payload.chat_session_id,
@@ -411,6 +420,21 @@ const agentSlice = createSlice({
             visitor_at: null,
             color: "",
           }),
+        };
+
+        const mergedVisitor: ActiveVisitor = log
+          ? {
+              ...baseVisitor,
+              agent_id: log.agent_id,
+              alias_name: log.alias_name,
+              geo_data: log.geo_data,
+              color: log.color || baseVisitor.color,
+              last_message_at: log.last_message_at ?? baseVisitor.last_message_at,
+            }
+          : baseVisitor;
+
+        state.captured_sessions.push({
+          ...mergedVisitor,
           captured_at: action.payload.captured_at,
           is_expanded: true,
           conversation_chain: [],
@@ -506,9 +530,21 @@ const agentSlice = createSlice({
         (l) => l.chat_session_id === action.payload.chat_session_id,
       );
       if (idx !== -1) {
-        state.team_member_conversation_logs[idx] = action.payload;
+        const existing = state.team_member_conversation_logs[idx];
+        state.team_member_conversation_logs[idx] = {
+          ...existing,
+          ...action.payload,
+          // Preserve unread state unless explicitly overridden
+          is_unread:
+            action.payload.is_unread !== undefined
+              ? action.payload.is_unread
+              : existing.is_unread ?? false,
+        };
       } else {
-        state.team_member_conversation_logs.unshift(action.payload);
+        state.team_member_conversation_logs.unshift({
+          ...action.payload,
+          is_unread: action.payload.is_unread ?? false,
+        });
       }
     },
     updateConversationLogLastMessage: (
@@ -519,19 +555,26 @@ const agentSlice = createSlice({
         last_message_at: string | null;
       }>,
     ) => {
-      const log = state.team_member_conversation_logs.find(
+      const idx = state.team_member_conversation_logs.findIndex(
         (l) => l.chat_session_id === action.payload.chat_session_id,
       );
-      if (log) {
+      if (idx !== -1) {
+        const log = state.team_member_conversation_logs[idx];
         log.last_message = action.payload.last_message;
         log.last_message_at = action.payload.last_message_at;
+        // Move this log to the front so active conversations bubble to the top
+        state.team_member_conversation_logs.splice(idx, 1);
+        state.team_member_conversation_logs.unshift(log);
       }
     },
     markConversationLogAsRead: (state, action: PayloadAction<string>) => {
       const log = state.team_member_conversation_logs.find(
         (l) => l.chat_session_id === action.payload,
       );
-      if (log) log.unread_count = 0;
+      if (log) {
+        log.unread_count = 0;
+        log.is_unread = false;
+      }
     },
     incrementConversationLogUnread: (state, action: PayloadAction<string>) => {
       const log = state.team_member_conversation_logs.find(
@@ -539,6 +582,7 @@ const agentSlice = createSlice({
       );
       if (log) {
         log.unread_count = (log.unread_count ?? 0) + 1;
+        log.is_unread = true;
       }
     },
     setCapturedSessionAlias: (

@@ -10,6 +10,7 @@ import {
   markSessionMessagesAsRead,
   updateConversationLogLastMessage,
   markConversationLogAsRead,
+  incrementConversationLogUnread,
   type ConversationMessage,
 } from "@/store/reducers/agentSlice";
 import { formatChatTimestamp } from "@/utils/formatDate";
@@ -122,6 +123,11 @@ export default function ConversationChatBody({
           last_message_at: visitorMsgAt,
         }),
       );
+
+      // When the panel is not visible, treat this as unread for history
+      if (!isVisibleRef.current) {
+        dispatch(incrementConversationLogUnread(chat_session_id));
+      }
 
       // If the panel is open and no separator is showing yet, place one at
       // the index this new message is about to occupy (WhatsApp-style)

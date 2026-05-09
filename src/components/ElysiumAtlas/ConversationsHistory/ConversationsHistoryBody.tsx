@@ -49,6 +49,7 @@ function mapToLog(
     ended_at: null,
     status: item.visitor_online ? "live" : "ended",
     unread_count: 0,
+    is_unread: false,
     color: "",
     geo_data: item.geo_data ?? null,
   };

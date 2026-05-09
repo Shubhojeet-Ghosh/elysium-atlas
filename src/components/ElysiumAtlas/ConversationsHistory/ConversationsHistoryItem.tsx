@@ -105,18 +105,9 @@ export default function ConversationsHistoryItem({
     }
   }, [isEditing]);
 
-  // Legacy: derive unread from collapsed live chat sessions (desktop inline panel)
-  const hasUnreadFromCaptured = useAppSelector((state) => {
-    const session = state.agent.captured_sessions.find(
-      (s) => s.chat_session_id === log.chat_session_id,
-    );
-    if (!session || session.is_expanded) return false;
-    return session.conversation_chain.some((m) => m.is_read === false);
-  });
-
-  // Also respect unread_count on the log itself so mobile (where chat
-  // dialogs unmount when minimized) still shows the purple dot.
-  const hasUnread = hasUnreadFromCaptured || (log.unread_count ?? 0) > 0;
+  // Derive unread purely from the log so it persists even if
+  // the captured session entry is removed.
+  const hasUnread = log.is_unread || (log.unread_count ?? 0) > 0;
 
   // Highlight this row when the conversation is currently captured (live chat),
   // mirroring the VisitorsList table behavior.
