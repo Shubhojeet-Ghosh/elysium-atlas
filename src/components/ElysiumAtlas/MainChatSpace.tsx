@@ -8,8 +8,9 @@ import {
   addMessage,
   setIsTyping,
   setInConversationWith,
+  setGeoData,
 } from "@/store/reducers/agentChatSlice";
-import { connectAiSocket, disconnectAiSocket } from "@/lib/aiSocket";
+import { useAiSocket, useAiSocketEvent } from "@/hooks/useAiSocket";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -21,7 +22,6 @@ import MessageActions from "./MessageActions";
 import { formatChatTimestamp } from "@/utils/formatDate";
 import { markdownComponents } from "@/utils/markdownComponents";
 import { getUserGeoLocationDetails } from "@/utils/geoLocationUtils";
-import { setGeoData } from "@/store/reducers/agentChatSlice";
 
 export default function MainChatSpace() {
   const {
@@ -42,55 +42,55 @@ export default function MainChatSpace() {
   const dispatch = useAppDispatch();
   const [inputValue, setInputValue] = useState("");
   const [newMessageAnimating, setNewMessageAnimating] = useState(false);
-  const [socket, setSocket] = useState<any>(null);
   const [streamingMessage, setStreamingMessage] = useState("");
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const [isGeoDataReady, setIsGeoDataReady] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Intercept link clicks and open in parent window
+  // Refs read by the socket's onConnect callback so it always sees the
+  // freshest values without re-subscribing.
+  const joinPayloadRef = useRef({ agent_id, chat_session_id, geo_data: geoData });
+  useEffect(() => {
+    joinPayloadRef.current = { agent_id, chat_session_id, geo_data: geoData };
+  }, [agent_id, chat_session_id, geoData]);
+
+  // Ref-backed streaming buffer to avoid stale closures in the chunk handler.
+  const streamingRef = useRef("");
+
+  // Open external links in the parent window (iframe-safe).
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       const link = target.closest("a");
-
       if (link && link.href && !link.href.startsWith("javascript:")) {
         e.preventDefault();
         window.parent.postMessage(
           { type: "navigate_link", url: link.href },
-          "*", // Use specific origin in production
+          "*",
         );
       }
     };
-
     document.addEventListener("click", handleClick, true);
     return () => document.removeEventListener("click", handleClick, true);
   }, []);
 
+  // Resolve geo data once (cache in localStorage). Non-blocking: emits will
+  // simply go out without geo_data if it's not ready yet.
   useEffect(() => {
-    // Already in redux (same session), mark ready and skip
-    if (geoData) {
-      setIsGeoDataReady(true);
-      return;
-    }
-
+    if (geoData) return;
     const GEO_CACHE_KEY = "elysium_geo_data";
-
-    // Try to restore from localStorage before hitting the API
     try {
       const cached = localStorage.getItem(GEO_CACHE_KEY);
       if (cached) {
         dispatch(setGeoData(JSON.parse(cached)));
-        setIsGeoDataReady(true);
         return;
       }
-    } catch (_) {
-      // localStorage unavailable or corrupt — fall through to API
+    } catch {
+      // ignore
     }
 
-    const fetchGeoData = async () => {
+    (async () => {
       try {
         const result = await getUserGeoLocationDetails();
         if (result?.status && result.data) {
@@ -105,139 +105,100 @@ export default function MainChatSpace() {
           dispatch(setGeoData(parsed));
           try {
             localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(parsed));
-          } catch (_) {
-            // Ignore storage quota/unavailability errors
+          } catch {
+            // ignore
           }
         }
-      } catch (_) {
-        // API failed — geo_data will be null, but socket emit must not be blocked
-      } finally {
-        // Always mark ready so the socket emit is never blocked
-        setIsGeoDataReady(true);
+      } catch {
+        // ignore
       }
-    };
+    })();
+  }, [geoData, dispatch]);
 
-    fetchGeoData();
-  }, []);
+  // Connect to the socket and (re)join the visitor session on every connect.
+  // This is the ONLY place that emits atlas-visitor-connected, and it runs
+  // again automatically after every reconnect — no manual race handling.
+  const { emit, status } = useAiSocket({
+    autoConnect: !isFetching,
+    onConnect: (socket) => {
+      const { agent_id, chat_session_id, geo_data } = joinPayloadRef.current;
+      if (!agent_id || !chat_session_id) return;
+      socket.emit("atlas-visitor-connected", {
+        agent_id,
+        chat_session_id,
+        geo_data: geo_data ?? null,
+      });
+    },
+  });
 
-  // Connect socket on mount, disconnect on unmount, and set up response listeners
+  // Re-emit the join when agent/session changes after initial connect.
   useEffect(() => {
-    // Only connect socket after API processing is complete
-    if (isFetching) {
-      return;
-    }
+    if (status !== "connected" || !agent_id || !chat_session_id) return;
+    emit("atlas-visitor-connected", {
+      agent_id,
+      chat_session_id,
+      geo_data: geoData ?? null,
+    });
+  }, [agent_id, chat_session_id, status, geoData, emit]);
 
-    // Connect the AI socket and store the instance
-    const socketInstance = connectAiSocket();
-    setSocket(socketInstance);
-
-    // Listen for response chunks
-    const handleResponseChunk = (data: {
-      chunk: string;
-      done: boolean;
-      full_response?: string;
-      message_id?: string;
-      created_at?: string;
-      role?: string;
-    }) => {
-      if (data.done) {
-        const newMessage = {
+  useAiSocketEvent<{
+    chunk: string;
+    done: boolean;
+    full_response?: string;
+    message_id?: string;
+    created_at?: string;
+    role?: string;
+  }>("atlas_response_chunk", (data) => {
+    if (data.done) {
+      const finalContent = data.full_response || streamingRef.current;
+      dispatch(
+        addMessage({
           message_id: data.message_id || uuidv4(),
           role: (data.role as "user" | "agent" | "human") || "agent",
-          content: data.full_response || streamingMessage,
+          content: finalContent,
           created_at: data.created_at || new Date().toISOString(),
-        };
-        dispatch(addMessage(newMessage));
-        setStreamingMessage("");
+        }),
+      );
+      streamingRef.current = "";
+      setStreamingMessage("");
+      dispatch(setIsTyping(false));
+    } else {
+      if (streamingRef.current === "") {
         dispatch(setIsTyping(false));
-      } else {
-        if (streamingMessage === "") {
-          dispatch(setIsTyping(false));
-        }
-        setStreamingMessage((prev) => prev + data.chunk);
       }
-    };
+      streamingRef.current += data.chunk;
+      setStreamingMessage(streamingRef.current);
+    }
+  });
 
-    socketInstance.on("atlas_response_chunk", handleResponseChunk);
-
-    // Listen for a visitor_message event and append it to chain
-    const handleVisitorMessage = (data: {
-      agent_id: string;
-      chat_session_id: string;
-      message: string;
-      sender: string;
-      in_conversation_with: string;
-    }) => {
-      // map sender string to a valid Message.role value
-      const role: "user" | "agent" | "human" =
-        data.sender === "team_member" ? "human" : "user";
-
-      const newMsg = {
+  useAiSocketEvent<{
+    agent_id: string;
+    chat_session_id: string;
+    message: string;
+    sender: string;
+    in_conversation_with: string;
+  }>("visitor_message", (data) => {
+    const role: "user" | "agent" | "human" =
+      data.sender === "team_member" ? "human" : "user";
+    dispatch(
+      addMessage({
         message_id: uuidv4(),
         role,
         content: data.message,
         created_at: new Date().toISOString(),
-      };
-      dispatch(addMessage(newMsg));
-      // update current in_conversation_with if provided
-      dispatch(setInConversationWith(data.in_conversation_with));
-    };
+      }),
+    );
+    dispatch(setInConversationWith(data.in_conversation_with));
+  });
 
-    socketInstance.on("visitor_message", handleVisitorMessage);
+  useAiSocketEvent<{ in_conversation_with: string }>(
+    "conversation_started",
+    (data) => dispatch(setInConversationWith(data.in_conversation_with)),
+  );
 
-    // Listen for conversation_started event
-    const handleConversationStarted = (data: {
-      agent_id: string;
-      chat_session_id: string;
-      in_conversation_with: string;
-    }) => {
-      dispatch(setInConversationWith(data.in_conversation_with));
-    };
-
-    // Listen for conversation_ended event
-    const handleConversationEnded = (data: {
-      agent_id: string;
-      chat_session_id: string;
-      in_conversation_with: string;
-    }) => {
-      dispatch(setInConversationWith(null));
-    };
-
-    socketInstance.on("conversation_started", handleConversationStarted);
-    socketInstance.on("conversation_ended", handleConversationEnded);
-
-    // Cleanup: disconnect socket when component unmounts
-    return () => {
-      socketInstance.off("atlas_response_chunk", handleResponseChunk);
-      socketInstance.off("visitor_message", handleVisitorMessage);
-      socketInstance.off("conversation_started", handleConversationStarted);
-      socketInstance.off("conversation_ended", handleConversationEnded);
-      disconnectAiSocket();
-      setSocket(null);
-    };
-  }, [agent_id, chat_session_id, isFetching]);
-
-  // Emit atlas-visitor-connected only after both socket is ready AND geo data is resolved
-  useEffect(() => {
-    if (!isGeoDataReady || !socket || !agent_id || !chat_session_id) return;
-
-    const payload = {
-      agent_id,
-      chat_session_id,
-      geo_data: geoData ?? null,
-    };
-    // console.log("Emitting atlas-visitor-connected with payload:", payload);
-    const emitVisitorConnected = (socketInstance: any) => {
-      socketInstance.emit("atlas-visitor-connected", payload);
-    };
-
-    if (socket.connected) {
-      emitVisitorConnected(socket);
-    } else {
-      // Wait for the socket to connect, then emit
-      socket.once("connect", () => emitVisitorConnected(socket));
-    }
-  }, [isGeoDataReady, socket, agent_id, chat_session_id]);
+  useAiSocketEvent("conversation_ended", () =>
+    dispatch(setInConversationWith(null)),
+  );
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     messagesEndRef.current?.scrollIntoView({ behavior });
@@ -245,9 +206,7 @@ export default function MainChatSpace() {
 
   useEffect(() => {
     if (!conversation_chain.length) return;
-
     const lastRole = conversation_chain[conversation_chain.length - 1]?.role;
-    // scroll when visitor (user) or team-member/human sends a message
     if (lastRole === "user" || lastRole === "human") {
       scrollToBottom();
     }
@@ -260,94 +219,57 @@ export default function MainChatSpace() {
     }
   }, [newMessageAnimating]);
 
-  // Scroll to bottom on initial mount
   useEffect(() => {
-    if (!isFetching) {
-      scrollToBottom("auto");
-    }
+    if (!isFetching) scrollToBottom("auto");
   }, [isFetching]);
 
-  // Handle scroll to detect if user is at bottom
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
-
     const { scrollTop, scrollHeight, clientHeight } =
       scrollContainerRef.current;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
-    setShowScrollButton(!isAtBottom);
+    setShowScrollButton(scrollHeight - scrollTop - clientHeight >= 100);
   };
 
   const handleSendMessage = useCallback(
     (message?: string) => {
-      const msg = message || inputValue.trim();
+      const msg = (message ?? inputValue).trim();
       if (msg === "") return;
 
       const user_message_created_at = new Date().toISOString();
 
-      const newMessage = {
-        message_id: uuidv4(),
-        role: "user" as const,
-        content: msg,
-        created_at: user_message_created_at,
-      };
-
-      dispatch(addMessage(newMessage));
-
-      const emitMessage = (socketInstance: any) => {
-        socketInstance.emit("atlas-visitor-message", {
-          agent_id,
-          message: msg,
-          chat_session_id,
+      dispatch(
+        addMessage({
+          message_id: uuidv4(),
+          role: "user",
+          content: msg,
           created_at: user_message_created_at,
-          ...(in_conversation_with ? { in_conversation_with } : {}),
-        });
+        }),
+      );
 
-        if (chatMode === "ai" && !in_conversation_with) {
-          dispatch(setIsTyping(true));
-        }
-      };
+      // `emit` is connection-safe: if the socket isn't connected yet, it
+      // queues the payload until the next connect. No reconnect dance needed.
+      emit("atlas-visitor-message", {
+        agent_id,
+        message: msg,
+        chat_session_id,
+        created_at: user_message_created_at,
+        ...(in_conversation_with ? { in_conversation_with } : {}),
+      });
 
-      if (socket) {
-        // Check if socket is connected
-        if (socket.connected) {
-          // Socket is connected, emit directly
-          emitMessage(socket);
-        } else {
-          // Socket is disconnected, reconnect first then emit
-          console.log(
-            "Socket disconnected, reconnecting before sending message...",
-          );
-          const reconnectedSocket = connectAiSocket();
-
-          // Wait for connection before emitting
-          if (reconnectedSocket.connected) {
-            emitMessage(reconnectedSocket);
-          } else {
-            // Listen for connect event and then emit
-            reconnectedSocket.once("connect", () => {
-              console.log("Socket reconnected, sending message...");
-              // Re-emit visitor connected event
-              reconnectedSocket.emit("atlas-visitor-connected", {
-                agent_id,
-                chat_session_id,
-              });
-              emitMessage(reconnectedSocket);
-            });
-          }
-        }
+      if (chatMode === "ai" && !in_conversation_with) {
+        dispatch(setIsTyping(true));
       }
 
       setNewMessageAnimating(true);
       setInputValue("");
 
-      // Reset textarea height
       if (textareaRef.current) {
         textareaRef.current.style.height = "40px";
       }
     },
     [
       inputValue,
-      socket,
+      emit,
       agent_id,
       chat_session_id,
       chatMode,
@@ -369,14 +291,11 @@ export default function MainChatSpace() {
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       setInputValue(e.target.value);
-
-      // Auto-resize textarea based on content
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
         const scrollHeight = textareaRef.current.scrollHeight;
-        const lineHeight = 20; // Approximate line height in pixels
-        const maxHeight = lineHeight * 5; // Max 5 rows
-
+        const lineHeight = 20;
+        const maxHeight = lineHeight * 5;
         textareaRef.current.style.height = `${Math.min(
           scrollHeight,
           maxHeight,
