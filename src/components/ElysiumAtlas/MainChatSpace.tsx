@@ -131,16 +131,6 @@ export default function MainChatSpace() {
     },
   });
 
-  // Re-emit the join when agent/session changes after initial connect.
-  useEffect(() => {
-    if (status !== "connected" || !agent_id || !chat_session_id) return;
-    emit("atlas-visitor-connected", {
-      agent_id,
-      chat_session_id,
-      geo_data: geoData ?? null,
-    });
-  }, [agent_id, chat_session_id, status, geoData, emit]);
-
   useAiSocketEvent<{
     chunk: string;
     done: boolean;
