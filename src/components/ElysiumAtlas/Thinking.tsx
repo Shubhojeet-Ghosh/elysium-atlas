@@ -1,13 +1,31 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 
-const DOT_MAX_SIZE = 12; // Maximum size of the dot in pixels
-const ANIMATION_DURATION = 2500; // Animation duration in milliseconds
+const DOT_MAX_SIZE = 12;
+const ANIMATION_DURATION = 2500;
+const TEXT_DELAY_MS = 1000;
+const TEXT_REVEAL_DURATION_MS = 900;
 
 interface ThinkingProps {
   text?: string;
+  textDelayMs?: number;
+  revealDurationMs?: number;
 }
 
-const Thinking: React.FC<ThinkingProps> = ({ text = "Thinking" }) => {
+const Thinking: React.FC<ThinkingProps> = ({
+  text = "Thinking",
+  textDelayMs = TEXT_DELAY_MS,
+  revealDurationMs = TEXT_REVEAL_DURATION_MS,
+}) => {
+  const [showText, setShowText] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowText(true), textDelayMs);
+    return () => clearTimeout(timer);
+  }, [textDelayMs]);
+
+  const label = `${text}...`;
+
   return (
     <>
       <style>
@@ -20,16 +38,44 @@ const Thinking: React.FC<ThinkingProps> = ({ text = "Thinking" }) => {
       </style>
       <div className="flex gap-3">
         <div className="flex-1 space-y-1">
-          <div className="text-[13px] text-gray-600 leading-relaxed flex items-center gap-[8px]">
+          <div className="flex h-[20px] items-center gap-[8px]">
             <span
-              className="inline-flex items-center justify-center bg-black rounded-full"
+              className="inline-flex shrink-0 items-center justify-center bg-black rounded-full"
               style={{
                 width: `${DOT_MAX_SIZE}px`,
                 height: `${DOT_MAX_SIZE}px`,
                 animation: `dotPulse ${ANIMATION_DURATION}ms ease-in-out infinite`,
               }}
-            ></span>
-            {text}...
+            />
+            <span className="inline-grid">
+              <span
+                className="invisible col-start-1 row-start-1 text-[13px] leading-[20px]"
+                aria-hidden
+              >
+                {label}
+              </span>
+              {showText && (
+                <motion.span
+                  className="col-start-1 row-start-1 inline-block text-[13px] leading-[20px] text-gray-600"
+                  initial={{
+                    clipPath: "inset(0 100% 0 0)",
+                    opacity: 0,
+                    x: -6,
+                  }}
+                  animate={{
+                    clipPath: "inset(0 0% 0 0)",
+                    opacity: 1,
+                    x: 0,
+                  }}
+                  transition={{
+                    duration: revealDurationMs / 1000,
+                    ease: [0.25, 0.1, 0.25, 1],
+                  }}
+                >
+                  {label}
+                </motion.span>
+              )}
+            </span>
           </div>
         </div>
       </div>
