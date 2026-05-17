@@ -4,7 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import aiSocket from "@/lib/aiSocket";
 
-export type SocketStatus = "connecting" | "connected" | "disconnected";
+export type SocketStatus =
+  | "connecting"
+  | "connected"
+  | "disconnected"
+  | "reconnecting";
 
 interface UseAiSocketOptions {
   /**
@@ -24,7 +28,7 @@ interface UseAiSocketOptions {
  * Owns the shared AI socket connection lifecycle for a component.
  *
  * - Ensures the socket is connected.
- * - Tracks status as React state.
+ * - Tracks status as React state (including reconnect attempts).
  * - Provides a connection-safe `emit` that queues until connected.
  * - Re-runs `onConnect` on every reconnect (so rejoin happens automatically).
  */
@@ -47,14 +51,30 @@ export function useAiSocket(options: UseAiSocketOptions = {}) {
       setStatus("connected");
       onConnectRef.current?.(aiSocket);
     };
-    const handleDisconnect = () => setStatus("disconnected");
-    const handleConnecting = () => setStatus("connecting");
+    const handleDisconnect = (reason: Socket.DisconnectReason) => {
+      setStatus("disconnected");
+      // Belt and suspenders: if for whatever reason the socket isn't actively
+      // trying to reconnect (e.g. server-initiated disconnect), kick it.
+      if (
+        autoConnect &&
+        !aiSocket.active &&
+        reason !== "io client disconnect"
+      ) {
+        // Tiny delay so we don't spam the server.
+        setTimeout(() => {
+          if (!aiSocket.connected) aiSocket.connect();
+        }, 500);
+      }
+    };
+    const handleReconnecting = () => setStatus("reconnecting");
+    const handleConnectError = () => setStatus("reconnecting");
 
     aiSocket.on("connect", handleConnect);
     aiSocket.on("disconnect", handleDisconnect);
-    aiSocket.io.on("reconnect_attempt", handleConnecting);
+    aiSocket.on("connect_error", handleConnectError);
+    aiSocket.io.on("reconnect_attempt", handleReconnecting);
 
-    if (autoConnect && !aiSocket.connected) {
+    if (autoConnect && !aiSocket.connected && !aiSocket.active) {
       aiSocket.connect();
     }
 
@@ -67,7 +87,8 @@ export function useAiSocket(options: UseAiSocketOptions = {}) {
     return () => {
       aiSocket.off("connect", handleConnect);
       aiSocket.off("disconnect", handleDisconnect);
-      aiSocket.io.off("reconnect_attempt", handleConnecting);
+      aiSocket.off("connect_error", handleConnectError);
+      aiSocket.io.off("reconnect_attempt", handleReconnecting);
       // Intentionally do NOT disconnect — the socket is shared app-wide.
     };
   }, [autoConnect]);
