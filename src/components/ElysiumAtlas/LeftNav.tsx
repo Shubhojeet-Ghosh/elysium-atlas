@@ -1,8 +1,10 @@
 "use client";
 import { PanelRightOpen, AlignStartVertical } from "lucide-react";
+import { usePathname } from "next/navigation";
 import Logo from "@/components/ElysiumAtlas/LogoComponent";
 import ThemeToggle from "@/components/ElysiumAtlas/ThemeToggle";
 import NavItems from "@/components/ElysiumAtlas/NavItems";
+import AgentNavItems from "@/components/ElysiumAtlas/AgentNavItems";
 import { useDispatch, useSelector } from "react-redux";
 import { toggleLeftNav } from "@/store/reducers/settingsSlice";
 import { RootState } from "@/store";
@@ -12,11 +14,17 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 
+function isAgentDetailPage(pathname: string) {
+  return /^\/my-agents\/(?!build$)[^/]+$/.test(pathname);
+}
+
 export default function LeftNav() {
   const dispatch = useDispatch();
+  const pathname = usePathname();
   const isOpen = useSelector(
     (state: RootState) => state.settings.isLeftNavOpen
   );
+  const showAgentNav = isAgentDetailPage(pathname);
 
   const toggleNav = () => {
     dispatch(toggleLeftNav());
@@ -83,7 +91,11 @@ export default function LeftNav() {
 
           {/* Navigation Items */}
           <div className="flex-1 w-full overflow-y-auto">
-            <NavItems isCollapsed={!isOpen} />
+            {showAgentNav ? (
+              <AgentNavItems isCollapsed={!isOpen} />
+            ) : (
+              <NavItems isCollapsed={!isOpen} />
+            )}
           </div>
 
           <ThemeToggle showIcon={false} />

@@ -26,6 +26,7 @@ import {
   setTemperature,
   setWelcomeMessage,
   setLlmModel,
+  setRetrievalStrategy,
   setTriggerGetAgentDetails,
   setWidgetScript,
   setAgentIcon,
@@ -79,6 +80,9 @@ export default function AgentPage() {
           dispatch(setTemperature(agentDetails.temperature || 0.5));
           dispatch(setWelcomeMessage(agentDetails.welcome_message));
           dispatch(setLlmModel(agentDetails.llm_model));
+          dispatch(
+            setRetrievalStrategy(agentDetails.retrieval_strategy || "simple"),
+          );
           dispatch(setWidgetScript(agentDetails.widget_script || null));
           dispatch(setAgentIcon(agentDetails.agent_icon || null));
           dispatch(setPrimaryColor(agentDetails.primary_color || "#fff"));

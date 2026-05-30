@@ -109,100 +109,47 @@ const CustomTabsList = React.forwardRef<HTMLDivElement, CustomTabsListProps>(
 
     React.useImperativeHandle(ref, () => listRef.current as HTMLDivElement);
 
-    // Track previous selected value to detect actual tab changes
-    const prevSelectedValueRef = React.useRef<string | undefined>(undefined);
-
     // Update indicator position when selected tab changes
     React.useEffect(() => {
-      const updateIndicator = (shouldScrollIntoView: boolean = false) => {
+      const updateIndicatorPosition = (activeTab: HTMLButtonElement) => {
+        if (!listRef.current) return;
+
+        setIndicatorStyle({
+          left: activeTab.offsetLeft,
+          width: activeTab.offsetWidth,
+        });
+      };
+
+      const updateIndicator = () => {
         if (!listRef.current || !selectedValue) return;
 
         const activeTab = listRef.current.querySelector(
           `[data-tab-value="${selectedValue}"]`,
         ) as HTMLButtonElement;
 
-        if (activeTab) {
-          const listRect = listRef.current.getBoundingClientRect();
-          const tabRect = activeTab.getBoundingClientRect();
+        if (!activeTab) return;
 
-          // Only scroll into view if explicitly requested (tab change) and tab is out of view
-          if (shouldScrollIntoView) {
-            const isOutOfView =
-              tabRect.right > listRect.right || tabRect.left < listRect.left;
+        updateIndicatorPosition(activeTab);
 
-            if (isOutOfView) {
-              // Scroll the active tab into view if needed (only on tab change)
-              activeTab.scrollIntoView({
-                behavior: "smooth",
-                block: "nearest",
-                inline: "center",
-              });
-
-              // Wait for scroll animation to complete before updating position
-              setTimeout(() => {
-                updateIndicatorPosition(activeTab);
-              }, 300);
-              return;
-            }
-          }
-
-          // Update indicator position immediately (for resize/scroll events or if not scrolling)
-          updateIndicatorPosition(activeTab);
-        }
-      };
-
-      const updateIndicatorPosition = (activeTab: HTMLButtonElement) => {
-        if (!listRef.current) return;
-        const tabRect = activeTab.getBoundingClientRect();
         const listRect = listRef.current.getBoundingClientRect();
+        const tabRect = activeTab.getBoundingClientRect();
+        const isOutOfView =
+          tabRect.right > listRect.right || tabRect.left < listRect.left;
 
-        // Calculate position relative to the scrollable container
-        const left = tabRect.left - listRect.left;
-        const width = tabRect.width;
-
-        // Calculate how much of the tab is visible
-        const visibleLeft = Math.max(0, left);
-        const visibleRight = Math.min(
-          left + width,
-          listRef.current.clientWidth,
-        );
-        const visibleWidth = Math.max(0, visibleRight - visibleLeft);
-
-        // Only show indicator if tab is at least partially visible
-        if (visibleWidth > 0) {
-          setIndicatorStyle({
-            left: visibleLeft,
-            width: visibleWidth,
+        if (isOutOfView) {
+          activeTab.scrollIntoView({
+            behavior: "instant",
+            block: "nearest",
+            inline: "nearest",
           });
-        } else {
-          // Hide indicator if tab is completely out of view
-          setIndicatorStyle({
-            left: 0,
-            width: 0,
-          });
+          requestAnimationFrame(() => updateIndicatorPosition(activeTab));
         }
       };
 
-      // Check if this is a tab change (not just a re-render)
-      const isTabChange = prevSelectedValueRef.current !== selectedValue;
+      updateIndicator();
 
-      // Initial update - scroll into view only if tab actually changed
-      if (isTabChange) {
-        updateIndicator(true);
-        prevSelectedValueRef.current = selectedValue;
-      } else {
-        updateIndicator(false);
-      }
-
-      // Update on resize (without scrolling into view)
-      const handleResize = () => {
-        updateIndicator(false);
-      };
-
-      // Update on scroll (without scrolling into view, just update indicator position)
-      const handleScroll = () => {
-        updateIndicator(false);
-      };
+      const handleResize = () => updateIndicator();
+      const handleScroll = () => updateIndicator();
 
       const resizeObserver = new ResizeObserver(handleResize);
       if (listRef.current) {
@@ -260,7 +207,7 @@ const CustomTabsList = React.forwardRef<HTMLDivElement, CustomTabsListProps>(
           {children}
           {/* Animated indicator */}
           <span
-            className="absolute bottom-[-1px] h-0.5 bg-serene-purple dark:bg-serene-purple transition-all duration-300 ease-in-out pointer-events-none"
+            className="absolute bottom-[-1px] h-0.5 bg-serene-purple dark:bg-serene-purple transition-[left,width] duration-150 ease-out pointer-events-none"
             style={{
               left: `${indicatorStyle.left}px`,
               width: `${indicatorStyle.width}px`,
@@ -318,7 +265,7 @@ const CustomTabsTrigger = React.forwardRef<
       data-state={isActive ? "active" : "inactive"}
       data-tab-value={value}
       className={cn(
-        "px-4 py-2 text-sm font-medium relative transition-all duration-300 ease-in-out cursor-pointer",
+        "px-4 py-2 text-sm font-medium relative transition-colors duration-150 ease-out cursor-pointer",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-serene-purple focus-visible:ring-offset-2",
         "disabled:pointer-events-none disabled:opacity-50",
         isActive

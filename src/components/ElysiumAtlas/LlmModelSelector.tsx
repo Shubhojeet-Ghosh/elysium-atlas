@@ -30,7 +30,7 @@ export default function LlmModelSelector() {
 
   return (
     <>
-      <div className="lg:w-[40%] w-full">
+      <div className="w-full">
         <div className="flex flex-col gap-2">
           <div>
             {" "}

@@ -1,18 +1,14 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import Cookies from "js-cookie";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CustomTabs } from "@/components/ui/CustomTabs";
-import AgentBuilderTabs from "./AgentBuilderTabs";
+import AgentDataSource, { AgentDataSourceTabs } from "./AgentDataSource";
+import AgentPersonalize from "./AgentPersonalize";
+import AgentLiveVisitors from "./AgentLiveVisitors";
 import AgentBackButton from "./AgentBackButton";
 import AgentMainContent from "./AgentMainContent";
 import UnsavedChangesBar from "./UnsavedChangesBar";
-import AgentLinks from "./AgentLinks";
-import AgentFiles from "./AgentFiles";
-import AgentText from "./AgentText";
-import AgentQnA from "./AgentQnA";
-import AgentPersonality from "./AgentPersonality";
-import LiveVisitors from "./LiveVisitors";
 import { useCurrentAgentDetails } from "./useAgentDetailsCompare";
 import { useAppDispatch, useAppSelector } from "@/store";
 import PrimaryButton from "../ui/PrimaryButton";
@@ -26,6 +22,7 @@ import {
   setTemperature,
   setWelcomeMessage,
   setLlmModel,
+  setRetrievalStrategy,
   setKnowledgeBaseLinks,
   setKnowledgeBaseFiles,
   setKnowledgeBaseText,
@@ -52,6 +49,12 @@ import { isEquivalent, normalizeValue } from "@/utils/comparisonUtils";
 import { toast } from "sonner";
 import { SquareArrowOutUpRight } from "lucide-react";
 import axios from "axios";
+import {
+  getSectionLabel,
+  isNoTabSection,
+  resolveSection,
+  resolveActiveTab,
+} from "@/utils/agentSectionUtils";
 
 export default function MyAgent({
   initialAgentDetails,
@@ -59,13 +62,20 @@ export default function MyAgent({
   initialAgentDetails: any;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const agentID = useAppSelector((state) => state.agent.agentID);
+  const section = resolveSection(searchParams);
+  const urlActiveTab = resolveActiveTab(searchParams, section);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const activeTab = pendingTab ?? urlActiveTab;
 
-  const [activeTab, setActiveTab] = useState(() => {
-    return searchParams.get("activeTab") || "agent";
-  });
+  useEffect(() => {
+    if (pendingTab !== null && pendingTab === urlActiveTab) {
+      setPendingTab(null);
+    }
+  }, [pendingTab, urlActiveTab]);
 
   const [mappedInitial, setMappedInitial] = useState<any>(null);
 
@@ -261,15 +271,19 @@ export default function MyAgent({
   );
   const currentAgentDetails = useCurrentAgentDetails();
 
-  // Handle tab change and update URL
-  const handleTabChange = (newTab: string) => {
-    setActiveTab(newTab);
-    const current = new URLSearchParams(Array.from(searchParams.entries()));
-    current.set("activeTab", newTab);
-    const search = current.toString();
-    const query = search ? `?${search}` : "";
-    router.push(`${window.location.pathname}${query}`);
-  };
+  const handleTabChange = useCallback(
+    (newTab: string) => {
+      if (newTab === activeTab) return;
+
+      setPendingTab(newTab);
+
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("section", "data-source");
+      params.set("activeTab", newTab);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [activeTab, pathname, router, searchParams],
+  );
 
   const buildUpdatePayload = (
     mappedInitial: any,
@@ -329,6 +343,12 @@ export default function MyAgent({
 
     if (!isEquivalent(mappedInitial.llmModel, current.llmModel)) {
       payload.llm_model = current.llmModel;
+    }
+
+    if (
+      !isEquivalent(mappedInitial.retrievalStrategy, current.retrievalStrategy)
+    ) {
+      payload.retrieval_strategy = current.retrievalStrategy;
     }
 
     if (mappedInitial.temperature !== current.temperature) {
@@ -700,6 +720,8 @@ export default function MyAgent({
       dispatch(setWelcomeMessage(dataToUse.welcomeMessage || ""));
     if (dataToUse.llmModel !== undefined)
       dispatch(setLlmModel(dataToUse.llmModel || ""));
+    if (dataToUse.retrievalStrategy !== undefined)
+      dispatch(setRetrievalStrategy(dataToUse.retrievalStrategy || "simple"));
     dispatch(setAgentIcon(dataToUse.agent_icon ?? null));
     dispatch(setPrimaryColor(dataToUse.primary_color || "#fff"));
     dispatch(setSecondaryColor(dataToUse.secondary_color || "#fff"));
@@ -754,16 +776,30 @@ export default function MyAgent({
     console.log("[MyAgent] currentAgentDetails:", currentAgentDetails);
   }, [initialAgentDetails, currentAgentDetails]);
 
-  // Set default activeTab in URL if not present
+  // Normalize invalid or legacy URL params without fighting in-flight tab changes
   useEffect(() => {
-    if (!searchParams.get("activeTab")) {
-      const current = new URLSearchParams(Array.from(searchParams.entries()));
-      current.set("activeTab", "agent");
-      const search = current.toString();
-      const query = search ? `?${search}` : "";
-      router.push(`${window.location.pathname}${query}`);
+    const resolvedSection = resolveSection(searchParams);
+    const urlSection = searchParams.get("section");
+    const urlTab = searchParams.get("activeTab");
+
+    if (isNoTabSection(resolvedSection)) {
+      if (resolvedSection !== urlSection || urlTab) {
+        router.replace(`${pathname}?section=${resolvedSection}`, {
+          scroll: false,
+        });
+      }
+      return;
     }
-  }, [searchParams, router]);
+
+    const resolvedTab = resolveActiveTab(searchParams, resolvedSection);
+
+    if (urlSection !== resolvedSection || urlTab !== resolvedTab) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("section", resolvedSection);
+      params.set("activeTab", resolvedTab);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
+  }, [pathname, router, searchParams]);
 
   const handleBack = () => {
     router.push("/my-agents");
@@ -788,77 +824,61 @@ export default function MyAgent({
 
   return (
     <>
-      <div className="sticky top-[65px] z-50">
-        <div className="w-full flex flex-row items-center justify-between gap-[8px] bg-white dark:bg-[#0a0a0a]">
-          <div className="flex flex-row items-center gap-2 flex-1 min-w-0 overflow-hidden lg:flex-none lg:w-[85%]">
-            <div className="mt-[10px] lg:mr-[10px] mr-[0px] shrink-0">
+      <div className="sticky top-[65px] z-50 bg-white dark:bg-[#0a0a0a]">
+        <div className="w-full flex flex-row items-center justify-between gap-[8px]">
+          <div className="flex flex-row items-center gap-5 min-w-0">
+            <div className="mt-[10px] shrink-0">
               <AgentBackButton onBack={handleBack} />
             </div>
-
-            <CustomTabs
-              value={activeTab}
-              onValueChange={handleTabChange}
-              className="flex-1 min-w-0"
-            >
-              <AgentBuilderTabs
-                activeTab={activeTab}
-                onTabChange={handleTabChange}
-              />
-            </CustomTabs>
+            <h1 className="mt-[10px] text-[26px] font-semibold text-gray-900 dark:text-gray-100 truncate">
+              {getSectionLabel(section)}
+            </h1>
           </div>
-          <div className="flex items-center justify-end">
-            <PrimaryButton className="text-[13px]" onClick={handlePreview}>
-              <div className="flex items-center justify-center gap-[6px]">
-                <SquareArrowOutUpRight size={16} />{" "}
-                <p className="lg:block md:hidden hidden">Preview Agent</p>
-              </div>
-            </PrimaryButton>
-          </div>
+          {section === "general" && (
+            <div className="flex items-center justify-end shrink-0">
+              <PrimaryButton className="text-[13px]" onClick={handlePreview}>
+                <div className="flex items-center justify-center gap-[6px]">
+                  <SquareArrowOutUpRight size={16} />{" "}
+                  <p className="lg:block md:hidden hidden">Preview Agent</p>
+                </div>
+              </PrimaryButton>
+            </div>
+          )}
         </div>
+        {section === "data-source" && (
+          <CustomTabs
+            value={activeTab}
+            onValueChange={handleTabChange}
+            className="w-full mt-2"
+          >
+            <AgentDataSourceTabs
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+            />
+          </CustomTabs>
+        )}
       </div>
-      {activeTab === "agent" && (
+      {section === "general" && (
         <AgentMainContent
           initialAgentDetails={mappedInitial}
           onSave={handleUpdate}
         />
       )}
-      {activeTab === "links" && (
-        <div className="mt-6">
-          <AgentLinks />
-        </div>
+      {section === "data-source" && (
+        <AgentDataSource
+          activeTab={activeTab}
+          documentFiles={documentFiles}
+          setDocumentFiles={setDocumentFiles}
+        />
       )}
-      {activeTab === "files" && (
-        <div className="mt-6">
-          <AgentFiles
-            documentFiles={documentFiles}
-            setDocumentFiles={setDocumentFiles}
-          />
-        </div>
+      {section === "personalize" && (
+        <AgentPersonalize
+          avatarFile={avatarFile}
+          setAvatarFile={setAvatarFile}
+          clearSignal={avatarClearSignal}
+        />
       )}
-      {activeTab === "text" && (
-        <div className="mt-6">
-          <AgentText />
-        </div>
-      )}
-      {activeTab === "qna" && (
-        <div className="mt-6">
-          <AgentQnA />
-        </div>
-      )}
-      {activeTab === "personalize" && (
-        <div className="mt-6">
-          <AgentPersonality
-            avatarFile={avatarFile}
-            setAvatarFile={setAvatarFile}
-            clearSignal={avatarClearSignal}
-          />
-        </div>
-      )}
-      {activeTab === "live-visitors" && (
-        <div>
-          <LiveVisitors />
-        </div>
-      )}
+      {section === "live-visitors" && <AgentLiveVisitors />}
       {mappedInitial && (
         <UnsavedChangesBar
           initial={mappedInitial}

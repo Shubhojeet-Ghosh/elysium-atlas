@@ -1,8 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 
-import AgentLeftSide from "./AgentLeftSide";
-import AgentRightSide from "./AgentRightSide";
+import AgentNameField from "./AgentNameField";
+import SystemPrompt from "./SystemPrompt";
+import WelcomeMessage from "./WelcomeMessage";
+import LlmModelSelector from "./LlmModelSelector";
+import RetrievalStrategySelector from "./RetrievalStrategySelector";
 import AgentReadyCard from "./AgentReadyCard";
 import AgentEmbedCard from "./AgentEmbedCard";
 import AgentProgressCard from "./AgentProgressCard";
@@ -46,9 +49,12 @@ export default function AgentMainContent({
             <AgentReadyCard />
           </div>
         )}
-        <div className="flex lg:flex-row flex-col gap-[30px] mt-[30px]">
-          <AgentLeftSide />
-          <AgentRightSide />
+        <div className="mt-[30px] grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-x-[30px] gap-y-[40px] items-start">
+          <AgentNameField />
+          <LlmModelSelector />
+          <SystemPrompt />
+          <RetrievalStrategySelector />
+          <WelcomeMessage />
         </div>
         <div className="flex lg:flex-row md:flex-row flex-col mt-[40px] mb-[10px] lg:justify-start md:justify-start justify-center items-start">
           <DeleteAgentCard />

@@ -11,6 +11,7 @@ export function mapInitialAgentDetails(details: any) {
     temperature: details.temperature,
     welcomeMessage: details.welcome_message,
     llmModel: details.llm_model,
+    retrievalStrategy: details.retrieval_strategy || "simple",
     knowledgeBaseLinks: [],
     knowledgeBaseFiles: [],
     knowledgeBaseText: [],

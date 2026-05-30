@@ -70,6 +70,7 @@ interface UserAgentState {
   temperature: number;
   welcomeMessage: string;
   llmModel: string;
+  retrievalStrategy: string;
   triggerGetAgentDetails: number;
   triggerFetchAgentUrls: number;
   triggerFetchAgentFiles: number;
@@ -105,6 +106,7 @@ const initialState: UserAgentState = {
   temperature: 0,
   welcomeMessage: "",
   llmModel: "",
+  retrievalStrategy: "simple",
   triggerGetAgentDetails: 0,
   triggerFetchAgentUrls: 0,
   triggerFetchAgentFiles: 0,
@@ -287,6 +289,9 @@ const agentSlice = createSlice({
     },
     setLlmModel: (state, action: PayloadAction<string>) => {
       state.llmModel = action.payload;
+    },
+    setRetrievalStrategy: (state, action: PayloadAction<string>) => {
+      state.retrievalStrategy = action.payload;
     },
     setTriggerGetAgentDetails: (state, action: PayloadAction<number>) => {
       state.triggerGetAgentDetails = action.payload;
@@ -622,6 +627,7 @@ const agentSlice = createSlice({
       state.temperature = 0;
       state.welcomeMessage = "";
       state.llmModel = "";
+      state.retrievalStrategy = "simple";
       state.triggerGetAgentDetails = 0;
       state.triggerFetchAgentUrls = 0;
       state.triggerFetchAgentFiles = 0;
@@ -670,6 +676,7 @@ export const {
   setTemperature,
   setWelcomeMessage,
   setLlmModel,
+  setRetrievalStrategy,
   setTriggerGetAgentDetails,
   setTriggerFetchAgentUrls,
   setTriggerFetchAgentFiles,

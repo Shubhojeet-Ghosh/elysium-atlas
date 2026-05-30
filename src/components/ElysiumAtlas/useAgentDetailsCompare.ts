@@ -15,6 +15,9 @@ export function useCurrentAgentDetails() {
   const temperature = useAppSelector((state) => state.agent.temperature);
   const welcomeMessage = useAppSelector((state) => state.agent.welcomeMessage);
   const llmModel = useAppSelector((state) => state.agent.llmModel);
+  const retrievalStrategy = useAppSelector(
+    (state) => state.agent.retrievalStrategy,
+  );
   const knowledgeBaseLinks = useAppSelector(
     (state) => state.agent.knowledgeBaseLinks,
   );
@@ -46,6 +49,7 @@ export function useCurrentAgentDetails() {
       temperature,
       welcomeMessage,
       llmModel,
+      retrievalStrategy,
       knowledgeBaseLinks,
       knowledgeBaseFiles,
       knowledgeBaseText,
@@ -66,6 +70,7 @@ export function useCurrentAgentDetails() {
       temperature,
       welcomeMessage,
       llmModel,
+      retrievalStrategy,
       knowledgeBaseLinks,
       knowledgeBaseFiles,
       knowledgeBaseText,
