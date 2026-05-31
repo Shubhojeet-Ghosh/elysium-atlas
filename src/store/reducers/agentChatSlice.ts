@@ -2,9 +2,12 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface Message {
   message_id: string;
+  /** MongoDB _id — used for mark-chat-message-read API */
+  _id?: string;
   role: "user" | "agent" | "human";
   content: string;
   created_at: string;
+  read_at?: string | null;
 }
 
 interface GeoData {
@@ -113,6 +116,24 @@ const agentChatSlice = createSlice({
     addMessage: (state, action: PayloadAction<Message>) => {
       state.conversation_chain.push(action.payload);
     },
+    markChatMessageAsRead: (
+      state,
+      action: PayloadAction<{
+        _id?: string | null;
+        message_id?: string;
+        read_at: string;
+      }>,
+    ) => {
+      const { _id, message_id, read_at } = action.payload;
+      const message = state.conversation_chain.find(
+        (m) =>
+          (_id && m._id === _id) ||
+          (message_id && m.message_id === message_id),
+      );
+      if (message) {
+        message.read_at = read_at;
+      }
+    },
     setChatMode: (state, action: PayloadAction<"human" | "ai">) => {
       state.chatMode = action.payload;
     },
@@ -160,6 +181,7 @@ export const {
   setVisitorAt,
   setConversationChain,
   addMessage,
+  markChatMessageAsRead,
   setChatMode,
   setIsTyping,
   setInConversationWith,

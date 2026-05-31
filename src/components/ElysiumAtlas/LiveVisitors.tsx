@@ -5,20 +5,22 @@ import aiSocket from "@/lib/aiSocket";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
   setActiveVisitors,
-  addActiveVisitor,
-  removeActiveVisitor,
   updateActiveVisitorStatus,
+  reconnectActiveVisitorIfPresent,
   setCapturedSessions,
-  upsertActiveVisitor,
 } from "@/store/reducers/agentSlice";
-import { VISITORS_PER_PAGE } from "@/lib/config";
+import {
+  VISITOR_PAGE_SIZE_OPTIONS,
+  readVisitorsPageSize,
+  writeVisitorsPageSize,
+  type VisitorPageSize,
+} from "@/lib/config";
 import VisitorsList from "./VisitorsList";
 import TeamMemberConversationsPanel from "./TeamMemberConversationsPanel";
 import ConversationsHistoryPanel from "./ConversationsHistoryPanel";
 
 export default function LiveVisitors() {
   const dispatch = useAppDispatch();
-  const agentName = useAppSelector((state) => state.agent.agentName);
   const agentID = useAppSelector((state) => state.agent.agentID);
   const teamID = useAppSelector((state) => state.userProfile.teamID);
   const userID = useAppSelector((state) => state.userProfile.userID);
@@ -31,8 +33,56 @@ export default function LiveVisitors() {
   const [hasNext, setHasNext] = useState(false);
   const [hasPrev, setHasPrev] = useState(false);
   const [total, setTotal] = useState(0);
+  const [pageSize, setPageSize] = useState<VisitorPageSize>(() =>
+    readVisitorsPageSize(),
+  );
 
-  // Reset to page 1 when agent changes
+  const currentPageRef = useRef(currentPage);
+  currentPageRef.current = currentPage;
+  const pageSizeRef = useRef(pageSize);
+  pageSizeRef.current = pageSize;
+
+  const applyPagination = useCallback(
+    (payload: {
+      total: number;
+      page: number;
+      has_next: boolean;
+      has_prev: boolean;
+      size?: number;
+    }) => {
+      const limit = payload.size ?? pageSizeRef.current;
+      setCurrentPage(payload.page);
+      setTotal(payload.total);
+      setHasNext(payload.has_next);
+      setHasPrev(payload.has_prev);
+      setTotalPages(
+        payload.total > 0 ? Math.max(1, Math.ceil(payload.total / limit)) : 0,
+      );
+    },
+    [],
+  );
+
+  const refetchVisitorsPage = useCallback(
+    (page: number, limit = pageSizeRef.current) => {
+      if (!agentID) return;
+      aiSocket.emit("atlas-agent-visitors-list", {
+        agent_id: agentID,
+        page,
+        limit,
+      });
+    },
+    [agentID],
+  );
+
+  const handlePageSizeChange = useCallback(
+    (size: VisitorPageSize) => {
+      setPageSize(size);
+      writeVisitorsPageSize(size);
+      refetchVisitorsPage(1, size);
+    },
+    [refetchVisitorsPage],
+  );
+
   useEffect(() => {
     setCurrentPage(1);
   }, [agentID]);
@@ -75,7 +125,7 @@ export default function LiveVisitors() {
         user_id: userID,
         agent_id: agentID,
         page: 1,
-        limit: VISITORS_PER_PAGE,
+        limit: pageSizeRef.current,
       });
     };
 
@@ -95,11 +145,13 @@ export default function LiveVisitors() {
       has_prev: boolean;
     }) => {
       dispatch(setActiveVisitors(data.visitors ?? []));
-      setCurrentPage(data.page);
-      setTotal(data.total);
-      setHasNext(data.has_next);
-      setHasPrev(data.has_prev);
-      setTotalPages(Math.ceil(data.total / VISITORS_PER_PAGE));
+      applyPagination({
+        total: data.total,
+        page: data.page,
+        has_next: data.has_next,
+        has_prev: data.has_prev,
+        size: data.size,
+      });
     };
 
     aiSocket.on("agent_visitors_list", handleVisitorsList);
@@ -108,6 +160,12 @@ export default function LiveVisitors() {
       agent_id: string;
       chat_session_id: string;
       sid: string;
+      pagination?: {
+        total: number;
+        page?: number;
+        has_next?: boolean;
+        has_prev?: boolean;
+      };
     }) => {
       dispatch(
         updateActiveVisitorStatus({
@@ -115,20 +173,56 @@ export default function LiveVisitors() {
           status: "offline",
         }),
       );
-      setTotal((prev) => Math.max(0, prev - 1));
+
+      if (data.pagination) {
+        applyPagination({
+          total: data.pagination.total,
+          page: data.pagination.page ?? currentPageRef.current,
+          has_next: data.pagination.has_next ?? false,
+          has_prev: data.pagination.has_prev ?? false,
+        });
+      }
     };
 
     aiSocket.on("agent_visitor_disconnected", handleVisitorDisconnected);
 
+    const handlePaginationUpdated = (data: {
+      agent_id: string;
+      total: number;
+      page?: number;
+      has_next?: boolean;
+      has_prev?: boolean;
+    }) => {
+      const newPage = data.page ?? currentPageRef.current;
+      const pageChanged = newPage !== currentPageRef.current;
+
+      applyPagination({
+        total: data.total,
+        page: newPage,
+        has_next: data.has_next ?? false,
+        has_prev: data.has_prev ?? false,
+      });
+
+      // Only refetch when the backend moves us to a different page (e.g. last
+      // visitor on the current page left). Avoid refetch on the same page so
+      // disconnected visitors stay visible as offline in the table.
+      if (pageChanged) {
+        refetchVisitorsPage(newPage);
+      }
+    };
+
+    aiSocket.on("agent_visitors_pagination_updated", handlePaginationUpdated);
+
     const handleNewVisitor = (data: { agent_id: string; visitor: any }) => {
-      dispatch(upsertActiveVisitor(data.visitor));
-      setTotal((prev) => prev + 1);
+      const chatSessionId = data.visitor?.chat_session_id;
+      if (!chatSessionId) return;
+
+      dispatch(reconnectActiveVisitorIfPresent(data.visitor));
     };
 
     aiSocket.on("agent_new_visitor", handleNewVisitor);
 
     return () => {
-      // notify server that this team member disconnected
       aiSocket.emit("atlas-team-member-disconnected", {
         team_id: teamID,
         user_id: userID,
@@ -138,22 +232,18 @@ export default function LiveVisitors() {
       aiSocket.off("agent_visitors_list", handleVisitorsList);
       aiSocket.off("agent_visitor_disconnected", handleVisitorDisconnected);
       aiSocket.off("agent_new_visitor", handleNewVisitor);
-      // clear visitors and captured sessions from redux when leaving this view
+      aiSocket.off("agent_visitors_pagination_updated", handlePaginationUpdated);
       dispatch(setActiveVisitors([]));
       dispatch(setCapturedSessions([]));
       setSocket(null);
     };
-  }, [teamID, userID, agentID, dispatch]);
+  }, [teamID, userID, agentID, dispatch, applyPagination, refetchVisitorsPage]);
 
   const handlePageChange = useCallback(
     (page: number) => {
-      aiSocket.emit("atlas-agent-visitors-list", {
-        agent_id: agentID,
-        page,
-        limit: VISITORS_PER_PAGE,
-      });
+      refetchVisitorsPage(page);
     },
-    [agentID],
+    [refetchVisitorsPage],
   );
 
   return (
@@ -165,13 +255,13 @@ export default function LiveVisitors() {
           hasNext={hasNext}
           hasPrev={hasPrev}
           total={total}
+          pageSize={pageSize}
+          pageSizeOptions={VISITOR_PAGE_SIZE_OPTIONS}
           onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
         />
       </div>
 
-      {/* Shared bottom-right panel area:
-          ConversationsHistoryPanel is always the rightmost element.
-          Active chat boxes (TeamMemberConversationsPanel) grow to its left. */}
       <div className="fixed bottom-0 right-0.5 lg:right-6 z-50 flex flex-row-reverse items-end gap-3 pointer-events-none">
         <ConversationsHistoryPanel />
         <TeamMemberConversationsPanel inline />

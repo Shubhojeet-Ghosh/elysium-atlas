@@ -49,6 +49,11 @@ export default function ChatWithAgent() {
     // Mark as ready to render
     setIsReady(true);
 
+    // Standalone chat page (not embedded) — treat as always open
+    if (typeof window !== "undefined" && window.parent === window) {
+      dispatch(setIsAgentOpen(true));
+    }
+
     // Cleanup on unmount - reset state
     return () => {
       dispatch(resetAgentChat());

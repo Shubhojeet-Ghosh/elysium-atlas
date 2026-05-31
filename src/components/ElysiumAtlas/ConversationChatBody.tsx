@@ -4,20 +4,30 @@ import { useState, useRef, useEffect, useCallback, Fragment } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { ArrowUp } from "lucide-react";
 import aiSocket from "@/lib/aiSocket";
-import { useAppSelector, useAppDispatch } from "@/store";
+import { useAppSelector, useAppDispatch, store } from "@/store";
 import {
   addMessageToCapturedSession,
-  markSessionMessagesAsRead,
+  markCapturedMessageAsRead,
   updateConversationLogLastMessage,
   markConversationLogAsRead,
   incrementConversationLogUnread,
   type ConversationMessage,
 } from "@/store/reducers/agentSlice";
 import { formatChatTimestamp } from "@/utils/formatDate";
+import {
+  isVisitorMessageUnread,
+  findFirstUnreadSeparatorIndex,
+} from "@/utils/conversationMessageUtils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { createMarkdownComponents } from "@/utils/markdownComponents";
+import { useMarkMessagesReadWhenVisible } from "@/hooks/useMarkMessagesReadWhenVisible";
+import ReadReceiptMarker from "@/components/ElysiumAtlas/ReadReceiptMarker";
+import {
+  useChatScrollToUnreadOrBottom,
+  AGENT_UNREAD_SEPARATOR_VIEWPORT_RATIO,
+} from "@/hooks/useChatScrollToUnreadOrBottom";
 
 const conversationMarkdownComponents = createMarkdownComponents({
   codeTextColor: "#1e2939",
@@ -35,9 +45,12 @@ export default function ConversationChatBody({
   isVisible?: boolean;
 }) {
   const dispatch = useAppDispatch();
+  const userID = useAppSelector((state) => state.userProfile.userID);
   const [inputValue, setInputValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const separatorElRef = useRef<HTMLDivElement>(null);
   // Always holds the latest isVisible value — avoids stale closures in socket handlers
   const isVisibleRef = useRef(isVisible);
   useEffect(() => {
@@ -50,6 +63,12 @@ export default function ConversationChatBody({
       state.agent.captured_sessions.find(
         (s) => s.chat_session_id === chat_session_id,
       )?.conversation_chain ?? [],
+  );
+  const messagingUnreadCount = useAppSelector(
+    (state) =>
+      state.agent.team_member_conversation_logs.find(
+        (l) => l.chat_session_id === chat_session_id,
+      )?.unread_count ?? 0,
   );
 
   // Mirror chain in a ref so the isVisible effect can read it without re-running
@@ -67,29 +86,84 @@ export default function ConversationChatBody({
     separatorIndexRef.current = separatorIndex;
   }, [separatorIndex]);
 
-  // Auto-scroll to bottom whenever messages update
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [conversation_chain]);
-
-  // When panel re-expands, jump instantly to bottom (no animation)
-  // and mark all unread messages as read
-  useEffect(() => {
-    if (isVisible) {
-      // Snapshot the first unread position BEFORE marking as read so the
-      // separator stays visible while the panel is open (WhatsApp-style)
-      const firstUnread = conversationChainRef.current.findIndex(
-        (m) => m.is_read === false,
+  const handleVisitorMessageMarked = useCallback(
+    (messageId: string, readAt: string) => {
+      dispatch(
+        markCapturedMessageAsRead({
+          chat_session_id,
+          message_id: messageId,
+          read_at: readAt,
+        }),
       );
-      setSeparatorIndex(firstUnread); // -1 if no unread → no separator
-      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
-      dispatch(markSessionMessagesAsRead(chat_session_id));
-      dispatch(markConversationLogAsRead(chat_session_id));
-    } else {
-      // Clear separator when panel collapses so next re-open gets a fresh one
-      setSeparatorIndex(-1);
+
+      const chain =
+        store
+          .getState()
+          .agent.captured_sessions.find(
+            (s) => s.chat_session_id === chat_session_id,
+          )?.conversation_chain ?? [];
+
+      if (!chain.some(isVisitorMessageUnread)) {
+        dispatch(markConversationLogAsRead(chat_session_id));
+      }
+    },
+    [chat_session_id, dispatch],
+  );
+
+  const { markVisible: markVisitorMessageVisible, reset: resetReadReceipts } =
+    useMarkMessagesReadWhenVisible({
+      enabled: isVisible,
+      agent_id,
+      chat_session_id,
+      read_by: userID,
+      onMessageMarked: handleVisitorMessageMarked,
+    });
+
+  useEffect(() => {
+    if (!isVisible) {
+      resetReadReceipts();
     }
-  }, [isVisible]);
+  }, [isVisible, resetReadReceipts]);
+
+  const hasUnreadMessages =
+    separatorIndex >= 0 ||
+    findFirstUnreadSeparatorIndex(
+      conversation_chain,
+      messagingUnreadCount,
+    ) !== -1;
+
+  useChatScrollToUnreadOrBottom({
+    active: isVisible,
+    ready: conversation_chain.length > 0,
+    conversationLength: conversation_chain.length,
+    separatorIndex,
+    hasUnreadMessages,
+    scrollContainerRef,
+    separatorElRef,
+    messagesEndRef,
+    separatorViewportRatio: AGENT_UNREAD_SEPARATOR_VIEWPORT_RATIO,
+  });
+
+  // Snapshot "New" separator when panel opens or history finishes loading
+  useEffect(() => {
+    if (!isVisible) {
+      setSeparatorIndex(-1);
+      separatorIndexRef.current = -1;
+      resetReadReceipts();
+      return;
+    }
+
+    if (separatorIndexRef.current !== -1) return;
+
+    const firstUnread = findFirstUnreadSeparatorIndex(
+      conversation_chain,
+      messagingUnreadCount,
+    );
+    if (firstUnread === -1) return;
+
+    separatorIndexRef.current = firstUnread;
+    setSeparatorIndex(firstUnread);
+  }, [isVisible, conversation_chain, chat_session_id, messagingUnreadCount, resetReadReceipts]);
 
   // Listen for incoming visitor messages on this session
   useEffect(() => {
@@ -98,20 +172,21 @@ export default function ConversationChatBody({
       chat_session_id: string;
       message: string;
       sender: string;
+      message_id?: string;
     }) => {
       if (data.chat_session_id !== chat_session_id) return;
 
       const visitorMsgAt = new Date().toISOString();
+      const messageId = data.message_id ?? uuidv4();
 
       dispatch(
         addMessageToCapturedSession({
           chat_session_id,
           message: {
-            message_id: uuidv4(),
+            message_id: messageId,
             role: "user",
             content: data.message,
             created_at: visitorMsgAt,
-            is_read: isVisibleRef.current,
           },
         }),
       );
@@ -174,6 +249,7 @@ export default function ConversationChatBody({
           chat_session_id,
           last_message: msg,
           last_message_at: newMessage.created_at,
+          from_agent: true,
         }),
       );
 
@@ -213,7 +289,10 @@ export default function ConversationChatBody({
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       {/* ── Messages area ── */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto custom-scrollbar"
+      >
         <div className="flex flex-col min-h-full px-3 py-3">
           {/* Spacer pushes messages to the bottom, just like MainChatSpace */}
           <div className="flex-grow" />
@@ -233,6 +312,7 @@ export default function ConversationChatBody({
                   <Fragment key={msg.message_id}>
                     {index === separatorIndex && (
                       <div
+                        ref={separatorElRef}
                         key={`sep-${msg.message_id}`}
                         className="flex items-center gap-2 my-1 px-1"
                       >
@@ -243,6 +323,32 @@ export default function ConversationChatBody({
                         <div className="flex-1 h-px bg-serene-purple/40" />
                       </div>
                     )}
+                    {isVisitorMessageUnread(msg) ? (
+                      <ReadReceiptMarker
+                        messageId={msg.message_id}
+                        enabled={isVisible}
+                        scrollRootRef={scrollContainerRef}
+                        onVisible={markVisitorMessageVisible}
+                        className={`flex flex-col gap-0.5 items-start`}
+                      >
+                        <div
+                          className={`max-w-[80%] px-3 py-2 text-[13px] leading-relaxed font-[500] break-words bg-pure-mist text-gray-800 dark:text-gray-900 rounded-2xl rounded-bl-sm`}
+                        >
+                          <div className="prose prose-sm max-w-none [&_*]:text-inherit [&_a]:underline [&_a]:cursor-pointer">
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              rehypePlugins={[rehypeHighlight]}
+                              components={conversationMarkdownComponents}
+                            >
+                              {msg.content}
+                            </ReactMarkdown>
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-gray-400 dark:text-pure-mist px-1">
+                          {formatChatTimestamp(msg.created_at)}
+                        </span>
+                      </ReadReceiptMarker>
+                    ) : (
                     <div
                       className={`flex flex-col gap-0.5 ${
                         isTeamMember ? "items-end" : "items-start"
@@ -269,6 +375,7 @@ export default function ConversationChatBody({
                         {formatChatTimestamp(msg.created_at)}
                       </span>
                     </div>
+                    )}
                   </Fragment>
                 );
               })}

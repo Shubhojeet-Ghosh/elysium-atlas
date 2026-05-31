@@ -105,17 +105,18 @@ export default function ConversationsHistoryItem({
     }
   }, [isEditing]);
 
-  // Derive unread purely from the log so it persists even if
-  // the captured session entry is removed.
-  const hasUnread = log.is_unread || (log.unread_count ?? 0) > 0;
-
-  // Highlight this row when the conversation is currently captured (live chat),
-  // mirroring the VisitorsList table behavior.
-  const isCaptured = useAppSelector((state) =>
-    state.agent.captured_sessions.some(
+  // Derive unread from the log (API + live chat updates)
+  const capturedSession = useAppSelector((state) =>
+    state.agent.captured_sessions.find(
       (s) => s.chat_session_id === log.chat_session_id,
     ),
   );
+  const isCaptured = !!capturedSession;
+  const hideUnreadIndicators = capturedSession?.is_expanded ?? false;
+  const hasUnread =
+    !hideUnreadIndicators &&
+    (log.is_unread || (log.unread_count ?? 0) > 0);
+  const showUnreadCount = hasUnread && (log.unread_count ?? 0) > 0;
 
   const handleItemClick = () => {
     if (isEditing) return;
@@ -157,9 +158,11 @@ export default function ConversationsHistoryItem({
   return (
     <div
       className={`group flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
-        isCaptured
-          ? "bg-serene-purple/10 dark:bg-serene-purple/20"
-          : "hover:bg-gray-50 dark:hover:bg-white/5"
+        hasUnread
+          ? "bg-serene-purple hover:bg-serene-purple/90"
+          : isCaptured
+            ? "bg-serene-purple/10 dark:bg-serene-purple/20"
+            : "hover:bg-gray-50 dark:hover:bg-white/5"
       }`}
       onClick={handleItemClick}
     >
@@ -184,7 +187,13 @@ export default function ConversationsHistoryItem({
               )}
             </div>
             {log.status === "live" && (
-              <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-teal-green ring-2 ring-white dark:ring-deep-onyx" />
+              <span
+                className={`absolute bottom-0 right-0 w-2 h-2 rounded-full bg-teal-green ring-2 ${
+                  hasUnread
+                    ? "ring-serene-purple"
+                    : "ring-white dark:ring-deep-onyx"
+                }`}
+              />
             )}
           </div>
         </TooltipTrigger>
@@ -204,7 +213,7 @@ export default function ConversationsHistoryItem({
                   <span
                     className={`text-[14px] truncate ${
                       hasUnread
-                        ? "font-semibold text-deep-onyx dark:text-pure-mist"
+                        ? "font-semibold text-white"
                         : "font-normal text-gray-800 dark:text-gray-200"
                     }`}
                   >
@@ -247,7 +256,11 @@ export default function ConversationsHistoryItem({
                     commitAlias();
                   }}
                   aria-label="Save alias"
-                  className="shrink-0 p-0.5 rounded-full cursor-pointer text-serene-purple hover:text-serene-purple/80 dark:text-pure-mist"
+                  className={`shrink-0 p-0.5 rounded-full cursor-pointer ${
+                    hasUnread
+                      ? "text-white hover:text-white/80"
+                      : "text-serene-purple hover:text-serene-purple/80 dark:text-pure-mist"
+                  }`}
                 >
                   <Save className="w-3.5 h-3.5" />
                 </button>
@@ -259,7 +272,11 @@ export default function ConversationsHistoryItem({
                   }}
                   onMouseDown={(e) => e.stopPropagation()}
                   aria-label="Edit alias"
-                  className="shrink-0 p-0.5 rounded-full cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600 dark:hover:text-pure-mist"
+                  className={`shrink-0 p-0.5 rounded-full cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity ${
+                    hasUnread
+                      ? "text-white/80 hover:text-white"
+                      : "text-gray-400 hover:text-gray-600 dark:hover:text-pure-mist"
+                  }`}
                 >
                   <SquarePen className="w-3.5 h-3.5" />
                 </button>
@@ -267,7 +284,13 @@ export default function ConversationsHistoryItem({
           </div>
 
           {log.last_message_at && (
-            <span className="text-[12px] text-gray-400 dark:text-gray-500 shrink-0">
+            <span
+              className={`text-[12px] shrink-0 ${
+                hasUnread
+                  ? "text-white/80"
+                  : "text-gray-400 dark:text-gray-500"
+              }`}
+            >
               {formatSmartDateUTC(log.last_message_at)}
             </span>
           )}
@@ -277,7 +300,7 @@ export default function ConversationsHistoryItem({
           <p
             className={`text-[13px] truncate flex-1 min-w-0 ${
               hasUnread
-                ? "font-semibold text-deep-onyx dark:text-pure-mist"
+                ? "font-semibold text-white/90"
                 : "font-normal text-gray-500 dark:text-gray-400"
             }`}
           >
@@ -285,9 +308,14 @@ export default function ConversationsHistoryItem({
               ? stripMarkdown(log.last_message)
               : "No messages yet"}
           </p>
-          {hasUnread && (
-            <span className="shrink-0 w-2 h-2 rounded-full bg-serene-purple" />
-          )}
+          {hasUnread &&
+            (showUnreadCount ? (
+              <span className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-white text-serene-purple text-[10px] font-bold flex items-center justify-center">
+                {log.unread_count! > 99 ? "99+" : log.unread_count}
+              </span>
+            ) : (
+              <span className="shrink-0 w-2 h-2 rounded-full bg-white" />
+            ))}
         </div>
       </div>
     </div>

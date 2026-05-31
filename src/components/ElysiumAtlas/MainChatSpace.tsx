@@ -1,16 +1,24 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Fragment } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import {
   addMessage,
+  markChatMessageAsRead,
   setIsTyping,
   setInConversationWith,
   setGeoData,
 } from "@/store/reducers/agentChatSlice";
 import { useAiSocket, useAiSocketEvent } from "@/hooks/useAiSocket";
+import {
+  isIncomingMessageUnread,
+  findFirstIncomingUnreadSeparatorIndex,
+} from "@/utils/conversationMessageUtils";
+import { useMarkMessagesReadWhenVisible } from "@/hooks/useMarkMessagesReadWhenVisible";
+import ReadReceiptMarker from "@/components/ElysiumAtlas/ReadReceiptMarker";
+import { useChatScrollToUnreadOrBottom } from "@/hooks/useChatScrollToUnreadOrBottom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -37,6 +45,7 @@ export default function MainChatSpace() {
     isTyping,
     geoData,
     in_conversation_with,
+    isAgentOpen,
   } = useAppSelector((state) => state.agentChat);
 
   const dispatch = useAppDispatch();
@@ -47,6 +56,14 @@ export default function MainChatSpace() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const separatorElRef = useRef<HTMLDivElement>(null);
+  const [separatorIndex, setSeparatorIndex] = useState(-1);
+  const separatorIndexRef = useRef(-1);
+  /** True once we've snapshotted unread separator for this open session */
+  const separatorSnapshottedRef = useRef(false);
+  useEffect(() => {
+    separatorIndexRef.current = separatorIndex;
+  }, [separatorIndex]);
 
   // Refs read by the socket's onConnect callback so it always sees the
   // freshest values without re-subscribing.
@@ -57,6 +74,41 @@ export default function MainChatSpace() {
 
   // Ref-backed streaming buffer to avoid stale closures in the chunk handler.
   const streamingRef = useRef("");
+  const isAgentOpenRef = useRef(isAgentOpen);
+  useEffect(() => {
+    isAgentOpenRef.current = isAgentOpen;
+  }, [isAgentOpen]);
+
+  const handleIncomingMessageMarked = useCallback(
+    (message_id: string, readAt: string, mongoId?: string | null) => {
+      dispatch(
+        markChatMessageAsRead({
+          message_id,
+          _id: mongoId ?? null,
+          read_at: readAt,
+        }),
+      );
+    },
+    [dispatch],
+  );
+
+  const { markVisible: markIncomingMessageVisible, reset: resetReadReceipts } =
+    useMarkMessagesReadWhenVisible({
+      enabled: !isFetching && isAgentOpen,
+      agent_id,
+      chat_session_id,
+      onMessageMarked: handleIncomingMessageMarked,
+    });
+  const markIncomingMessageVisibleRef = useRef(markIncomingMessageVisible);
+  useEffect(() => {
+    markIncomingMessageVisibleRef.current = markIncomingMessageVisible;
+  }, [markIncomingMessageVisible]);
+
+  useEffect(() => {
+    if (!isAgentOpen) {
+      resetReadReceipts();
+    }
+  }, [isAgentOpen, resetReadReceipts]);
 
   // Open external links in the parent window (iframe-safe).
   useEffect(() => {
@@ -141,9 +193,10 @@ export default function MainChatSpace() {
   }>("atlas_response_chunk", (data) => {
     if (data.done) {
       const finalContent = data.full_response || streamingRef.current;
+      const messageId = data.message_id || uuidv4();
       dispatch(
         addMessage({
-          message_id: data.message_id || uuidv4(),
+          message_id: messageId,
           role: (data.role as "user" | "agent" | "human") || "agent",
           content: finalContent,
           created_at: data.created_at || new Date().toISOString(),
@@ -152,6 +205,13 @@ export default function MainChatSpace() {
       streamingRef.current = "";
       setStreamingMessage("");
       dispatch(setIsTyping(false));
+
+      // Visitor is already in chat — mark read immediately, no "New" separator
+      if (isAgentOpenRef.current) {
+        requestAnimationFrame(() => {
+          markIncomingMessageVisibleRef.current(messageId, null);
+        });
+      }
     } else {
       if (streamingRef.current === "") {
         dispatch(setIsTyping(false));
@@ -167,18 +227,37 @@ export default function MainChatSpace() {
     message: string;
     sender: string;
     in_conversation_with: string;
+    _id?: string;
+    message_id?: string;
+    role?: string;
+    created_at?: string;
   }>("visitor_message", (data) => {
     const role: "user" | "agent" | "human" =
-      data.sender === "team_member" ? "human" : "user";
+      data.sender === "team_member"
+        ? "human"
+        : ((data.role as "user" | "agent" | "human") ?? "user");
     dispatch(
       addMessage({
-        message_id: uuidv4(),
+        message_id: data.message_id ?? uuidv4(),
+        _id: data._id,
         role,
         content: data.message,
-        created_at: new Date().toISOString(),
+        created_at: data.created_at ?? new Date().toISOString(),
       }),
     );
     dispatch(setInConversationWith(data.in_conversation_with));
+
+    if (
+      (role === "human" || role === "agent") &&
+      isAgentOpenRef.current
+    ) {
+      const messageId = data.message_id ?? "";
+      if (messageId) {
+        requestAnimationFrame(() => {
+          markIncomingMessageVisibleRef.current(messageId, data._id ?? null);
+        });
+      }
+    }
   });
 
   useAiSocketEvent<{ in_conversation_with: string }>(
@@ -190,17 +269,55 @@ export default function MainChatSpace() {
     dispatch(setInConversationWith(null)),
   );
 
-  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
-    messagesEndRef.current?.scrollIntoView({ behavior });
-  };
-
   useEffect(() => {
-    if (!conversation_chain.length) return;
-    const lastRole = conversation_chain[conversation_chain.length - 1]?.role;
-    if (lastRole === "user" || lastRole === "human") {
-      scrollToBottom();
+    if (!isAgentOpen) {
+      resetReadReceipts();
     }
-  }, [conversation_chain]);
+  }, [isAgentOpen, resetReadReceipts]);
+
+  const hasUnreadMessages =
+    separatorIndex >= 0 ||
+    findFirstIncomingUnreadSeparatorIndex(conversation_chain) !== -1;
+
+  useChatScrollToUnreadOrBottom({
+    active: isAgentOpen,
+    ready: !isFetching && conversation_chain.length > 0,
+    conversationLength: conversation_chain.length,
+    separatorIndex,
+    hasUnreadMessages,
+    scrollContainerRef,
+    separatorElRef,
+    messagesEndRef,
+  });
+
+  // Reset separator when session changes
+  useEffect(() => {
+    setSeparatorIndex(-1);
+    separatorIndexRef.current = -1;
+    separatorSnapshottedRef.current = false;
+    resetReadReceipts();
+  }, [agent_id, chat_session_id, resetReadReceipts]);
+
+  // Snapshot "New" separator only when chat opens with existing unread history
+  useEffect(() => {
+    if (!isAgentOpen) {
+      setSeparatorIndex(-1);
+      separatorIndexRef.current = -1;
+      separatorSnapshottedRef.current = false;
+      resetReadReceipts();
+      return;
+    }
+
+    if (isFetching || conversation_chain.length === 0) return;
+    if (separatorSnapshottedRef.current) return;
+
+    separatorSnapshottedRef.current = true;
+    const firstUnread = findFirstIncomingUnreadSeparatorIndex(conversation_chain);
+    if (firstUnread === -1) return;
+
+    separatorIndexRef.current = firstUnread;
+    setSeparatorIndex(firstUnread);
+  }, [isAgentOpen, isFetching, conversation_chain, resetReadReceipts]);
 
   useEffect(() => {
     if (newMessageAnimating) {
@@ -209,9 +326,9 @@ export default function MainChatSpace() {
     }
   }, [newMessageAnimating]);
 
-  useEffect(() => {
-    if (!isFetching) scrollToBottom("auto");
-  }, [isFetching]);
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  };
 
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
@@ -314,15 +431,47 @@ export default function MainChatSpace() {
           ) : (
             <div className="pl-[18px] pr-[16px] font-[600] py-4 space-y-6">
               {conversation_chain.map((message, index) => (
-                <ChatMessage
-                  key={message.message_id}
-                  message={message}
-                  agent_id={agent_id}
-                  primary_color={primary_color}
-                  text_color={text_color}
-                  isLast={index === conversation_chain.length - 1}
-                  isAnimating={newMessageAnimating}
-                />
+                <Fragment key={message.message_id}>
+                  {index === separatorIndex && (
+                    <div
+                      ref={separatorElRef}
+                      className="flex items-center gap-2 my-1 px-1"
+                    >
+                      <div className="flex-1 h-px bg-gray-300" />
+                      <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+                        New
+                      </span>
+                      <div className="flex-1 h-px bg-gray-300" />
+                    </div>
+                  )}
+                  {isIncomingMessageUnread(message) && message.message_id ? (
+                    <ReadReceiptMarker
+                      messageId={message.message_id}
+                      mongoId={message._id ?? null}
+                      enabled={!isFetching && isAgentOpen}
+                      scrollRootRef={scrollContainerRef}
+                      onVisible={markIncomingMessageVisible}
+                    >
+                      <ChatMessage
+                        message={message}
+                        agent_id={agent_id}
+                        primary_color={primary_color}
+                        text_color={text_color}
+                        isLast={index === conversation_chain.length - 1}
+                        isAnimating={newMessageAnimating}
+                      />
+                    </ReadReceiptMarker>
+                  ) : (
+                    <ChatMessage
+                      message={message}
+                      agent_id={agent_id}
+                      primary_color={primary_color}
+                      text_color={text_color}
+                      isLast={index === conversation_chain.length - 1}
+                      isAnimating={newMessageAnimating}
+                    />
+                  )}
+                </Fragment>
               ))}
 
               {isTyping && !in_conversation_with && (

@@ -12,6 +12,7 @@ import {
   incrementConversationLogUnread,
 } from "@/store/reducers/agentSlice";
 import fastApiAxios from "@/utils/fastapi_axios";
+import { normalizeConversationMessage } from "@/utils/conversationMessageUtils";
 import aiSocket from "@/lib/aiSocket";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import ConversationChatHeader, {
@@ -57,11 +58,16 @@ function ChatBox({
         );
         const data = response.data;
         if (data.success === true) {
-          const messages = data.chat_session_data?.messages ?? [];
+          const rawMessages = data.chat_session_data?.messages ?? [];
+          const messages = Array.isArray(rawMessages)
+            ? rawMessages.map((m: Record<string, unknown>) =>
+                normalizeConversationMessage(m),
+              )
+            : [];
           dispatch(
             setConversationChainForSession({
               chat_session_id: session.chat_session_id,
-              conversation_chain: Array.isArray(messages) ? messages : [],
+              conversation_chain: messages,
             }),
           );
         }
@@ -213,6 +219,7 @@ export default function TeamMemberConversationsPanel({
       chat_session_id: string;
       message: string;
       sender: string;
+      message_id?: string;
     }) => {
       const session = capturedSessions.find(
         (s) => s.chat_session_id === data.chat_session_id,
@@ -225,11 +232,10 @@ export default function TeamMemberConversationsPanel({
         addMessageToCapturedSession({
           chat_session_id: data.chat_session_id,
           message: {
-            message_id: `${data.chat_session_id}-${visitorMsgAt}`,
+            message_id: data.message_id ?? `${data.chat_session_id}-${visitorMsgAt}`,
             role: "user",
             content: data.message,
             created_at: visitorMsgAt,
-            is_read: false,
           },
         }),
       );

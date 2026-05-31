@@ -12,6 +12,7 @@ import {
   type ActiveVisitor,
   type ConversationMessage,
 } from "@/store/reducers/agentSlice";
+import { isVisitorMessageUnread } from "@/utils/conversationMessageUtils";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { setCapturedSessionAlias } from "@/store/reducers/agentSlice";
 
@@ -134,7 +135,7 @@ export default function ConversationChatHeader({
     const s = state.agent.captured_sessions.find(
       (cs) => cs.chat_session_id === session.chat_session_id,
     );
-    return s?.conversation_chain.some((m) => m.is_read === false) ?? false;
+    return s?.conversation_chain.some(isVisitorMessageUnread) ?? false;
   });
 
   return (
@@ -218,7 +219,11 @@ export default function ConversationChatHeader({
                 commitAlias();
               }}
               aria-label="Save alias"
-              className="ml-2 p-1 rounded-full cursor-pointer transition-colors text-serene-purple hover:text-serene-purple/80 dark:text-pure-mist"
+              className={`ml-2 p-1 rounded-full cursor-pointer transition-colors ${
+                hasUnread
+                  ? "text-white hover:text-white/80"
+                  : "text-serene-purple hover:text-serene-purple/80 dark:text-pure-mist"
+              }`}
             >
               <Save className="w-4 h-4" />
             </button>
@@ -230,7 +235,11 @@ export default function ConversationChatHeader({
               }}
               onMouseDown={(e) => e.stopPropagation()}
               aria-label="Edit alias"
-              className="ml-2 p-1 rounded-full cursor-pointer text-gray-500 hover:text-gray-700 dark:hover:text-pure-mist transition-opacity opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+              className={`ml-2 p-1 rounded-full cursor-pointer transition-opacity opacity-100 lg:opacity-0 lg:group-hover:opacity-100 ${
+                hasUnread
+                  ? "text-white/80 hover:text-white"
+                  : "text-gray-500 hover:text-gray-700 dark:hover:text-pure-mist"
+              }`}
             >
               <SquarePen className="w-4 h-4" />
             </button>

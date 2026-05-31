@@ -19,7 +19,9 @@ export interface ConversationMessage {
   role: "user" | "agent" | "human";
   content: string;
   created_at: string;
+  /** @deprecated Prefer read_at — kept for backwards compatibility */
   is_read?: boolean;
+  read_at?: string | null;
 }
 
 export interface ActiveVisitor {
@@ -76,6 +78,7 @@ interface UserAgentState {
   triggerFetchAgentFiles: number;
   triggerFetchAgentCustomTexts: number;
   triggerFetchAgentQnA: number;
+  triggerFetchTeamMemberChatSessions: number;
   widget_script: string | null;
   agent_icon: string | null;
   primary_color: string;
@@ -112,6 +115,7 @@ const initialState: UserAgentState = {
   triggerFetchAgentFiles: 0,
   triggerFetchAgentCustomTexts: 0,
   triggerFetchAgentQnA: 0,
+  triggerFetchTeamMemberChatSessions: 0,
   widget_script: null,
   agent_icon: null,
   primary_color: "#fff",
@@ -121,6 +125,41 @@ const initialState: UserAgentState = {
   captured_sessions: [],
   team_member_conversation_logs: [],
 };
+
+function buildConversationLogFromSources(
+  state: UserAgentState,
+  chat_session_id: string,
+  overrides: Partial<TeamMemberConversationLog> = {},
+): TeamMemberConversationLog {
+  const captured = state.captured_sessions.find(
+    (s) => s.chat_session_id === chat_session_id,
+  );
+  const visitor = state.active_visitors.find(
+    (v) => v.chat_session_id === chat_session_id,
+  );
+  const source = captured ?? visitor;
+
+  return {
+    chat_session_id,
+    alias_name: overrides.alias_name ?? source?.alias_name ?? null,
+    agent_id: overrides.agent_id ?? source?.agent_id ?? state.agentID,
+    last_message: overrides.last_message ?? null,
+    last_message_at: overrides.last_message_at ?? null,
+    captured_at:
+      overrides.captured_at ??
+      captured?.captured_at ??
+      source?.last_connected_at ??
+      new Date().toISOString(),
+    ended_at: overrides.ended_at ?? null,
+    status:
+      overrides.status ??
+      (visitor?.status === "offline" ? "ended" : "live"),
+    unread_count: overrides.unread_count ?? 0,
+    is_unread: overrides.is_unread ?? false,
+    color: overrides.color ?? source?.color ?? "",
+    geo_data: overrides.geo_data ?? source?.geo_data ?? null,
+  };
+}
 
 const agentSlice = createSlice({
   name: "agent",
@@ -308,6 +347,9 @@ const agentSlice = createSlice({
     setTriggerFetchAgentQnA: (state, action: PayloadAction<number>) => {
       state.triggerFetchAgentQnA = action.payload;
     },
+    triggerFetchTeamMemberChatSessions: (state) => {
+      state.triggerFetchTeamMemberChatSessions += 1;
+    },
     setWidgetScript: (state, action: PayloadAction<string | null>) => {
       state.widget_script = action.payload;
     },
@@ -350,6 +392,27 @@ const agentSlice = createSlice({
             color: action.payload.color || "",
           },
         ];
+      }
+    },
+    reconnectActiveVisitorIfPresent: (
+      state,
+      action: PayloadAction<ActiveVisitor>,
+    ) => {
+      const existing = state.active_visitors.find(
+        (v) => v.chat_session_id === action.payload.chat_session_id,
+      );
+      if (!existing) return;
+
+      existing.status = "online";
+      existing.newly_joined = false;
+      if (action.payload.last_connected_at) {
+        existing.last_connected_at = action.payload.last_connected_at;
+      }
+      if (action.payload.alias_name != null) {
+        existing.alias_name = action.payload.alias_name;
+      }
+      if (action.payload.geo_data) {
+        existing.geo_data = action.payload.geo_data;
       }
     },
     setActiveVisitors: (state, action: PayloadAction<ActiveVisitor[]>) => {
@@ -462,14 +525,20 @@ const agentSlice = createSlice({
       if (session) session.is_expanded = false;
     },
     removeCapturedSession: (state, action: PayloadAction<string>) => {
+      const session = state.captured_sessions.find(
+        (s) => s.chat_session_id === action.payload,
+      );
       state.captured_sessions = state.captured_sessions.filter(
         (s) => s.chat_session_id !== action.payload,
       );
-      // when a captured session is removed, reset active visitor status back to online
       const visitor = state.active_visitors.find(
         (v) => v.chat_session_id === action.payload,
       );
-      if (visitor) visitor.status = "online";
+      if (visitor) {
+        const wasOffline =
+          visitor.status === "offline" || session?.status === "offline";
+        visitor.status = wasOffline ? "offline" : "online";
+      }
     },
     setCapturedSessions: (
       state,
@@ -502,9 +571,34 @@ const agentSlice = createSlice({
         (s) => s.chat_session_id === action.payload,
       );
       if (session) {
+        const readAt = new Date().toISOString();
         session.conversation_chain.forEach((m) => {
-          if (m.is_read === false) m.is_read = true;
+          if (m.role === "user" && !m.read_at) {
+            m.read_at = readAt;
+            m.is_read = true;
+          }
         });
+      }
+    },
+    markCapturedMessageAsRead: (
+      state,
+      action: PayloadAction<{
+        chat_session_id: string;
+        message_id: string;
+        read_at: string;
+      }>,
+    ) => {
+      const session = state.captured_sessions.find(
+        (s) => s.chat_session_id === action.payload.chat_session_id,
+      );
+      if (session) {
+        const message = session.conversation_chain.find(
+          (m) => m.message_id === action.payload.message_id,
+        );
+        if (message) {
+          message.read_at = action.payload.read_at;
+          message.is_read = true;
+        }
       }
     },
     setConversationChainForSession: (
@@ -529,7 +623,9 @@ const agentSlice = createSlice({
     },
     addOrUpdateConversationLog: (
       state,
-      action: PayloadAction<TeamMemberConversationLog>,
+      action: PayloadAction<
+        Partial<TeamMemberConversationLog> & { chat_session_id: string }
+      >,
     ) => {
       const idx = state.team_member_conversation_logs.findIndex(
         (l) => l.chat_session_id === action.payload.chat_session_id,
@@ -539,17 +635,23 @@ const agentSlice = createSlice({
         state.team_member_conversation_logs[idx] = {
           ...existing,
           ...action.payload,
-          // Preserve unread state unless explicitly overridden
           is_unread:
             action.payload.is_unread !== undefined
               ? action.payload.is_unread
-              : existing.is_unread ?? false,
+              : (existing.is_unread ?? false),
+          unread_count:
+            action.payload.unread_count !== undefined
+              ? action.payload.unread_count
+              : (existing.unread_count ?? 0),
         };
       } else {
-        state.team_member_conversation_logs.unshift({
-          ...action.payload,
-          is_unread: action.payload.is_unread ?? false,
-        });
+        state.team_member_conversation_logs.unshift(
+          buildConversationLogFromSources(state, action.payload.chat_session_id, {
+            ...action.payload,
+            is_unread: action.payload.is_unread ?? false,
+            unread_count: action.payload.unread_count ?? 0,
+          }),
+        );
       }
     },
     updateConversationLogLastMessage: (
@@ -558,19 +660,34 @@ const agentSlice = createSlice({
         chat_session_id: string;
         last_message: string | null;
         last_message_at: string | null;
+        /** When true, creates the log if missing (first agent message) */
+        from_agent?: boolean;
       }>,
     ) => {
       const idx = state.team_member_conversation_logs.findIndex(
         (l) => l.chat_session_id === action.payload.chat_session_id,
       );
-      if (idx !== -1) {
-        const log = state.team_member_conversation_logs[idx];
-        log.last_message = action.payload.last_message;
-        log.last_message_at = action.payload.last_message_at;
-        // Move this log to the front so active conversations bubble to the top
-        state.team_member_conversation_logs.splice(idx, 1);
-        state.team_member_conversation_logs.unshift(log);
+      if (idx === -1) {
+        if (!action.payload.from_agent) return;
+
+        state.team_member_conversation_logs.unshift(
+          buildConversationLogFromSources(
+            state,
+            action.payload.chat_session_id,
+            {
+              last_message: action.payload.last_message,
+              last_message_at: action.payload.last_message_at,
+            },
+          ),
+        );
+        return;
       }
+
+      const log = state.team_member_conversation_logs[idx];
+      log.last_message = action.payload.last_message;
+      log.last_message_at = action.payload.last_message_at;
+      state.team_member_conversation_logs.splice(idx, 1);
+      state.team_member_conversation_logs.unshift(log);
     },
     markConversationLogAsRead: (state, action: PayloadAction<string>) => {
       const log = state.team_member_conversation_logs.find(
@@ -585,10 +702,10 @@ const agentSlice = createSlice({
       const log = state.team_member_conversation_logs.find(
         (l) => l.chat_session_id === action.payload,
       );
-      if (log) {
-        log.unread_count = (log.unread_count ?? 0) + 1;
-        log.is_unread = true;
-      }
+      if (!log) return;
+
+      log.unread_count = (log.unread_count ?? 0) + 1;
+      log.is_unread = true;
     },
     setCapturedSessionAlias: (
       state,
@@ -633,6 +750,7 @@ const agentSlice = createSlice({
       state.triggerFetchAgentFiles = 0;
       state.triggerFetchAgentCustomTexts = 0;
       state.triggerFetchAgentQnA = 0;
+      state.triggerFetchTeamMemberChatSessions = 0;
       state.widget_script = null;
       state.agent_icon = null;
       state.primary_color = "#fff";
@@ -682,6 +800,7 @@ export const {
   setTriggerFetchAgentFiles,
   setTriggerFetchAgentCustomTexts,
   setTriggerFetchAgentQnA,
+  triggerFetchTeamMemberChatSessions,
   setWidgetScript,
   setAgentIcon,
   setPrimaryColor,
@@ -689,6 +808,7 @@ export const {
   setTextColor,
   addActiveVisitor,
   upsertActiveVisitor,
+  reconnectActiveVisitorIfPresent,
   setActiveVisitors,
   updateActiveVisitorStatus,
   removeActiveVisitor,
@@ -697,6 +817,7 @@ export const {
   setCapturedSessions,
   addMessageToCapturedSession,
   markSessionMessagesAsRead,
+  markCapturedMessageAsRead,
   setConversationChainForSession,
   setCapturedSessionAlias,
   expandCapturedSession,

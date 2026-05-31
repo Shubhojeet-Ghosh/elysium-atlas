@@ -7,8 +7,12 @@ interface VisitorsListProps {
   hasNext: boolean;
   hasPrev: boolean;
   total: number;
+  pageSize: number;
+  pageSizeOptions: readonly number[];
   onPageChange: (page: number) => void;
+  onPageSizeChange: (size: VisitorPageSize) => void;
 }
+import { type VisitorPageSize } from "@/lib/config";
 import {
   Table,
   TableBody,
@@ -18,7 +22,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import CustomInput from "@/components/inputs/CustomInput";
-import { ChevronLeft, ChevronRight, Search, Radio } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search } from "lucide-react";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { formatDateTime12hr } from "@/utils/formatDate";
 import Badge from "@/components/ui/Badge";
@@ -36,7 +47,10 @@ export default function VisitorsList({
   hasNext,
   hasPrev,
   total,
+  pageSize,
+  pageSizeOptions,
   onPageChange,
+  onPageSizeChange,
 }: VisitorsListProps) {
   const activeVisitors = useAppSelector((state) => state.agent.active_visitors);
   const agentID = useAppSelector((state) => state.agent.agentID);
@@ -46,8 +60,13 @@ export default function VisitorsList({
   const dispatch = useAppDispatch();
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [pageInput, setPageInput] = useState("1");
   const [showRightGradient, setShowRightGradient] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setPageInput(String(currentPage));
+  }, [currentPage]);
 
   // Filter by session ID or alias name
   const filteredVisitors = useMemo(() => {
@@ -156,14 +175,166 @@ export default function VisitorsList({
 
   const handlePageClick = (page: number) => onPageChange(page);
 
-  if (activeVisitors.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500 gap-3">
-        <Radio className="w-10 h-10 opacity-40" />
-        <p className="text-[13px]">No visitors are currently online</p>
+  const handleFirstPage = () => {
+    if (currentPage > 1) onPageChange(1);
+  };
+
+  const handleLastPage = () => {
+    const lastPage = Math.max(1, totalPages);
+    if (currentPage < lastPage) onPageChange(lastPage);
+  };
+
+  const commitPageJump = () => {
+    const parsed = parseInt(pageInput, 10);
+    if (Number.isNaN(parsed)) {
+      setPageInput(String(currentPage));
+      return;
+    }
+    const target = Math.min(Math.max(1, totalPages), Math.max(1, parsed));
+    setPageInput(String(target));
+    if (target !== currentPage) onPageChange(target);
+  };
+
+  const paginationBtnClass =
+    "p-1.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors";
+
+  const effectiveTotalPages = Math.max(1, totalPages);
+  const paginationDisabled = total === 0;
+
+  const paginationControls = (
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 mb-3">
+      <div className="flex items-center justify-end gap-1.5 flex-wrap">
+        <button
+          type="button"
+          onClick={handleFirstPage}
+          disabled={paginationDisabled || currentPage <= 1}
+          className={paginationBtnClass}
+          aria-label="First page"
+        >
+          <ChevronsLeft className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+        </button>
+        <button
+          type="button"
+          onClick={handlePreviousPage}
+          disabled={paginationDisabled || !hasPrev}
+          className={paginationBtnClass}
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+        </button>
+
+        <div className="flex items-center gap-1">
+          {Array.from({ length: effectiveTotalPages }, (_, i) => i + 1).map(
+            (page) => {
+            if (
+              page === 1 ||
+              page === effectiveTotalPages ||
+              (page >= currentPage - 1 && page <= currentPage + 1)
+            ) {
+              return (
+                <button
+                  type="button"
+                  key={page}
+                  onClick={() => handlePageClick(page)}
+                  disabled={paginationDisabled}
+                  className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors ${
+                    paginationDisabled
+                      ? "opacity-50 cursor-not-allowed border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+                      : "cursor-pointer"
+                  } ${
+                    !paginationDisabled && currentPage === page
+                      ? "bg-serene-purple text-white border-serene-purple"
+                      : !paginationDisabled
+                        ? "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        : ""
+                  }`}
+                >
+                  {page}
+                </button>
+              );
+            }
+            if (page === currentPage - 2 || page === currentPage + 2) {
+              return (
+                <span
+                  key={page}
+                  className="px-1 text-[11px] text-gray-400 dark:text-gray-500"
+                >
+                  ...
+                </span>
+              );
+            }
+            return null;
+          },
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={handleNextPage}
+          disabled={paginationDisabled || !hasNext}
+          className={paginationBtnClass}
+          aria-label="Next page"
+        >
+          <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+        </button>
+        <button
+          type="button"
+          onClick={handleLastPage}
+          disabled={paginationDisabled || currentPage >= effectiveTotalPages}
+          className={paginationBtnClass}
+          aria-label="Last page"
+        >
+          <ChevronsRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+        </button>
       </div>
-    );
-  }
+
+      <div className="flex items-center justify-end gap-2 text-[12px] text-gray-500 dark:text-gray-400">
+        <span className="whitespace-nowrap">Rows per page</span>
+        <Select
+          value={String(pageSize)}
+          onValueChange={(value) =>
+            onPageSizeChange(Number(value) as VisitorPageSize)
+          }
+        >
+          <SelectTrigger
+            aria-label="Rows per page"
+            className="h-9 w-[72px] border-[2px] border-gray-300 dark:border-deep-onyx rounded-[10px] bg-white dark:bg-deep-onyx text-[13px] font-[600] text-deep-onyx dark:text-pure-mist shadow-none focus-visible:border-serene-purple focus-visible:ring-serene-purple/30 px-2"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end">
+            {pageSizeOptions.map((option) => (
+              <SelectItem key={option} value={String(option)}>
+                {option}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex items-center justify-end gap-2 text-[12px] text-gray-500 dark:text-gray-400">
+        <span className="whitespace-nowrap">Go to</span>
+        <CustomInput
+          type="number"
+          min={1}
+          max={effectiveTotalPages}
+          value={pageInput}
+          onChange={(e) => setPageInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitPageJump();
+            }
+          }}
+          onBlur={commitPageJump}
+          disabled={paginationDisabled}
+          aria-label="Page number"
+          className="w-[52px] h-9 text-center text-[13px] py-2 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
+        />
+        <span className="whitespace-nowrap">of {effectiveTotalPages}</span>
+      </div>
+    </div>
+  );
 
   return (
     <div className="w-full mt-[12px] overflow-hidden">
@@ -183,229 +354,157 @@ export default function VisitorsList({
       </div>
 
       {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div className="flex justify-end mb-3">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePreviousPage}
-              disabled={!hasPrev}
-              className="p-1.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-            </button>
+      {paginationControls}
 
-            <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                (page) => {
-                  if (
-                    page === 1 ||
-                    page === totalPages ||
-                    (page >= currentPage - 1 && page <= currentPage + 1)
-                  ) {
-                    return (
-                      <button
-                        key={page}
-                        onClick={() => handlePageClick(page)}
-                        className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors cursor-pointer ${
-                          currentPage === page
-                            ? "bg-serene-purple text-white border-serene-purple"
-                            : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    );
-                  } else if (
-                    page === currentPage - 2 ||
-                    page === currentPage + 2
-                  ) {
-                    return (
-                      <span
-                        key={page}
-                        className="px-1 text-[11px] text-gray-400 dark:text-gray-500"
-                      >
-                        ...
-                      </span>
-                    );
-                  }
-                  return null;
-                },
-              )}
-            </div>
+      <div className="relative">
+        <div
+          ref={scrollContainerRef}
+          className="overflow-x-auto md:overflow-visible"
+        >
+          <div className="inline-block min-w-full align-middle">
+            <Table className="min-w-[400px] lg:min-w-full">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-[260px] max-w-[260px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
+                    Visitor
+                  </TableHead>
+                  <TableHead className="min-w-[120px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
+                    Status
+                  </TableHead>
+                  <TableHead className="w-[260px] max-w-[260px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
+                    Visitor At
+                  </TableHead>
+                  <TableHead className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
+                    Connected Since
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {currentVisitors.map((visitor, index) => {
+                  const displayName =
+                    visitor.alias_name || visitor.chat_session_id;
+                  const matchesName =
+                    searchTerm.trim() &&
+                    displayName
+                      ?.toLowerCase()
+                      .includes(searchTerm.toLowerCase());
 
-            <button
-              onClick={handleNextPage}
-              disabled={!hasNext}
-              className="p-1.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-              aria-label="Next page"
-            >
-              <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-            </button>
-          </div>
-        </div>
-      )}
+                  const isCaptured = capturedSessions.some(
+                    (s) => s.chat_session_id === visitor.chat_session_id,
+                  );
 
-      {filteredVisitors.length === 0 ? (
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-[12px]">
-          No visitors found matching &quot;{searchTerm}&quot;
-        </div>
-      ) : (
-        <div className="relative">
-          <div
-            ref={scrollContainerRef}
-            className="overflow-x-auto md:overflow-visible"
-          >
-            <div className="inline-block min-w-full align-middle">
-              <Table className="min-w-[400px] lg:min-w-full">
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-[260px] max-w-[260px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
-                      Visitor
-                    </TableHead>
-                    <TableHead className="min-w-[120px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
-                      Status
-                    </TableHead>
-                    <TableHead className="w-[260px] max-w-[260px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
-                      Visitor At
-                    </TableHead>
-                    <TableHead className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
-                      Connected Since
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {currentVisitors.map((visitor, index) => {
-                    const displayName =
-                      visitor.alias_name || visitor.chat_session_id;
-                    const matchesName =
-                      searchTerm.trim() &&
-                      displayName
-                        ?.toLowerCase()
-                        .includes(searchTerm.toLowerCase());
-
-                    const isCaptured = capturedSessions.some(
-                      (s) => s.chat_session_id === visitor.chat_session_id,
-                    );
-
-                    return (
-                      <TableRow
-                        key={visitor.sid || visitor.chat_session_id || index}
-                        onClick={() =>
-                          handleVisitorClick(visitor.chat_session_id)
-                        }
-                        className={`cursor-pointer border-b border-gray-100 dark:border-deep-onyx transition-all duration-200 ${
-                          isCaptured
-                            ? "bg-serene-purple/10 dark:bg-serene-purple/20"
-                            : "hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 hover:text-serene-purple dark:hover:text-serene-purple"
-                        }`}
-                      >
-                        {/* Visitor name / alias */}
-                        <TableCell className="font-medium py-4 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist w-[260px] min-w-[320px] max-w-[260px]">
-                          <span className="flex items-center gap-6">
-                            {/* Circular flag avatar */}
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="shrink-0 w-[34px] h-[34px] rounded-full overflow-hidden block cursor-pointer shadow-sm">
-                                  {visitor.geo_data?.country_flag ? (
-                                    <img
-                                      src={visitor.geo_data.country_flag}
-                                      alt={visitor.geo_data.country_name ?? ""}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <span className="w-full h-full flex items-center justify-center text-[11px] font-semibold text-black bg-pure-mist">
-                                      {visitor.chat_session_id
-                                        .slice(-2)
-                                        .toUpperCase()}
-                                    </span>
-                                  )}
-                                </span>
-                              </TooltipTrigger>
-                              {visitor.geo_data?.country_name && (
-                                <TooltipContent side="top">
-                                  {visitor.geo_data.country_name}
-                                </TooltipContent>
-                              )}
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="truncate max-w-[220px] overflow-hidden text-ellipsis">
-                                  {matchesName
-                                    ? highlightTruncated(
-                                        displayName,
-                                        searchTerm,
-                                      )
-                                    : truncateMiddle(displayName)}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">
-                                {displayName}
-                              </TooltipContent>
-                            </Tooltip>
-                            {visitor.newly_joined && (
-                              <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-teal-green/10 text-teal-green dark:bg-teal-green dark:text-pure-mist">
-                                new
+                  return (
+                    <TableRow
+                      key={visitor.sid || visitor.chat_session_id || index}
+                      onClick={() =>
+                        handleVisitorClick(visitor.chat_session_id)
+                      }
+                      className={`cursor-pointer border-b border-gray-100 dark:border-deep-onyx transition-all duration-200 ${
+                        isCaptured
+                          ? "bg-serene-purple/10 dark:bg-serene-purple/20"
+                          : "hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 hover:text-serene-purple dark:hover:text-serene-purple"
+                      }`}
+                    >
+                      {/* Visitor name / alias */}
+                      <TableCell className="font-medium py-4 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist w-[260px] min-w-[320px] max-w-[260px]">
+                        <span className="flex items-center gap-6">
+                          {/* Circular flag avatar */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="shrink-0 w-[34px] h-[34px] rounded-full overflow-hidden block cursor-pointer shadow-sm">
+                                {visitor.geo_data?.country_flag ? (
+                                  <img
+                                    src={visitor.geo_data.country_flag}
+                                    alt={visitor.geo_data.country_name ?? ""}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="w-full h-full flex items-center justify-center text-[11px] font-semibold text-black bg-pure-mist">
+                                    {visitor.chat_session_id
+                                      .slice(-2)
+                                      .toUpperCase()}
+                                  </span>
+                                )}
                               </span>
-                            )}
-                          </span>
-                        </TableCell>
-
-                        {/* Status pill */}
-                        <TableCell className="min-w-[120px] py-4 px-[10px] text-[14px] whitespace-nowrap">
-                          {visitor.status === "in-conversation" && (
-                            <Badge className="bg-serene-purple text-white">
-                              in conversation
-                            </Badge>
-                          )}
-                          {visitor.status === "online" && (
-                            <Badge>{visitor.status}</Badge>
-                          )}
-                          {visitor.status === "offline" && (
-                            <Badge className="bg-transparent border border-serene-purple !text-serene-purple dark:border-pure-mist dark:!text-pure-mist">
-                              {visitor.status}
-                            </Badge>
-                          )}
-                        </TableCell>
-
-                        {/* Visitor At (first 10 ... last 6, tooltip full url) */}
-                        <TableCell className="font-medium py-4 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist w-[260px] max-w-[260px]">
-                          {visitor.visitor_at ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="inline-block truncate max-w-[220px]">
-                                  {truncateVisitorAt(visitor.visitor_at)}
-                                </span>
-                              </TooltipTrigger>
+                            </TooltipTrigger>
+                            {visitor.geo_data?.country_name && (
                               <TooltipContent side="top">
-                                {visitor.visitor_at}
+                                {visitor.geo_data.country_name}
                               </TooltipContent>
-                            </Tooltip>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </TableCell>
+                            )}
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="truncate max-w-[220px] overflow-hidden text-ellipsis">
+                                {matchesName
+                                  ? highlightTruncated(
+                                      displayName,
+                                      searchTerm,
+                                    )
+                                  : truncateMiddle(displayName)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              {displayName}
+                            </TooltipContent>
+                          </Tooltip>
+                        </span>
+                      </TableCell>
 
-                        {/* Connected since */}
-                        <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-4 px-[10px] text-[14px] whitespace-nowrap text-gray-500 dark:text-gray-400">
-                          {visitor.last_connected_at
-                            ? formatDateTime12hr(visitor.last_connected_at)
-                            : "—"}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                      {/* Status pill */}
+                      <TableCell className="min-w-[120px] py-4 px-[10px] text-[14px] whitespace-nowrap">
+                        {visitor.status === "in-conversation" && (
+                          <Badge className="bg-serene-purple text-white">
+                            in conversation
+                          </Badge>
+                        )}
+                        {visitor.status === "online" && (
+                          <Badge>{visitor.status}</Badge>
+                        )}
+                        {visitor.status === "offline" && (
+                          <Badge className="bg-transparent border border-serene-purple !text-serene-purple dark:border-pure-mist dark:!text-pure-mist">
+                            {visitor.status}
+                          </Badge>
+                        )}
+                      </TableCell>
+
+                      {/* Visitor At (first 10 ... last 6, tooltip full url) */}
+                      <TableCell className="font-medium py-4 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist w-[260px] max-w-[260px]">
+                        {visitor.visitor_at ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-block truncate max-w-[220px]">
+                                {truncateVisitorAt(visitor.visitor_at)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              {visitor.visitor_at}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </TableCell>
+
+                      {/* Connected since */}
+                      <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-4 px-[10px] text-[14px] whitespace-nowrap text-gray-500 dark:text-gray-400">
+                        {visitor.last_connected_at
+                          ? formatDateTime12hr(visitor.last_connected_at)
+                          : "—"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </div>
-
-          {/* Right gradient for mobile horizontal scroll */}
-          {showRightGradient && (
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
-          )}
         </div>
-      )}
+
+        {/* Right gradient for mobile horizontal scroll */}
+        {showRightGradient && currentVisitors.length > 0 && (
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
+        )}
+      </div>
     </div>
   );
 }

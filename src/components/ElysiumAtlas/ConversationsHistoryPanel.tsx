@@ -1,24 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppSelector } from "@/store";
+import { useTeamMemberChatSessions } from "@/hooks/useTeamMemberChatSessions";
 import ConversationsHistoryHeader from "./ConversationsHistory/ConversationsHistoryHeader";
 import ConversationsHistoryBody from "./ConversationsHistory/ConversationsHistoryBody";
 
 export default function ConversationsHistoryPanel() {
+  const agentID = useAppSelector((state) => state.agent.agentID);
   const conversationLogs = useAppSelector(
     (state) => state.agent.team_member_conversation_logs,
   );
+  const { fetchSessions, page, hasNext, loading, initialLoaded } =
+    useTeamMemberChatSessions();
   const [isExpanded, setIsExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!isExpanded || !agentID) return;
+    fetchSessions(1, { replace: true });
+  }, [isExpanded, agentID, fetchSessions]);
 
   const totalUnread = conversationLogs.reduce(
     (acc, l) => acc + (l.unread_count ?? 0),
     0,
   );
 
-  // Drive header unread indicator purely from logs so it persists even if
-  // captured session entries are removed.
-  const hasCollapsedUnread = totalUnread > 0;
+  const hasCollapsedUnread = conversationLogs.some(
+    (l) => l.is_unread || (l.unread_count ?? 0) > 0,
+  );
 
   return (
     <div
@@ -33,7 +42,15 @@ export default function ConversationsHistoryPanel() {
         onToggle={() => setIsExpanded((v) => !v)}
       />
 
-      {isExpanded && <ConversationsHistoryBody />}
+      {isExpanded && (
+        <ConversationsHistoryBody
+          fetchSessions={fetchSessions}
+          page={page}
+          hasNext={hasNext}
+          loading={loading}
+          initialLoaded={initialLoaded}
+        />
+      )}
     </div>
   );
 }

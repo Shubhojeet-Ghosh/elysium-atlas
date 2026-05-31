@@ -1,116 +1,38 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import Cookies from "js-cookie";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Search } from "lucide-react";
 import CustomInput from "@/components/inputs/CustomInput";
 import type { TeamMemberConversationLog } from "@/store/reducers/agentSlice";
-import {
-  setTeamMemberConversationLogs,
-  addOrUpdateConversationLog,
-} from "@/store/reducers/agentSlice";
-import { useAppSelector, useAppDispatch } from "@/store";
-import fastApiAxios from "@/utils/fastapi_axios";
+import { useAppSelector } from "@/store";
 import ConversationsHistoryEmptyState from "./ConversationsHistoryEmptyState";
 import ConversationsHistoryItem from "./ConversationsHistoryItem";
 
-interface ApiResponseItem {
-  chat_session_id: string;
-  alias_name: string | null;
-  last_message_at: string | null;
-  visitor_online: boolean;
-  last_connected_at: string;
-  geo_data: {
-    country_name: string | null;
-    country_flag: string | null;
-    district: string | null;
-    ip: string | null;
-    time_zone: string | null;
-  } | null;
-  last_message: {
-    message_id: string;
-    role: string;
-    content: string;
-    created_at: string;
-  } | null;
+interface ConversationsHistoryBodyProps {
+  fetchSessions: (
+    pageNum: number,
+    options?: { replace?: boolean; silent?: boolean },
+  ) => Promise<void>;
+  page: number;
+  hasNext: boolean;
+  loading: boolean;
+  initialLoaded: boolean;
 }
 
-function mapToLog(
-  item: ApiResponseItem,
-  agentId: string,
-): TeamMemberConversationLog {
-  return {
-    chat_session_id: item.chat_session_id,
-    alias_name: item.alias_name,
-    agent_id: agentId,
-    last_message: item.last_message?.content ?? null,
-    last_message_at: item.last_message_at,
-    captured_at: item.last_connected_at,
-    ended_at: null,
-    status: item.visitor_online ? "live" : "ended",
-    unread_count: 0,
-    is_unread: false,
-    color: "",
-    geo_data: item.geo_data ?? null,
-  };
-}
-
-export default function ConversationsHistoryBody() {
-  const dispatch = useAppDispatch();
-  const agentID = useAppSelector((state) => state.agent.agentID);
+export default function ConversationsHistoryBody({
+  fetchSessions,
+  page,
+  hasNext,
+  loading,
+  initialLoaded,
+}: ConversationsHistoryBodyProps) {
   const conversationLogs = useAppSelector(
     (state) => state.agent.team_member_conversation_logs,
   );
 
-  const [page, setPage] = useState(1);
-  const [hasNext, setHasNext] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [initialLoaded, setInitialLoaded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-
   const sentinelRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  const fetchPage = useCallback(
-    async (pageNum: number) => {
-      if (!agentID) return;
-      const token = Cookies.get("elysium_atlas_session_token");
-      setLoading(true);
-      try {
-        const res = await fastApiAxios.post(
-          "/elysium-agents/atlas-team-members/team-member-chat-sessions",
-          { agent_id: agentID, page: pageNum, limit: 20 },
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
-        const { data, has_next } = res.data as {
-          data: ApiResponseItem[];
-          has_next: boolean;
-        };
-
-        const logs = data.map((item) => mapToLog(item, agentID));
-
-        if (pageNum === 1) {
-          dispatch(setTeamMemberConversationLogs(logs));
-        } else {
-          logs.forEach((log) => dispatch(addOrUpdateConversationLog(log)));
-        }
-
-        setHasNext(has_next);
-        setPage(pageNum);
-      } catch {
-        // silently ignore fetch errors
-      } finally {
-        setLoading(false);
-        if (pageNum === 1) setInitialLoaded(true);
-      }
-    },
-    [agentID, dispatch],
-  );
-
-  // Initial load
-  useEffect(() => {
-    fetchPage(1);
-  }, [fetchPage]);
 
   // Infinite scroll via IntersectionObserver
   useEffect(() => {
@@ -118,14 +40,14 @@ export default function ConversationsHistoryBody() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasNext && !loading) {
-          fetchPage(page + 1);
+          fetchSessions(page + 1);
         }
       },
       { root: scrollContainerRef.current, threshold: 0.1 },
     );
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [hasNext, loading, page, fetchPage]);
+  }, [hasNext, loading, page, fetchSessions]);
 
   const filteredLogs = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();

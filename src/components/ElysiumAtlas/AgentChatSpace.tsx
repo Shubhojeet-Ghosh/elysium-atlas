@@ -1,5 +1,5 @@
 import { useAppSelector, useAppDispatch } from "@/store";
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import ChatHeader from "./ChatHeader";
 import MainChatSpace from "./MainChatSpace";
 import ChatFooter from "./ChatFooter";
@@ -8,20 +8,24 @@ import {
   setAgentFields,
   setIsFetching,
   setConversationChain,
-  addMessage,
 } from "@/store/reducers/agentChatSlice";
-import { set } from "nprogress";
+import { normalizeVisitorChatMessage } from "@/utils/conversationMessageUtils";
 
 export default function AgentChatSpace() {
-  const { agent_id, chat_session_id, visitor_at } = useAppSelector(
+  const { agent_id, chat_session_id, visitor_at, isAgentOpen } = useAppSelector(
     (state) => state.agentChat,
   );
 
   const dispatch = useAppDispatch();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      dispatch(setIsFetching(true));
+  const fetchChatSession = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!agent_id || !chat_session_id) return;
+
+      if (!options?.silent) {
+        dispatch(setIsFetching(true));
+      }
+
       try {
         const payload = {
           agent_id: agent_id,
@@ -69,11 +73,17 @@ export default function AgentChatSpace() {
           );
 
           if (Array.isArray(sessionMessages) && sessionMessages.length > 0) {
-            dispatch(setConversationChain(sessionMessages));
+            dispatch(
+              setConversationChain(
+                sessionMessages.map((m: Record<string, unknown>) =>
+                  normalizeVisitorChatMessage(m),
+                ),
+              ),
+            );
           } else {
             const welcomeMessage = agentFields.welcome_message || "";
             if (welcomeMessage) {
-              dispatch(setConversationChain([])); // Ensure conversation chain is empty
+              dispatch(setConversationChain([]));
             }
           }
         } else {
@@ -82,14 +92,28 @@ export default function AgentChatSpace() {
       } catch (error) {
         console.error("Error fetching agent fields:", error);
       } finally {
-        dispatch(setIsFetching(false));
+        if (!options?.silent) {
+          dispatch(setIsFetching(false));
+        }
       }
-    };
+    },
+    [agent_id, chat_session_id, visitor_at, dispatch],
+  );
 
-    if (agent_id && chat_session_id) {
-      fetchData();
+  useEffect(() => {
+    fetchChatSession();
+  }, [fetchChatSession]);
+
+  // Re-fetch history when the visitor re-opens the widget after closing it
+  const prevAgentOpenRef = useRef(isAgentOpen);
+  useEffect(() => {
+    const wasOpen = prevAgentOpenRef.current;
+    prevAgentOpenRef.current = isAgentOpen;
+
+    if (isAgentOpen && !wasOpen && agent_id && chat_session_id) {
+      fetchChatSession({ silent: true });
     }
-  }, [agent_id, chat_session_id, visitor_at, dispatch]);
+  }, [isAgentOpen, agent_id, chat_session_id, fetchChatSession]);
 
   return (
     <>
