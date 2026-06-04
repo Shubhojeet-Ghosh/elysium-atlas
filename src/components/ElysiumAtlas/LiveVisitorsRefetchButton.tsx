@@ -32,12 +32,11 @@ export default function LiveVisitorsRefetchButton({
       disabled={!agentID}
       aria-label="Refresh live visitors"
       className={cn(
-        "flex items-center justify-center gap-1.5 px-[10px] py-[8px] rounded-[10px] border border-serene-purple text-serene-purple text-[13px] font-medium transition-all duration-200 cursor-pointer hover:bg-serene-purple/10 disabled:opacity-50 disabled:cursor-not-allowed",
+        "flex items-center justify-center px-[10px] py-[8px] rounded-[10px] border border-serene-purple text-serene-purple transition-all duration-200 cursor-pointer hover:bg-serene-purple/10 disabled:opacity-50 disabled:cursor-not-allowed",
         className,
       )}
     >
       <RefreshCw size={16} />
-      <span className="hidden sm:inline">Refresh</span>
     </button>
   );
 }

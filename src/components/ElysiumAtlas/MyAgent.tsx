@@ -7,7 +7,6 @@ import AgentDataSource, { AgentDataSourceTabs } from "./AgentDataSource";
 import AgentPersonalize from "./AgentPersonalize";
 import AgentLiveVisitors from "./AgentLiveVisitors";
 import AgentBackButton from "./AgentBackButton";
-import LiveVisitorsRefetchButton from "./LiveVisitorsRefetchButton";
 import AgentMainContent from "./AgentMainContent";
 import UnsavedChangesBar from "./UnsavedChangesBar";
 import { useCurrentAgentDetails } from "./useAgentDetailsCompare";
@@ -843,11 +842,6 @@ export default function MyAgent({
                   <p className="lg:block md:hidden hidden">Preview Agent</p>
                 </div>
               </PrimaryButton>
-            </div>
-          )}
-          {section === "live-visitors" && (
-            <div className="mt-[10px] flex items-center justify-end shrink-0">
-              <LiveVisitorsRefetchButton />
             </div>
           )}
         </div>

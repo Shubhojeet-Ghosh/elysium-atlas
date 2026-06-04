@@ -40,6 +40,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import LiveVisitorsRefetchButton from "./LiveVisitorsRefetchButton";
 
 export default function VisitorsList({
   currentPage,
@@ -288,60 +289,62 @@ export default function VisitorsList({
         </button>
       </div>
 
-      <div className="flex items-center justify-end gap-2 text-[12px] text-gray-500 dark:text-gray-400">
-        <span className="whitespace-nowrap">Rows per page</span>
-        <Select
-          value={String(pageSize)}
-          onValueChange={(value) =>
-            onPageSizeChange(Number(value) as VisitorPageSize)
-          }
-        >
-          <SelectTrigger
-            aria-label="Rows per page"
-            className="h-9 w-[72px] border-[2px] border-gray-300 dark:border-deep-onyx rounded-[10px] bg-white dark:bg-deep-onyx text-[13px] font-[600] text-deep-onyx dark:text-pure-mist shadow-none focus-visible:border-serene-purple focus-visible:ring-serene-purple/30 px-2"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent align="end">
-            {pageSizeOptions.map((option) => (
-              <SelectItem key={option} value={String(option)}>
-                {option}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex items-center justify-end gap-2 text-[12px] text-gray-500 dark:text-gray-400">
-        <span className="whitespace-nowrap">Go to</span>
-        <CustomInput
-          type="number"
-          min={1}
-          max={effectiveTotalPages}
-          value={pageInput}
-          onChange={(e) => setPageInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              commitPageJump();
+      <div className="flex items-center justify-between w-full sm:contents">
+        <div className="flex items-center gap-2 text-[12px] text-gray-500 dark:text-gray-400">
+          <span className="whitespace-nowrap">Rows per page</span>
+          <Select
+            value={String(pageSize)}
+            onValueChange={(value) =>
+              onPageSizeChange(Number(value) as VisitorPageSize)
             }
-          }}
-          onBlur={commitPageJump}
-          disabled={paginationDisabled}
-          aria-label="Page number"
-          className="w-[52px] h-9 text-center text-[13px] py-2 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
-        />
-        <span className="whitespace-nowrap">of {effectiveTotalPages}</span>
+          >
+            <SelectTrigger
+              aria-label="Rows per page"
+              className="h-9 w-[72px] border-[2px] border-gray-300 dark:border-deep-onyx rounded-[10px] bg-white dark:bg-deep-onyx text-[13px] font-[600] text-deep-onyx dark:text-pure-mist shadow-none focus-visible:border-serene-purple focus-visible:ring-serene-purple/30 px-2"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end">
+              {pageSizeOptions.map((option) => (
+                <SelectItem key={option} value={String(option)}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2 text-[12px] text-gray-500 dark:text-gray-400">
+          <span className="whitespace-nowrap">Go to</span>
+          <CustomInput
+            type="number"
+            min={1}
+            max={effectiveTotalPages}
+            value={pageInput}
+            onChange={(e) => setPageInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitPageJump();
+              }
+            }}
+            onBlur={commitPageJump}
+            disabled={paginationDisabled}
+            aria-label="Page number"
+            className="w-[52px] h-9 text-center text-[13px] py-2 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+          <span className="whitespace-nowrap">of {effectiveTotalPages}</span>
+        </div>
       </div>
     </div>
   );
 
   return (
     <div className="w-full mt-[12px] overflow-hidden">
-      {/* Header + Search */}
-      <div className="flex items-center justify-between mb-4 px-0">
-        <div className="lg:text-[16px] text-[14px] font-bold text-deep-onyx dark:text-pure-mist"></div>
-        <div className="relative lg:w-[300px] w-[220px]">
+      {/* Search + Refresh */}
+      <div className="flex items-center justify-end gap-2 mb-4 px-0">
+        <LiveVisitorsRefetchButton className="shrink-0" />
+        <div className="relative w-full max-w-[220px] lg:max-w-[300px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
           <CustomInput
             type="text"

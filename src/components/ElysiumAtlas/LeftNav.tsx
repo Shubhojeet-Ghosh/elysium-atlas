@@ -6,7 +6,7 @@ import ThemeToggle from "@/components/ElysiumAtlas/ThemeToggle";
 import NavItems from "@/components/ElysiumAtlas/NavItems";
 import AgentNavItems from "@/components/ElysiumAtlas/AgentNavItems";
 import { useDispatch, useSelector } from "react-redux";
-import { toggleLeftNav } from "@/store/reducers/settingsSlice";
+import { setLeftNavOpen, toggleLeftNav } from "@/store/reducers/settingsSlice";
 import { RootState } from "@/store";
 import {
   Tooltip,
@@ -30,16 +30,28 @@ export default function LeftNav() {
     dispatch(toggleLeftNav());
   };
 
+  const closeNav = () => {
+    dispatch(setLeftNavOpen(false));
+  };
+
   return (
-    <div
-      className={`fixed top-0 left-0 z-[100] transition-all duration-300 ${
-        !isOpen ? "w-0 lg:w-20" : "w-[280px]"
-      }`}
-    >
+    <>
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-[99] bg-black/50 dark:bg-black/70 backdrop-blur-[2px] lg:hidden"
+          onClick={closeNav}
+          aria-hidden="true"
+        />
+      )}
+      <div
+        className={`fixed top-0 left-0 z-[100] transition-all duration-300 ${
+          !isOpen ? "w-0 lg:w-20" : "w-[280px]"
+        }`}
+      >
       <div className="relative group h-full">
         <div
           className={`bg-white dark:bg-black flex flex-col items-center justify-between h-dvh transition-all duration-300 
-            px-4 py-2.5 border-r-2 border-gray-300 dark:border-gray-300 hover:border-serene-purple dark:hover:border-serene-purple
+            px-4 py-2.5 lg:border-r-2 lg:border-gray-300 lg:dark:border-gray-300 lg:hover:border-serene-purple lg:dark:hover:border-serene-purple
             ${isOpen ? "translate-x-0" : "-translate-x-full"}
             ${isOpen ? "w-[280px]" : "w-0 lg:w-20 overflow-hidden"}
             lg:translate-x-0`}
@@ -117,5 +129,6 @@ export default function LeftNav() {
         <TooltipContent side="right">Open navigation</TooltipContent>
       </Tooltip>
     </div>
+    </>
   );
 }
