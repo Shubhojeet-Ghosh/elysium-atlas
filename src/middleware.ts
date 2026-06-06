@@ -5,6 +5,9 @@ import type { NextRequest } from "next/server";
 const publicRoutes = [
   "/auth/login",
   "/auth/verify",
+  "/email/auth/login",
+  "/email/auth/register-user",
+  "/email/auth/register-department",
   "/", // Root page - adjust if this should be private
   "/chat-with-agent",
 ];
@@ -14,6 +17,25 @@ const privateRoutes = [
   "/my-agents",
   // Add more private routes here as needed
 ];
+
+const emailAuthPublicRoutes = [
+  "/email/auth/login",
+  "/email/auth/register-user",
+  "/email/auth/register-department",
+];
+
+function isEmailAuthPublicRoute(pathname: string): boolean {
+  return emailAuthPublicRoutes.some(
+    (route) => pathname === route || pathname.startsWith(route + "/"),
+  );
+}
+
+function isEmailProtectedRoute(pathname: string): boolean {
+  return (
+    pathname.startsWith("/email/") &&
+    !isEmailAuthPublicRoute(pathname)
+  );
+}
 
 // Check if a route is public
 function isPublicRoute(pathname: string): boolean {
@@ -34,6 +56,9 @@ export function middleware(request: NextRequest) {
   const cookieName = "elysium_atlas_session_token";
   const sessionToken = request.cookies.get(cookieName)?.value;
   const hasValidToken = sessionToken && sessionToken.trim() !== "";
+  const emailSessionToken = request.cookies.get("email-session-token")?.value;
+  const hasEmailSessionToken =
+    emailSessionToken && emailSessionToken.trim() !== "";
 
   // Get the origin from the request URL (includes protocol and host)
   const origin = new URL(request.url).origin;
@@ -44,11 +69,25 @@ export function middleware(request: NextRequest) {
     hasValidToken &&
     isPublicRoute(pathname) &&
     pathname !== "/" &&
-    pathname !== "/chat-with-agent"
+    pathname !== "/chat-with-agent" &&
+    pathname !== "/email/auth/login" &&
+    pathname !== "/email/auth/register-user" &&
+    pathname !== "/email/auth/register-department"
   ) {
     // Redirect authenticated users away from public pages to my-agents
     const myAgentsUrl = new URL("/my-agents", origin);
     return NextResponse.redirect(myAgentsUrl);
+  }
+
+  if (isEmailProtectedRoute(pathname) && !hasEmailSessionToken) {
+    const emailLoginUrl = new URL("/email/auth/login", origin);
+    emailLoginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(emailLoginUrl);
+  }
+
+  if (isEmailAuthPublicRoute(pathname) && hasEmailSessionToken) {
+    const aiAgentsUrl = new URL("/email/ai-agents", origin);
+    return NextResponse.redirect(aiAgentsUrl);
   }
 
   // Check if the route is private

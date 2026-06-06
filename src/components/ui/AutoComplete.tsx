@@ -8,6 +8,7 @@ import Image from "next/image";
 interface AutoCompleteItem {
   value: string;
   label: string;
+  selectedLabel?: string;
   icon?: string | null;
 }
 
@@ -91,7 +92,9 @@ export default function AutoComplete({
             />
           )}
           <span className={cn(!selectedItem && "text-muted-foreground")}>
-            {selectedItem ? selectedItem.label : placeholder}
+            {selectedItem
+              ? (selectedItem.selectedLabel ?? selectedItem.label)
+              : placeholder}
           </span>
         </div>
         <ChevronsUpDown className="h-4 w-4 opacity-50" />

@@ -11,6 +11,8 @@ import { userAgentsReducer } from "./reducers/userAgentsSlice";
 import { agentReducer } from "./reducers/agentSlice";
 import { agentChatReducer } from "./reducers/agentChatSlice";
 import { userPlanReducer } from "./reducers/userPlanSlice";
+import { emailUserReducer } from "./reducers/emailUserSlice";
+import { emailDepartmentsReducer } from "./reducers/emailDepartmentsSlice";
 
 // Noop storage logic to handle SSR issues
 const createNoopStorage = () => {
@@ -67,6 +69,16 @@ const userPlanPersistConfig = {
   storage: storage,
 };
 
+const emailUserPersistConfig = {
+  key: "emailUser",
+  storage: storage,
+};
+
+const emailDepartmentsPersistConfig = {
+  key: "emailDepartments",
+  storage: storage,
+};
+
 // Apply persistReducer to settings and userAgents
 const persistedSettingsReducer = persistReducer(
   settingsPersistConfig,
@@ -94,6 +106,14 @@ const persistedUserPlanReducer = persistReducer(
   userPlanPersistConfig,
   userPlanReducer,
 );
+const persistedEmailUserReducer = persistReducer(
+  emailUserPersistConfig,
+  emailUserReducer,
+);
+const persistedEmailDepartmentsReducer = persistReducer(
+  emailDepartmentsPersistConfig,
+  emailDepartmentsReducer,
+);
 
 // Configure Redux Store
 export const store = configureStore({
@@ -105,6 +125,8 @@ export const store = configureStore({
     agent: persistedAgentReducer,
     agentChat: persistedAgentChatReducer,
     userPlan: persistedUserPlanReducer,
+    emailUser: persistedEmailUserReducer,
+    emailDepartments: persistedEmailDepartmentsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

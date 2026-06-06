@@ -1,7 +1,7 @@
 // utils/fastapi_axios.ts
 import axios from "axios";
 
-const noAuthRoutes = ["/auth/login"];
+const noAuthRoutes = ["/auth/login", "/email-auth/v1/login"];
 
 // You can use a separate env variable for FastAPI base URL
 const fastApiAxios = axios.create({
