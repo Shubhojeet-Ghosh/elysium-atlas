@@ -55,9 +55,9 @@ export default function EmailTablePagination({
 
   return (
     <div
-      className={`flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 ${className}`}
+      className={`flex flex-row flex-nowrap items-center justify-end gap-2 overflow-x-auto ${className}`}
     >
-      <div className="flex items-center justify-end gap-1.5 flex-wrap">
+      <div className="flex items-center justify-end gap-1.5 flex-nowrap shrink-0">
           <button
             type="button"
             onClick={() => onPageChange(1)}
@@ -144,7 +144,7 @@ export default function EmailTablePagination({
           </button>
         </div>
 
-        <div className="flex items-center gap-2 text-[12px] text-gray-500">
+        <div className="flex items-center gap-2 text-[12px] text-gray-500 shrink-0">
           <span className="whitespace-nowrap">Go to</span>
           <CustomInput
             type="number"

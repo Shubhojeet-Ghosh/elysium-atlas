@@ -841,7 +841,7 @@ export default function EmailInbox() {
             </div>
 
             <div className="mt-4 flex min-h-0 flex-1 flex-col">
-              <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+              <div className="mb-3 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
                 {threadPagination && (
                   <EmailTablePagination
                     currentPage={threadPage}
@@ -850,21 +850,24 @@ export default function EmailInbox() {
                     hasPrev={threadPagination.has_prev}
                     total={threadPagination.total}
                     onPageChange={handleThreadPageChange}
+                    className="w-full sm:w-auto"
                   />
                 )}
-                <button
-                  type="button"
-                  onClick={handleRefresh}
-                  disabled={isLoadingThreads || isRefreshing || !teamID}
-                  aria-label="Refresh threads"
-                  className="inline-flex shrink-0 items-center justify-center h-9 w-9 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isRefreshing ? (
-                    <Spinner className="border-serene-purple h-4 w-4" />
-                  ) : (
-                    <RefreshCw size={16} className="text-gray-600" />
-                  )}
-                </button>
+                <div className="flex w-full justify-end sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={handleRefresh}
+                    disabled={isLoadingThreads || isRefreshing || !teamID}
+                    aria-label="Refresh threads"
+                    className="hidden sm:inline-flex shrink-0 items-center justify-center h-9 w-9 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isRefreshing ? (
+                      <Spinner className="border-serene-purple h-4 w-4" />
+                    ) : (
+                      <RefreshCw size={16} className="text-gray-600" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div className="min-h-0 flex-1 overflow-hidden">
