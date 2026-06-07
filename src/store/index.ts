@@ -13,6 +13,9 @@ import { agentChatReducer } from "./reducers/agentChatSlice";
 import { userPlanReducer } from "./reducers/userPlanSlice";
 import { emailUserReducer } from "./reducers/emailUserSlice";
 import { emailDepartmentsReducer } from "./reducers/emailDepartmentsSlice";
+import { emailKnowledgeReducer } from "./reducers/emailKnowledgeSlice";
+import { emailToolsReducer } from "./reducers/emailToolsSlice";
+import { emailRulesReducer } from "./reducers/emailRulesSlice";
 
 // Noop storage logic to handle SSR issues
 const createNoopStorage = () => {
@@ -79,6 +82,21 @@ const emailDepartmentsPersistConfig = {
   storage: storage,
 };
 
+const emailKnowledgePersistConfig = {
+  key: "emailKnowledge",
+  storage: storage,
+};
+
+const emailToolsPersistConfig = {
+  key: "emailTools",
+  storage: storage,
+};
+
+const emailRulesPersistConfig = {
+  key: "emailRules",
+  storage: storage,
+};
+
 // Apply persistReducer to settings and userAgents
 const persistedSettingsReducer = persistReducer(
   settingsPersistConfig,
@@ -114,6 +132,18 @@ const persistedEmailDepartmentsReducer = persistReducer(
   emailDepartmentsPersistConfig,
   emailDepartmentsReducer,
 );
+const persistedEmailKnowledgeReducer = persistReducer(
+  emailKnowledgePersistConfig,
+  emailKnowledgeReducer,
+);
+const persistedEmailToolsReducer = persistReducer(
+  emailToolsPersistConfig,
+  emailToolsReducer,
+);
+const persistedEmailRulesReducer = persistReducer(
+  emailRulesPersistConfig,
+  emailRulesReducer,
+);
 
 // Configure Redux Store
 export const store = configureStore({
@@ -127,6 +157,9 @@ export const store = configureStore({
     userPlan: persistedUserPlanReducer,
     emailUser: persistedEmailUserReducer,
     emailDepartments: persistedEmailDepartmentsReducer,
+    emailKnowledge: persistedEmailKnowledgeReducer,
+    emailTools: persistedEmailToolsReducer,
+    rules: persistedEmailRulesReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

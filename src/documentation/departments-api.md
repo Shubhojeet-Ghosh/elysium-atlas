@@ -13,6 +13,7 @@ For user registration and login, see [email-auth-login-api.md](./email-auth-logi
 ```
 
 **Example (local dev):**
+
 ```
 http://localhost:7000/elysium-agents
 ```
@@ -29,6 +30,10 @@ http://localhost:7000/elysium-agents
 ```
 
 Departments must exist **before** registering users. Each user is assigned a `department_id` at registration.
+
+For **LLM email routing** (which department owns an inbound thread), create rules per department via [email-routing-rules-api.md](./email-routing-rules-api.md).
+
+For **CC / BCC on AI replies** (when to add team members), see [email-recipient-rules-api.md](./email-recipient-rules-api.md).
 
 ---
 
@@ -94,11 +99,11 @@ No `Authorization` header required (prototype).
 }
 ```
 
-| Field | Type | Required | Rules |
-|-------|------|----------|-------|
-| `name` | string | Yes | Department name (min 1 char) |
-| `description` | string | Yes | Department description (min 1 char) |
-| `team_id` | string | Yes | Team this department belongs to |
+| Field         | Type   | Required | Rules                               |
+| ------------- | ------ | -------- | ----------------------------------- |
+| `name`        | string | Yes      | Department name (min 1 char)        |
+| `description` | string | Yes      | Department description (min 1 char) |
+| `team_id`     | string | Yes      | Team this department belongs to     |
 
 ### Success — `201 Created`
 
@@ -197,9 +202,9 @@ No `Authorization` header required (prototype).
 }
 ```
 
-| Field | Type | Required | Rules |
-|-------|------|----------|-------|
-| `team_id` | string | Yes | Team whose departments to list |
+| Field     | Type   | Required | Rules                          |
+| --------- | ------ | -------- | ------------------------------ |
+| `team_id` | string | Yes      | Team whose departments to list |
 
 ### Success — `200 OK`
 
@@ -236,11 +241,14 @@ Returns an empty `departments` array if the team has no departments yet.
 
 ```javascript
 async function listTeamDepartments(teamId) {
-  const res = await fetch(`${BASE}/email-departments/v1/list-team-departments`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ team_id: teamId }),
-  });
+  const res = await fetch(
+    `${BASE}/email-departments/v1/list-team-departments`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ team_id: teamId }),
+    },
+  );
 
   const data = await res.json();
   if (!res.ok || !data.success) {
@@ -279,9 +287,9 @@ Content-Type: application/json
 }
 ```
 
-| Field | Type | Required | Rules |
-|-------|------|----------|-------|
-| `team_id` | string | Yes | Team identifier (min 1 char) |
+| Field     | Type   | Required | Rules                        |
+| --------- | ------ | -------- | ---------------------------- |
+| `team_id` | string | Yes      | Team identifier (min 1 char) |
 
 ### Success — `200 OK`
 
@@ -318,14 +326,14 @@ Content-Type: application/json
 }
 ```
 
-| Response field | Description |
-|----------------|-------------|
-| `team_id` | The team you queried |
-| `count` | Number of users returned |
-| `users` | Array of user objects with department info |
-| `user_id` | Mongo `_id` of the user (string) |
-| `department_name` | From `email-departments` |
-| `department_description` | From `email-departments` |
+| Response field           | Description                                |
+| ------------------------ | ------------------------------------------ |
+| `team_id`                | The team you queried                       |
+| `count`                  | Number of users returned                   |
+| `users`                  | Array of user objects with department info |
+| `user_id`                | Mongo `_id` of the user (string)           |
+| `department_name`        | From `email-departments`                   |
+| `department_description` | From `email-departments`                   |
 
 **Empty team:** if no users exist for that `team_id`, you still get `200` with `"count": 0` and `"users": []`.
 
@@ -377,7 +385,11 @@ const teamId = "team_123";
 
 // 1. Create departments
 const salesDept = await createDepartment("Sales", "Sales inquiries", teamId);
-const supportDept = await createDepartment("Support", "Customer support", teamId);
+const supportDept = await createDepartment(
+  "Support",
+  "Customer support",
+  teamId,
+);
 
 // Optional: list all departments for the team
 const departments = await listTeamDepartments(teamId);
@@ -405,18 +417,18 @@ console.log(teamData.users);
 
 ## Quick reference
 
-| API | Method | Path | Body |
-|-----|--------|------|------|
-| Create department | `POST` | `/elysium-agents/email-departments/v1/create` | `{ name, description, team_id }` |
-| List team departments | `POST` | `/elysium-agents/email-departments/v1/list-team-departments` | `{ team_id }` |
-| List team users | `POST` | `/elysium-agents/email-auth/v1/list-team-users` | `{ team_id }` |
+| API                   | Method | Path                                                         | Auth | Body                             |
+| --------------------- | ------ | ------------------------------------------------------------ | ---- | -------------------------------- |
+| Create department     | `POST` | `/elysium-agents/email-departments/v1/create`                | No   | `{ name, description, team_id }` |
+| List team departments | `POST` | `/elysium-agents/email-departments/v1/list-team-departments` | No   | `{ team_id }`                    |
+| List team users       | `POST` | `/elysium-agents/email-auth/v1/list-team-users`              | No   | `{ team_id }`                    |
 
-| Collection | Purpose |
-|------------|---------|
-| `email-departments` | Department records per team (`_id` = `department_id`, `team_id`) |
-| `email-users` | User accounts with `team_id` + `department_id` |
-| `email-user-department-mapping` | User ↔ department mapping (auto on register) |
-| `email-gmail_accounts` | Connected Gmail inboxes (see gmail-oauth-setup.md) |
+| Collection                      | Purpose                                                          |
+| ------------------------------- | ---------------------------------------------------------------- |
+| `email-departments`             | Department records per team (`_id` = `department_id`, `team_id`) |
+| `email-users`                   | User accounts with `team_id` + `department_id`                   |
+| `email-user-department-mapping` | User ↔ department mapping (auto on register)                     |
+| `email-gmail_accounts`          | Connected Gmail inboxes (see gmail-oauth-setup.md)               |
 
 ---
 

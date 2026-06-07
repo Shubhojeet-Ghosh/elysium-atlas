@@ -21,6 +21,7 @@ interface AutoCompleteProps {
   onChange?: (value: string) => void;
   className?: string;
   searchPlaceholder?: string;
+  listMaxHeightClass?: string;
 }
 
 export default function AutoComplete({
@@ -32,6 +33,7 @@ export default function AutoComplete({
   onChange,
   className,
   searchPlaceholder = "Search...",
+  listMaxHeightClass = "max-h-[300px]",
 }: AutoCompleteProps) {
   const [open, setOpen] = useState(false);
   const [selectedValue, setSelectedValue] = useState(defaultValue);
@@ -118,7 +120,7 @@ export default function AutoComplete({
               />
             </div>
           </div>
-          <div className="max-h-[300px] overflow-y-auto p-1">
+          <div className={cn("overflow-y-auto p-1", listMaxHeightClass)}>
             {filteredItems.length === 0 ? (
               <div
                 className={cn(

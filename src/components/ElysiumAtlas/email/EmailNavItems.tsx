@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot, Inbox, Mail } from "lucide-react";
+import { Bot, Inbox, Mail, Route, Users, Workflow } from "lucide-react";
+import Badge from "@/components/ui/Badge";
 import {
   Tooltip,
   TooltipTrigger,
@@ -24,6 +25,24 @@ const navItems = [
     name: "Inbox",
     href: "/email/inbox",
     icon: Mail,
+  },
+  {
+    name: "Smart Routing",
+    href: "/email/routing-rules",
+    icon: Route,
+    showStarsIcon: true,
+  },
+  {
+    name: "Smart Recipients",
+    href: "/email/recipient-rules",
+    icon: Users,
+    showStarsIcon: true,
+  },
+  {
+    name: "Workflows",
+    href: "/email/workflows",
+    icon: Workflow,
+    badge: "Beta",
   },
 ] as const;
 
@@ -59,7 +78,28 @@ export default function EmailNavItems({ isCollapsed }: EmailNavItemsProps) {
               }`}
             />
             {!isCollapsed && (
-              <span className="text-sm font-medium truncate">{item.name}</span>
+              <span className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="text-sm font-medium truncate">{item.name}</span>
+                {"showStarsIcon" in item && item.showStarsIcon ? (
+                  <img
+                    src="/stars.svg"
+                    alt=""
+                    aria-hidden
+                    className={`h-3.5 w-3.5 shrink-0 ${
+                      isActive ? "brightness-0 invert" : "opacity-80"
+                    }`}
+                  />
+                ) : null}
+                {"badge" in item && item.badge ? (
+                  <Badge
+                    className={`uppercase tracking-wide ${
+                      isActive ? "bg-white/20 text-white" : ""
+                    }`}
+                  >
+                    {item.badge}
+                  </Badge>
+                ) : null}
+              </span>
             )}
           </Link>
         );
@@ -68,7 +108,11 @@ export default function EmailNavItems({ isCollapsed }: EmailNavItemsProps) {
           return (
             <Tooltip key={item.name}>
               <TooltipTrigger asChild>{itemContent}</TooltipTrigger>
-              <TooltipContent side="right">{item.name}</TooltipContent>
+              <TooltipContent side="right">
+                {"badge" in item && item.badge
+                  ? `${item.name} (${item.badge})`
+                  : item.name}
+              </TooltipContent>
             </Tooltip>
           );
         }

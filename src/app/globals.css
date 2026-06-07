@@ -136,6 +136,15 @@
   height: 3px !important;
 }
 
+.workflow-builder-canvas .react-flow__edge-path {
+  stroke: #6c5f8d;
+}
+
+.workflow-builder-canvas .react-flow__handle.connecting,
+.workflow-builder-canvas .react-flow__handle.valid {
+  background: #6c5f8d !important;
+}
+
 #nprogress .peg {
   box-shadow:
     0 0 10px #6c5f8d,

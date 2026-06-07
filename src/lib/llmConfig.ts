@@ -19,6 +19,16 @@ export const AVAILABLE_MODELS = [
       "https://cdn.sgdevstudio.in/assets/icons/llm_icons/openai_icon.svg",
   },
   {
+    model_code: "gpt-5.4",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/openai_icon.svg",
+  },
+  {
+    model_code: "gpt-5.5",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/openai_icon.svg",
+  },
+  {
     model_code: "claude-3-7-sonnet-latest",
     model_icon:
       "https://cdn.sgdevstudio.in/assets/icons/llm_icons/claude-icon.svg",
