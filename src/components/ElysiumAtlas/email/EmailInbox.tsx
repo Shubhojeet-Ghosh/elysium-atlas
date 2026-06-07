@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ChevronDown, RefreshCw } from "lucide-react";
+import { ArrowDownLeft, ArrowLeft, ArrowUpRight, ChevronDown, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import Spinner from "@/components/ui/Spinner";
 import {
@@ -10,24 +10,34 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { setEmailDepartments } from "@/store/reducers/emailDepartmentsSlice";
 import {
   getEmailThread,
   listTeamThreads,
+  sendThreadDraft,
+  type EmailAiAction,
   type EmailPagination,
   type EmailThread,
   type EmailThreadMessage,
   type EmailThreadSummary,
+  type EmailMessageDirection,
 } from "@/utils/emailAiAgentsApi";
 import { listTeamDepartments } from "@/utils/emailDepartmentsApi";
 import type { EmailDepartment } from "@/store/types/EmailDepartmentsTypes";
 import { formatDateTime12hr, formatSmartDateUTC } from "@/utils/formatDate";
 import EmailTablePagination from "@/components/ElysiumAtlas/email/EmailTablePagination";
 import EmailMessageHtmlBody from "@/components/ElysiumAtlas/email/EmailMessageHtmlBody";
+import EmailThreadDraftPanel from "@/components/ElysiumAtlas/email/EmailThreadDraftPanel";
 
 const THREADS_PAGE_SIZE = 20;
 const MESSAGES_PAGE_SIZE = 20;
+const INBOX_THREADS_POLL_INTERVAL_MS = 5000;
 const MESSAGE_AVATAR_SIZE_CLASS =
   "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[14px] font-medium text-white";
 
@@ -240,8 +250,14 @@ function threadFromSummary(
     has_unread: summary.has_unread,
     department_id: summary.department_id,
     assigned_user_id: summary.assigned_user_id,
+    action_required: summary.action_required,
+    ai_action: summary.ai_action,
     updated_at: "",
   };
+}
+
+function hasDraftReady(aiAction?: EmailAiAction | null): boolean {
+  return aiAction?.status === "draft_ready";
 }
 
 function formatGmailMessageTime(dateString: string): string {
@@ -310,15 +326,95 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+function getMessageAiHint(
+  message: EmailThreadMessage,
+  isTriggerMessage: boolean,
+): string | null {
+  if (message.direction === "outbound" && message.ai_reply?.assisted) {
+    if (message.ai_reply.mode === "auto") {
+      return "Sent using AI";
+    }
+    if (message.ai_reply.mode === "reviewed") {
+      return "Drafted by AI, sent by you";
+    }
+    return "AI-assisted reply";
+  }
+
+  if (
+    message.direction === "inbound" &&
+    (isTriggerMessage || message.ai_outcome?.type === "draft_created")
+  ) {
+    return "AI drafted a reply to this email";
+  }
+
+  return null;
+}
+
+function EmailMessageStarsIcon({ label }: { label: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          role="img"
+          aria-label={label}
+          className="inline-flex shrink-0 items-center"
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          <img
+            src="/stars.svg"
+            alt=""
+            aria-hidden
+            className="h-3.5 w-3.5 shrink-0 opacity-80"
+          />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-[260px] text-center">
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function EmailMessageDirectionIcon({
+  direction,
+}: {
+  direction: EmailMessageDirection;
+}) {
+  const isOutbound = direction === "outbound";
+  const label = isOutbound ? "Outbound" : "Inbound";
+  const Icon = isOutbound ? ArrowUpRight : ArrowDownLeft;
+  const colorClass = isOutbound ? "text-serene-purple" : "text-teal-green";
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          role="img"
+          aria-label={label}
+          className={`inline-flex shrink-0 items-center ${colorClass}`}
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          <Icon size={14} strokeWidth={2.25} />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 interface EmailThreadMessageItemProps {
   message: EmailThreadMessage;
   isExpanded: boolean;
+  isTriggerMessage?: boolean;
   onToggle: () => void;
 }
 
 function EmailThreadMessageItem({
   message,
   isExpanded,
+  isTriggerMessage = false,
   onToggle,
 }: EmailThreadMessageItemProps) {
   const sender = parseEmailAddress(message.from);
@@ -330,9 +426,14 @@ function EmailThreadMessageItem({
     bodyText.split("\n")[0] ||
     (bodyHtml ? stripHtml(bodyHtml) : "") ||
     "";
+  const aiHint = getMessageAiHint(message, isTriggerMessage);
 
   return (
-    <article className="border-b border-gray-200 px-2 py-3">
+    <article
+      className={`border-b border-gray-200 px-2 py-3 ${
+        isTriggerMessage ? "bg-serene-purple/10 border-l-2 border-l-serene-purple/50" : ""
+      }`}
+    >
       {!isExpanded ? (
         <button
           type="button"
@@ -357,12 +458,16 @@ function EmailThreadMessageItem({
             {snippet}
           </span>
 
-          <time
-            className="w-[72px] shrink-0 text-right text-[12px] text-gray-500 whitespace-nowrap"
-            dateTime={message.received_at}
-          >
-            {formatCollapsedTime(message.received_at)}
-          </time>
+          <div className="flex shrink-0 items-center justify-end gap-2">
+            {aiHint && <EmailMessageStarsIcon label={aiHint} />}
+            <EmailMessageDirectionIcon direction={message.direction} />
+            <time
+              className="text-right text-[12px] text-gray-500 whitespace-nowrap"
+              dateTime={message.received_at}
+            >
+              {formatCollapsedTime(message.received_at)}
+            </time>
+          </div>
         </button>
       ) : (
         <div className="flex items-start gap-3">
@@ -389,12 +494,16 @@ function EmailThreadMessageItem({
                 <EmailMessageRecipientsPopover message={message} />
               </div>
 
-              <time
-                className="shrink-0 text-[12px] text-gray-500 whitespace-nowrap"
-                dateTime={message.received_at}
-              >
-                {formatGmailMessageTime(message.received_at)}
-              </time>
+              <div className="flex shrink-0 items-center justify-end gap-2">
+                {aiHint && <EmailMessageStarsIcon label={aiHint} />}
+                <EmailMessageDirectionIcon direction={message.direction} />
+                <time
+                  className="text-[12px] text-gray-500 whitespace-nowrap"
+                  dateTime={message.received_at}
+                >
+                  {formatGmailMessageTime(message.received_at)}
+                </time>
+              </div>
             </div>
 
             <div className="mt-4 text-[14px] leading-relaxed text-gray-900 wrap-break-word">
@@ -417,12 +526,14 @@ interface EmailThreadDetailProps {
   teamId: string;
   thread: EmailThread;
   onBack: () => void;
+  onDraftSent?: () => void;
 }
 
 function EmailThreadDetail({
   teamId,
   thread,
   onBack,
+  onDraftSent,
 }: EmailThreadDetailProps) {
   const departments = useAppSelector(
     (state) => state.emailDepartments.departments,
@@ -440,6 +551,7 @@ function EmailThreadDetail({
   const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(
     new Set(),
   );
+  const [isSendingDraft, setIsSendingDraft] = useState(false);
 
   const loadThreadMessages = useCallback(
     async (page: number, append = false) => {
@@ -528,6 +640,35 @@ function EmailThreadDetail({
     has_unread: thread.has_unread,
     department_id: thread.department_id,
     assigned_user_id: thread.assigned_user_id,
+    action_required: thread.action_required,
+    ai_action: thread.ai_action,
+  };
+
+  const triggerMessageId = summary.ai_action?.trigger_message_id?.trim();
+  const showDraftPanel =
+    summary.action_required && hasDraftReady(summary.ai_action);
+
+  const handleSendDraft = async () => {
+    setIsSendingDraft(true);
+    try {
+      const data = await sendThreadDraft(teamId, thread.thread_id);
+
+      if (!data.success) {
+        throw new Error(data.message || "Failed to send draft.");
+      }
+
+      toast.success(data.message || "AI draft sent successfully.", {
+        position: "top-center",
+      });
+      await loadThreadMessages(1);
+      onDraftSent?.();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to send draft."), {
+        position: "top-center",
+      });
+    } finally {
+      setIsSendingDraft(false);
+    }
   };
 
   const departmentName = getDepartmentName(departments, summary.department_id);
@@ -588,9 +729,21 @@ function EmailThreadDetail({
                 key={message.message_id}
                 message={message}
                 isExpanded={expandedMessageIds.has(message.message_id)}
+                isTriggerMessage={
+                  Boolean(triggerMessageId) &&
+                  message.message_id === triggerMessageId
+                }
                 onToggle={() => toggleMessageExpanded(message.message_id)}
               />
             ))}
+
+            {showDraftPanel && summary.ai_action && (
+              <EmailThreadDraftPanel
+                aiAction={summary.ai_action}
+                isSending={isSendingDraft}
+                onSend={handleSendDraft}
+              />
+            )}
 
             {messagePagination?.has_next && (
               <div className="flex justify-center py-4">
@@ -662,18 +815,26 @@ export default function EmailInbox() {
   );
 
   const fetchThreads = useCallback(
-    async (page: number, showRefreshSpinner = false) => {
+    async (
+      page: number,
+      showRefreshSpinner = false,
+      silent = false,
+    ) => {
       if (!teamID) {
         setThreads([]);
         setThreadPagination(null);
-        setIsLoadingThreads(false);
+        if (!silent) {
+          setIsLoadingThreads(false);
+        }
         return;
       }
 
-      if (showRefreshSpinner) {
-        setIsRefreshing(true);
-      } else {
-        setIsLoadingThreads(true);
+      if (!silent) {
+        if (showRefreshSpinner) {
+          setIsRefreshing(true);
+        } else {
+          setIsLoadingThreads(true);
+        }
       }
 
       try {
@@ -687,14 +848,18 @@ export default function EmailInbox() {
         setThreadPagination(data.pagination || null);
         setThreadPage(data.pagination?.page || page);
       } catch (error) {
-        toast.error(getApiErrorMessage(error, "Failed to load inbox."), {
-          position: "top-center",
-        });
-        setThreads([]);
-        setThreadPagination(null);
+        if (!silent) {
+          toast.error(getApiErrorMessage(error, "Failed to load inbox."), {
+            position: "top-center",
+          });
+          setThreads([]);
+          setThreadPagination(null);
+        }
       } finally {
-        setIsLoadingThreads(false);
-        setIsRefreshing(false);
+        if (!silent) {
+          setIsLoadingThreads(false);
+          setIsRefreshing(false);
+        }
       }
     },
     [teamID],
@@ -727,6 +892,23 @@ export default function EmailInbox() {
   useEffect(() => {
     fetchThreads(1);
   }, [fetchThreads]);
+
+  const shouldPollInboxThreads =
+    Boolean(teamID) && !threadIdFromUrl && !selectedThread;
+
+  useEffect(() => {
+    if (!shouldPollInboxThreads) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      fetchThreads(threadPage, false, true);
+    }, INBOX_THREADS_POLL_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [shouldPollInboxThreads, threadPage, fetchThreads]);
 
   useEffect(() => {
     fetchTeamDepartments();
@@ -891,6 +1073,7 @@ export default function EmailInbox() {
                         const timestamp = thread.last_message_at
                           ? formatSmartDateUTC(thread.last_message_at)
                           : "—";
+                        const needsAttention = Boolean(thread.action_required);
 
                         return (
                           <button
@@ -898,7 +1081,11 @@ export default function EmailInbox() {
                             type="button"
                             onClick={() => handleSelectThread(thread)}
                             className={`grid w-full grid-cols-[minmax(120px,200px)_minmax(180px,1fr)_minmax(64px,96px)] items-center gap-3 border-b border-gray-100 px-3 py-2 text-left cursor-pointer transition-colors hover:bg-gray-50 ${
-                              thread.has_unread ? "bg-white" : "bg-gray-50/40"
+                              needsAttention
+                                ? "bg-serene-purple/10"
+                                : thread.has_unread
+                                  ? "bg-white"
+                                  : "bg-gray-50/40"
                             }`}
                           >
                             <span
@@ -914,13 +1101,18 @@ export default function EmailInbox() {
                             <span className="min-w-0 truncate text-[13px]">
                               <span
                                 className={
-                                  thread.has_unread
+                                  thread.has_unread || needsAttention
                                     ? "font-semibold text-deep-onyx"
                                     : "font-normal text-gray-800"
                                 }
                               >
                                 {subject}
                               </span>
+                              {needsAttention && (
+                                <span className="ml-2 inline-flex items-center rounded-full bg-serene-purple/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-serene-purple">
+                                  Needs your attention
+                                </span>
+                              )}
                               {snippet && (
                                 <span className="font-normal text-gray-500">
                                   {" "}
@@ -967,6 +1159,7 @@ export default function EmailInbox() {
               teamId={teamID}
               thread={selectedThread}
               onBack={handleBackToList}
+              onDraftSent={() => fetchThreads(threadPage, true)}
             />
           </div>
         )}

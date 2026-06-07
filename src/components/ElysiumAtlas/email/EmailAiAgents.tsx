@@ -33,6 +33,7 @@ import { useAppDispatch, useAppSelector } from "@/store";
 import { setEmailKnowledge } from "@/store/reducers/emailKnowledgeSlice";
 import { setEmailTools } from "@/store/reducers/emailToolsSlice";
 import { setEmailRules } from "@/store/reducers/emailRulesSlice";
+import { setEmailDepartments } from "@/store/reducers/emailDepartmentsSlice";
 import {
   createEmailAiAgent,
   getEmailAiAgent,
@@ -52,6 +53,7 @@ import { listTeamKnowledge } from "@/utils/emailKnowledgeApi";
 import { listTeamTools } from "@/utils/emailToolDefinitionsApi";
 import { listTeamEmailRoutingRules } from "@/utils/emailRoutingRulesApi";
 import { listTeamEmailRecipientRules } from "@/utils/emailRecipientRulesApi";
+import { listTeamDepartments } from "@/utils/emailDepartmentsApi";
 import { formatDateTime12hr } from "@/utils/formatDate";
 import { emailConfig } from "@/lib/emailConfig";
 import { AVAILABLE_MODELS } from "@/lib/llmConfig";
@@ -59,6 +61,7 @@ import EmailAgentReplyAction from "@/components/ElysiumAtlas/email/EmailAgentRep
 
 const DEFAULT_LLM_MODEL = AVAILABLE_MODELS[0]?.model_code ?? "gpt-4o-mini";
 const MAX_ATTACHED_RULES = 50;
+const MAX_EMAIL_FORMAT_TEMPLATE_LENGTH = 10000;
 const RECIPIENT_RULE_LABEL_LENGTH = 60;
 
 function truncateRuleLabel(text: string, maxLength = RECIPIENT_RULE_LABEL_LENGTH) {
@@ -75,6 +78,7 @@ type AgentSheetMode = "create" | "edit";
 function resetAgentFormState(setters: {
   setAgentName: (value: string) => void;
   setSystemPrompt: (value: string) => void;
+  setEmailFormatTemplate: (value: string) => void;
   setLlmModel: (value: string) => void;
   setSelectedKnowledgeId: (value: string) => void;
   setSelectedToolId: (value: string) => void;
@@ -86,6 +90,7 @@ function resetAgentFormState(setters: {
 }) {
   setters.setAgentName("");
   setters.setSystemPrompt("");
+  setters.setEmailFormatTemplate("");
   setters.setLlmModel(DEFAULT_LLM_MODEL);
   setters.setSelectedKnowledgeId("");
   setters.setSelectedToolId("");
@@ -101,6 +106,7 @@ function populateAgentFormFromDetails(
   setters: {
     setAgentName: (value: string) => void;
     setSystemPrompt: (value: string) => void;
+    setEmailFormatTemplate: (value: string) => void;
     setLlmModel: (value: string) => void;
     setSelectedKnowledgeId: (value: string) => void;
     setSelectedToolId: (value: string) => void;
@@ -115,6 +121,7 @@ function populateAgentFormFromDetails(
   setters.setSelectedInboxId(agent.gmail_account_id || "");
   setters.setLlmModel(agent.llm_model || DEFAULT_LLM_MODEL);
   setters.setSystemPrompt(agent.system_prompt || "");
+  setters.setEmailFormatTemplate(agent.email_format_template || "");
   setters.setSelectedKnowledgeId(agent.knowledge_id || "");
   setters.setSelectedToolId(agent.tool_ids?.[0] || "");
   setters.setReplyActionMode(
@@ -169,6 +176,7 @@ export default function EmailAiAgents() {
   const [isLoadingAgentDetails, setIsLoadingAgentDetails] = useState(false);
   const [agentName, setAgentName] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
+  const [emailFormatTemplate, setEmailFormatTemplate] = useState("");
   const [llmModel, setLlmModel] = useState(DEFAULT_LLM_MODEL);
   const [selectedKnowledgeId, setSelectedKnowledgeId] = useState("");
   const [selectedToolId, setSelectedToolId] = useState("");
@@ -341,12 +349,14 @@ export default function EmailAiAgents() {
         toolsData,
         routingData,
         recipientData,
+        departmentsData,
       ] = await Promise.all([
         listTeamGmailAccounts(teamID),
         listTeamKnowledge(teamID),
         listTeamTools(teamID),
         listTeamEmailRoutingRules(teamID, true),
         listTeamEmailRecipientRules(teamID),
+        listTeamDepartments(teamID),
       ]);
 
       if (inboxesData.success && Array.isArray(inboxesData.accounts)) {
@@ -386,6 +396,18 @@ export default function EmailAiAgents() {
               : [],
         }),
       );
+
+      if (
+        departmentsData.success &&
+        Array.isArray(departmentsData.departments)
+      ) {
+        dispatch(
+          setEmailDepartments({
+            teamID,
+            departments: departmentsData.departments,
+          }),
+        );
+      }
     } catch {
       // Leave existing local/Redux data unchanged on fetch failure.
     } finally {
@@ -405,6 +427,7 @@ export default function EmailAiAgents() {
   const formSetters = {
     setAgentName,
     setSystemPrompt,
+    setEmailFormatTemplate,
     setLlmModel,
     setSelectedKnowledgeId,
     setSelectedToolId,
@@ -495,6 +518,14 @@ export default function EmailAiAgents() {
       return;
     }
 
+    if (emailFormatTemplate.length > MAX_EMAIL_FORMAT_TEMPLATE_LENGTH) {
+      toast.error(
+        `Email format template must be ${MAX_EMAIL_FORMAT_TEMPLATE_LENGTH} characters or fewer.`,
+        { position: "top-center" },
+      );
+      return;
+    }
+
     if (!llmModel) {
       toast.error("Please select an LLM model.", { position: "top-center" });
       return;
@@ -534,6 +565,7 @@ export default function EmailAiAgents() {
               replyAction,
               selectedRoutingRuleIds,
               selectedRecipientRuleIds,
+              emailFormatTemplate,
             )
           : await createEmailAiAgent(
               agentName,
@@ -545,6 +577,7 @@ export default function EmailAiAgents() {
               replyAction,
               selectedRoutingRuleIds,
               selectedRecipientRuleIds,
+              emailFormatTemplate,
             );
 
       if (data.success) {
@@ -856,6 +889,32 @@ export default function EmailAiAgents() {
                 placeholder="Enter your system prompt here..."
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
+                rows={6}
+                resizable={true}
+                className="mt-[2px] min-h-[120px] w-full"
+              />
+            </div>
+
+            <div className="flex flex-col gap-[8px]">
+              <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
+                Email Format Template
+              </p>
+              <p className="text-[12px] text-gray-500 ml-[2px]">
+                Optional. Describe how reply emails should be structured — tone,
+                greeting, body layout, and sign-off.
+              </p>
+              <CustomTextareaPrimary
+                placeholder={`Use a professional tone.
+
+Greeting: Hi {customer_name},
+
+Body: 2-3 short paragraphs answering the question.
+
+Closing:
+Best regards,
+Support Team`}
+                value={emailFormatTemplate}
+                onChange={(e) => setEmailFormatTemplate(e.target.value)}
                 rows={6}
                 resizable={true}
                 className="mt-[2px] min-h-[120px] w-full"

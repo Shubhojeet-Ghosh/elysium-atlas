@@ -6,6 +6,53 @@ const EMAIL_SESSION_COOKIE = "email-session-token";
 export type EmailAgentSyncStatus = "idle" | "syncing" | "error";
 export type EmailMessageDirection = "inbound" | "outbound";
 export type EmailReplyActionMode = "draft" | "auto_send";
+export type EmailAiActionStatus = "draft_ready" | "resolved" | "superseded";
+
+export interface EmailAiActionRecipients {
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  cc_users?: Array<{ user_id: string; email: string; name: string }>;
+  bcc_users?: Array<{ user_id: string; email: string; name: string }>;
+  matched_recipient_rules?: Array<{
+    _id?: string;
+    rule_name: string;
+    cc: string[];
+    bcc: string[];
+  }>;
+}
+
+export interface EmailAiAction {
+  status: EmailAiActionStatus;
+  type: "draft";
+  flow_run_id?: string;
+  trigger_message_id?: string;
+  gmail_draft_id?: string;
+  gmail_draft_message_id?: string;
+  confidence?: number;
+  subject?: string;
+  body_text?: string;
+  recipients?: EmailAiActionRecipients;
+  created_at?: string;
+  resolved_at?: string | null;
+}
+
+export interface EmailAiOutcome {
+  type: "draft_created";
+  flow_run_id?: string;
+  gmail_draft_id?: string;
+  confidence?: number;
+  recipients?: EmailAiActionRecipients;
+}
+
+export interface EmailAiReply {
+  assisted: boolean;
+  mode: "reviewed" | "auto";
+  flow_run_id?: string;
+  agent_id?: string;
+  confidence?: number;
+  gmail_draft_id?: string;
+}
 
 export interface EmailReplyAction {
   mode: EmailReplyActionMode;
@@ -40,6 +87,7 @@ export interface EmailAiAgent {
   last_synced_at?: string | null;
   last_sync_error?: string | null;
   system_prompt?: string;
+  email_format_template?: string;
   knowledge_id?: string;
   tool_ids?: string[];
   llm_model?: string;
@@ -64,6 +112,8 @@ export interface EmailThread {
   has_unread: boolean;
   department_id?: string;
   assigned_user_id?: string;
+  action_required?: boolean;
+  ai_action?: EmailAiAction | null;
   updated_at: string;
 }
 
@@ -84,6 +134,11 @@ export interface EmailThreadMessage {
   received_at: string;
   is_unread?: boolean;
   label_ids?: string[];
+  processing_status?: string;
+  flow_run_id?: string;
+  processed_at?: string;
+  ai_outcome?: EmailAiOutcome;
+  ai_reply?: EmailAiReply;
   created_at?: string;
 }
 
@@ -95,6 +150,8 @@ export interface EmailThreadSummary {
   has_unread: boolean;
   department_id?: string;
   assigned_user_id?: string;
+  action_required?: boolean;
+  ai_action?: EmailAiAction | null;
 }
 
 export interface ListTeamEmailAiAgentsResponse {
@@ -121,6 +178,19 @@ export interface GetThreadResponse {
   count?: number;
   messages?: EmailThreadMessage[];
   pagination?: EmailPagination;
+}
+
+export interface SendThreadDraftResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    thread_id: string;
+    gmail_draft_id?: string;
+    gmail_message_id?: string;
+    gmail_thread_id?: string;
+    label_ids?: string[];
+    ai_action_status?: string;
+  };
 }
 
 export interface GetEmailAiAgentResponse {
@@ -155,6 +225,7 @@ export async function createEmailAiAgent(
   replyAction: EmailReplyAction = DEFAULT_REPLY_ACTION,
   routingRuleIds: string[] = [],
   recipientRuleIds: string[] = [],
+  emailFormatTemplate = "",
 ) {
   const response = await fastApiAxios.post(
     "/elysium-agents/email-ai-agents/v1/create",
@@ -162,6 +233,7 @@ export async function createEmailAiAgent(
       name: name.trim(),
       gmail_account_id: gmailAccountId,
       system_prompt: systemPrompt.trim(),
+      email_format_template: emailFormatTemplate.trim(),
       knowledge_id: knowledgeId,
       tool_ids: toolIds,
       llm_model: llmModel,
@@ -197,6 +269,7 @@ export async function updateEmailAiAgent(
   replyAction: EmailReplyAction = DEFAULT_REPLY_ACTION,
   routingRuleIds: string[] = [],
   recipientRuleIds: string[] = [],
+  emailFormatTemplate = "",
 ) {
   const response = await fastApiAxios.post(
     "/elysium-agents/email-ai-agents/v1/update",
@@ -205,6 +278,7 @@ export async function updateEmailAiAgent(
       name: name.trim(),
       gmail_account_id: gmailAccountId,
       system_prompt: systemPrompt.trim(),
+      email_format_template: emailFormatTemplate.trim(),
       knowledge_id: knowledgeId,
       tool_ids: toolIds,
       llm_model: llmModel,
@@ -272,4 +346,16 @@ export async function getEmailThread(
   );
 
   return response.data as GetThreadResponse;
+}
+
+export async function sendThreadDraft(teamId: string, threadId: string) {
+  const response = await fastApiAxios.post(
+    "/elysium-agents/email-ai-agents/v1/send-thread-draft",
+    { team_id: teamId, thread_id: threadId },
+    {
+      headers: getEmailAuthHeaders(),
+    },
+  );
+
+  return response.data as SendThreadDraftResponse;
 }

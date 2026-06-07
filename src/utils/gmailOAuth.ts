@@ -2,13 +2,28 @@ export const GMAIL_OAUTH_CODE_KEY = "gmail_oauth_code";
 export const GMAIL_OAUTH_STATE_KEY = "gmail_oauth_state";
 export const GMAIL_INBOX_NAME_DRAFT_KEY = "gmail_inbox_name_draft";
 
-const GMAIL_OAUTH_SCOPES = [
+/** Keep in sync with backend config/gmail_oauth_config.py */
+export const GMAIL_OAUTH_SCOPE_URLS = [
   "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.compose",
   "https://www.googleapis.com/auth/gmail.send",
   "openid",
   "email",
   "profile",
-].join(" ");
+] as const;
+
+const GMAIL_OAUTH_SCOPES = GMAIL_OAUTH_SCOPE_URLS.join(" ");
+
+/** Required Gmail scopes — all three must be granted on connect/reconnect. */
+const REQUIRED_GMAIL_SCOPES = [
+  "gmail.readonly",
+  "gmail.compose",
+  "gmail.send",
+] as const;
+
+function hasRequiredGmailScopes(grantedScope: string): boolean {
+  return REQUIRED_GMAIL_SCOPES.every((scope) => grantedScope.includes(scope));
+}
 
 export function getGmailOAuthRedirectUri(): string {
   if (process.env.NEXT_PUBLIC_GMAIL_OAUTH_REDIRECT_URI) {
@@ -69,6 +84,7 @@ export function handleGmailOAuthCallback(): GmailOAuthCallbackResult {
   const params = new URLSearchParams(window.location.search);
   const error = params.get("error");
   const code = params.get("code");
+  const grantedScope = params.get("scope");
   const returnedState = params.get("state");
 
   if (!error && !code) {
@@ -89,6 +105,14 @@ export function handleGmailOAuthCallback(): GmailOAuthCallbackResult {
 
   if (!code) {
     return { status: "none" };
+  }
+
+  if (grantedScope && !hasRequiredGmailScopes(grantedScope)) {
+    return {
+      status: "error",
+      message:
+        "Google did not grant all required Gmail permissions (read, compose, send). Please reconnect and approve every permission.",
+    };
   }
 
   const expectedState = sessionStorage.getItem(GMAIL_OAUTH_STATE_KEY);
