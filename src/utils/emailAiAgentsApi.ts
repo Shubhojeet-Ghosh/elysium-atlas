@@ -6,7 +6,13 @@ const EMAIL_SESSION_COOKIE = "email-session-token";
 export type EmailAgentSyncStatus = "idle" | "syncing" | "error";
 export type EmailMessageDirection = "inbound" | "outbound";
 export type EmailReplyActionMode = "draft" | "auto_send";
-export type EmailAiActionStatus = "draft_ready" | "resolved" | "superseded";
+export type EmailAiActionStatus =
+  | "draft_ready"
+  | "sent"
+  | "resolved"
+  | "superseded";
+export type EmailAiActionType = "draft" | "draft_fallback" | "auto_send";
+export type EmailAiOutcomeType = "draft_created" | "auto_sent";
 
 export interface EmailAiActionRecipients {
   to: string[];
@@ -24,12 +30,16 @@ export interface EmailAiActionRecipients {
 
 export interface EmailAiAction {
   status: EmailAiActionStatus;
-  type: "draft";
+  type: EmailAiActionType;
   flow_run_id?: string;
   trigger_message_id?: string;
   gmail_draft_id?: string;
   gmail_draft_message_id?: string;
+  gmail_message_id?: string;
   confidence?: number;
+  auto_send_min_confidence?: number;
+  threshold_met?: boolean;
+  fallback_reason?: string;
   subject?: string;
   body_text?: string;
   recipients?: EmailAiActionRecipients;
@@ -38,10 +48,14 @@ export interface EmailAiAction {
 }
 
 export interface EmailAiOutcome {
-  type: "draft_created";
+  type: EmailAiOutcomeType;
   flow_run_id?: string;
   gmail_draft_id?: string;
+  gmail_message_id?: string;
   confidence?: number;
+  auto_send_min_confidence?: number;
+  threshold_met?: boolean;
+  fallback_reason?: string;
   recipients?: EmailAiActionRecipients;
 }
 
@@ -52,6 +66,19 @@ export interface EmailAiReply {
   agent_id?: string;
   confidence?: number;
   gmail_draft_id?: string;
+  sender_email?: string;
+  sender_name?: string;
+}
+
+export type EmailAiStatusState = "processing" | "idle" | "failed";
+
+export interface EmailAiStatus {
+  current_status: EmailAiStatusState;
+  flow_run_id?: string;
+  trigger_message_id?: string;
+  started_at?: string;
+  updated_at?: string;
+  last_error?: string | null;
 }
 
 export interface EmailReplyAction {
@@ -76,6 +103,7 @@ export interface EmailPagination {
 export interface EmailAiAgent {
   agent_id: string;
   name: string;
+  flow_id?: string;
   gmail_account_id: string;
   user_id?: string;
   team_id?: string;
@@ -112,6 +140,8 @@ export interface EmailThread {
   has_unread: boolean;
   department_id?: string;
   assigned_user_id?: string;
+  is_ai_processing?: boolean;
+  ai_status?: EmailAiStatus | null;
   action_required?: boolean;
   ai_action?: EmailAiAction | null;
   updated_at: string;
@@ -150,6 +180,8 @@ export interface EmailThreadSummary {
   has_unread: boolean;
   department_id?: string;
   assigned_user_id?: string;
+  is_ai_processing?: boolean;
+  ai_status?: EmailAiStatus | null;
   action_required?: boolean;
   ai_action?: EmailAiAction | null;
 }
@@ -199,10 +231,24 @@ export interface GetEmailAiAgentResponse {
   agent?: EmailAiAgent;
 }
 
+export interface EmailAgentAttachConflictData {
+  flow_id?: string;
+  attached_agent_id?: string;
+  attached_agent_name?: string;
+}
+
+export interface CreateEmailAiAgentResponse {
+  success: boolean;
+  message?: string;
+  agent?: EmailAiAgent;
+  flow_synced?: boolean;
+}
+
 export interface UpdateEmailAiAgentResponse {
   success: boolean;
   message?: string;
   agent?: EmailAiAgent;
+  flow_synced?: boolean;
 }
 
 function getEmailAuthHeaders() {
@@ -220,12 +266,13 @@ export async function createEmailAiAgent(
   gmailAccountId: string,
   systemPrompt: string,
   llmModel: string,
-  knowledgeId: string,
+  knowledgeId = "",
   toolIds: string[],
   replyAction: EmailReplyAction = DEFAULT_REPLY_ACTION,
   routingRuleIds: string[] = [],
   recipientRuleIds: string[] = [],
   emailFormatTemplate = "",
+  flowId?: string,
 ) {
   const response = await fastApiAxios.post(
     "/elysium-agents/email-ai-agents/v1/create",
@@ -234,19 +281,20 @@ export async function createEmailAiAgent(
       gmail_account_id: gmailAccountId,
       system_prompt: systemPrompt.trim(),
       email_format_template: emailFormatTemplate.trim(),
-      knowledge_id: knowledgeId,
+      knowledge_id: knowledgeId.trim() || null,
       tool_ids: toolIds,
       llm_model: llmModel,
       reply_action: replyAction,
       routing_rule_ids: routingRuleIds,
       recipient_rule_ids: recipientRuleIds,
+      ...(flowId ? { flow_id: flowId } : {}),
     },
     {
       headers: getEmailAuthHeaders(),
     },
   );
 
-  return response.data;
+  return response.data as CreateEmailAiAgentResponse;
 }
 
 export async function getEmailAiAgent(agentId: string) {
@@ -264,12 +312,13 @@ export async function updateEmailAiAgent(
   gmailAccountId: string,
   systemPrompt: string,
   llmModel: string,
-  knowledgeId: string,
+  knowledgeId = "",
   toolIds: string[],
   replyAction: EmailReplyAction = DEFAULT_REPLY_ACTION,
   routingRuleIds: string[] = [],
   recipientRuleIds: string[] = [],
   emailFormatTemplate = "",
+  flowId?: string,
 ) {
   const response = await fastApiAxios.post(
     "/elysium-agents/email-ai-agents/v1/update",
@@ -279,12 +328,13 @@ export async function updateEmailAiAgent(
       gmail_account_id: gmailAccountId,
       system_prompt: systemPrompt.trim(),
       email_format_template: emailFormatTemplate.trim(),
-      knowledge_id: knowledgeId,
+      knowledge_id: knowledgeId.trim() || null,
       tool_ids: toolIds,
       llm_model: llmModel,
       reply_action: replyAction,
       routing_rule_ids: routingRuleIds,
       recipient_rule_ids: recipientRuleIds,
+      ...(flowId ? { flow_id: flowId } : {}),
     },
     {
       headers: getEmailAuthHeaders(),

@@ -466,7 +466,7 @@ One document = one Gmail inbox linked to one user.
 
 ### Troubleshooting: 403 insufficient scopes
 
-If the email flow fails at `save_gmail_draft` or (later) `send_email` with:
+If the email flow fails at `save_gmail_draft` or `send_email` with:
 
 ```text
 ACCESS_TOKEN_SCOPE_INSUFFICIENT

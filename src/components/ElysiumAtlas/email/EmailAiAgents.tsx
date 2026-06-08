@@ -34,6 +34,7 @@ import { setEmailKnowledge } from "@/store/reducers/emailKnowledgeSlice";
 import { setEmailTools } from "@/store/reducers/emailToolsSlice";
 import { setEmailRules } from "@/store/reducers/emailRulesSlice";
 import { setEmailDepartments } from "@/store/reducers/emailDepartmentsSlice";
+import { setEmailFlows } from "@/store/reducers/emailFlowsSlice";
 import {
   createEmailAiAgent,
   getEmailAiAgent,
@@ -54,6 +55,8 @@ import { listTeamTools } from "@/utils/emailToolDefinitionsApi";
 import { listTeamEmailRoutingRules } from "@/utils/emailRoutingRulesApi";
 import { listTeamEmailRecipientRules } from "@/utils/emailRecipientRulesApi";
 import { listTeamDepartments } from "@/utils/emailDepartmentsApi";
+import { listTeamEmailFlows } from "@/utils/emailFlowsApi";
+import { fetchTeamEmailFlowsForStore } from "@/utils/fetchTeamEmailFlowsStore";
 import { formatDateTime12hr } from "@/utils/formatDate";
 import { emailConfig } from "@/lib/emailConfig";
 import { AVAILABLE_MODELS } from "@/lib/llmConfig";
@@ -64,7 +67,10 @@ const MAX_ATTACHED_RULES = 50;
 const MAX_EMAIL_FORMAT_TEMPLATE_LENGTH = 10000;
 const RECIPIENT_RULE_LABEL_LENGTH = 60;
 
-function truncateRuleLabel(text: string, maxLength = RECIPIENT_RULE_LABEL_LENGTH) {
+function truncateRuleLabel(
+  text: string,
+  maxLength = RECIPIENT_RULE_LABEL_LENGTH,
+) {
   const trimmed = text.trim();
   if (trimmed.length <= maxLength) {
     return trimmed;
@@ -75,14 +81,30 @@ function truncateRuleLabel(text: string, maxLength = RECIPIENT_RULE_LABEL_LENGTH
 
 type AgentSheetMode = "create" | "edit";
 
+function resolveFlowIdForSave(
+  mode: AgentSheetMode,
+  selectedFlowId: string,
+  originalFlowId: string | null,
+): string | undefined {
+  const trimmed = selectedFlowId.trim();
+  if (mode === "create") {
+    return trimmed || undefined;
+  }
+  if (trimmed && trimmed !== (originalFlowId ?? "")) {
+    return trimmed;
+  }
+  return undefined;
+}
+
 function resetAgentFormState(setters: {
   setAgentName: (value: string) => void;
   setSystemPrompt: (value: string) => void;
   setEmailFormatTemplate: (value: string) => void;
   setLlmModel: (value: string) => void;
   setSelectedKnowledgeId: (value: string) => void;
-  setSelectedToolId: (value: string) => void;
+  setSelectedToolIds: (value: string[]) => void;
   setSelectedInboxId: (value: string) => void;
+  setSelectedFlowId: (value: string) => void;
   setReplyActionMode: (value: EmailReplyActionMode) => void;
   setAutoSendMinConfidence: (value: number) => void;
   setSelectedRoutingRuleIds: (value: string[]) => void;
@@ -93,10 +115,13 @@ function resetAgentFormState(setters: {
   setters.setEmailFormatTemplate("");
   setters.setLlmModel(DEFAULT_LLM_MODEL);
   setters.setSelectedKnowledgeId("");
-  setters.setSelectedToolId("");
+  setters.setSelectedToolIds([]);
   setters.setSelectedInboxId("");
+  setters.setSelectedFlowId("");
   setters.setReplyActionMode(DEFAULT_REPLY_ACTION.mode);
-  setters.setAutoSendMinConfidence(DEFAULT_REPLY_ACTION.auto_send_min_confidence);
+  setters.setAutoSendMinConfidence(
+    DEFAULT_REPLY_ACTION.auto_send_min_confidence,
+  );
   setters.setSelectedRoutingRuleIds([]);
   setters.setSelectedRecipientRuleIds([]);
 }
@@ -109,8 +134,9 @@ function populateAgentFormFromDetails(
     setEmailFormatTemplate: (value: string) => void;
     setLlmModel: (value: string) => void;
     setSelectedKnowledgeId: (value: string) => void;
-    setSelectedToolId: (value: string) => void;
+    setSelectedToolIds: (value: string[]) => void;
     setSelectedInboxId: (value: string) => void;
+    setSelectedFlowId: (value: string) => void;
     setReplyActionMode: (value: EmailReplyActionMode) => void;
     setAutoSendMinConfidence: (value: number) => void;
     setSelectedRoutingRuleIds: (value: string[]) => void;
@@ -119,11 +145,12 @@ function populateAgentFormFromDetails(
 ) {
   setters.setAgentName(agent.name || "");
   setters.setSelectedInboxId(agent.gmail_account_id || "");
+  setters.setSelectedFlowId(agent.flow_id || "");
   setters.setLlmModel(agent.llm_model || DEFAULT_LLM_MODEL);
   setters.setSystemPrompt(agent.system_prompt || "");
   setters.setEmailFormatTemplate(agent.email_format_template || "");
   setters.setSelectedKnowledgeId(agent.knowledge_id || "");
-  setters.setSelectedToolId(agent.tool_ids?.[0] || "");
+  setters.setSelectedToolIds(agent.tool_ids || []);
   setters.setReplyActionMode(
     agent.reply_action?.mode ?? DEFAULT_REPLY_ACTION.mode,
   );
@@ -167,6 +194,7 @@ export default function EmailAiAgents() {
   const teamTools = useAppSelector((state) => state.emailTools.tools);
   const routingRules = useAppSelector((state) => state.rules.routingRules);
   const recipientRules = useAppSelector((state) => state.rules.recipientRules);
+  const teamFlows = useAppSelector((state) => state.emailFlows.flows);
   const [agents, setAgents] = useState<EmailAiAgent[]>([]);
   const [isLoadingFormData, setIsLoadingFormData] = useState(false);
   const [isLoadingAgents, setIsLoadingAgents] = useState(true);
@@ -179,17 +207,19 @@ export default function EmailAiAgents() {
   const [emailFormatTemplate, setEmailFormatTemplate] = useState("");
   const [llmModel, setLlmModel] = useState(DEFAULT_LLM_MODEL);
   const [selectedKnowledgeId, setSelectedKnowledgeId] = useState("");
-  const [selectedToolId, setSelectedToolId] = useState("");
+  const [selectedToolIds, setSelectedToolIds] = useState<string[]>([]);
   const [selectedInboxId, setSelectedInboxId] = useState("");
+  const [selectedFlowId, setSelectedFlowId] = useState("");
+  const [originalFlowId, setOriginalFlowId] = useState<string | null>(null);
   const [replyActionMode, setReplyActionMode] = useState<EmailReplyActionMode>(
     DEFAULT_REPLY_ACTION.mode,
   );
   const [autoSendMinConfidence, setAutoSendMinConfidence] = useState(
     DEFAULT_REPLY_ACTION.auto_send_min_confidence,
   );
-  const [selectedRoutingRuleIds, setSelectedRoutingRuleIds] = useState<string[]>(
-    [],
-  );
+  const [selectedRoutingRuleIds, setSelectedRoutingRuleIds] = useState<
+    string[]
+  >([]);
   const [selectedRecipientRuleIds, setSelectedRecipientRuleIds] = useState<
     string[]
   >([]);
@@ -249,16 +279,18 @@ export default function EmailAiAgents() {
       label: tool.display_name,
     }));
 
-    if (selectedToolId && !items.some((item) => item.value === selectedToolId)) {
-      const currentTool = teamTools.find((tool) => tool.tool_id === selectedToolId);
-      items.unshift({
-        value: selectedToolId,
-        label: currentTool?.display_name || selectedToolId,
-      });
-    }
+    selectedToolIds.forEach((toolId) => {
+      if (!items.some((item) => item.value === toolId)) {
+        const currentTool = teamTools.find((tool) => tool.tool_id === toolId);
+        items.unshift({
+          value: toolId,
+          label: currentTool?.display_name || toolId,
+        });
+      }
+    });
 
     return items;
-  }, [activeTeamTools, teamTools, selectedToolId]);
+  }, [activeTeamTools, teamTools, selectedToolIds]);
 
   const routingRuleAutoCompleteItems = useMemo(() => {
     const selectableRules = routingRules.filter(
@@ -310,6 +342,44 @@ export default function EmailAiAgents() {
     return items;
   }, [recipientRules, selectedRecipientRuleIds]);
 
+  const workflowAutoCompleteItems = useMemo(() => {
+    const items = teamFlows
+      .filter((flow) => {
+        if (!flow.is_attached || !flow.attached_agent_id?.trim()) {
+          return true;
+        }
+        if (
+          sheetMode === "edit" &&
+          editingAgentId &&
+          flow.attached_agent_id === editingAgentId
+        ) {
+          return true;
+        }
+        return false;
+      })
+      .map((flow) => ({
+        value: flow.flow_id,
+        label: flow.summary ? `${flow.name} — ${flow.summary}` : flow.name,
+        selectedLabel: flow.name,
+      }));
+
+    if (
+      selectedFlowId &&
+      !items.some((item) => item.value === selectedFlowId)
+    ) {
+      const currentFlow = teamFlows.find(
+        (flow) => flow.flow_id === selectedFlowId,
+      );
+      items.unshift({
+        value: selectedFlowId,
+        label: currentFlow?.name || selectedFlowId,
+        selectedLabel: currentFlow?.name || selectedFlowId,
+      });
+    }
+
+    return items;
+  }, [teamFlows, sheetMode, editingAgentId, selectedFlowId]);
+
   const fetchAgents = useCallback(async () => {
     if (!teamID) {
       setAgents([]);
@@ -350,6 +420,7 @@ export default function EmailAiAgents() {
         routingData,
         recipientData,
         departmentsData,
+        flowsData,
       ] = await Promise.all([
         listTeamGmailAccounts(teamID),
         listTeamKnowledge(teamID),
@@ -357,6 +428,7 @@ export default function EmailAiAgents() {
         listTeamEmailRoutingRules(teamID, true),
         listTeamEmailRecipientRules(teamID),
         listTeamDepartments(teamID),
+        listTeamEmailFlows(teamID),
       ]);
 
       if (inboxesData.success && Array.isArray(inboxesData.accounts)) {
@@ -365,7 +437,10 @@ export default function EmailAiAgents() {
         setTeamInboxes([]);
       }
 
-      if (knowledgeData.success && Array.isArray(knowledgeData.knowledge_items)) {
+      if (
+        knowledgeData.success &&
+        Array.isArray(knowledgeData.knowledge_items)
+      ) {
         dispatch(
           setEmailKnowledge({
             teamID,
@@ -408,6 +483,15 @@ export default function EmailAiAgents() {
           }),
         );
       }
+
+      if (flowsData.success && Array.isArray(flowsData.data?.flows)) {
+        dispatch(
+          setEmailFlows({
+            teamID,
+            flows: flowsData.data.flows,
+          }),
+        );
+      }
     } catch {
       // Leave existing local/Redux data unchanged on fetch failure.
     } finally {
@@ -424,14 +508,22 @@ export default function EmailAiAgents() {
     void fetchAgentFormData();
   }, [fetchAgentFormData]);
 
+  useEffect(() => {
+    if (!teamID) {
+      return;
+    }
+    void fetchTeamEmailFlowsForStore(teamID, dispatch);
+  }, [teamID, dispatch]);
+
   const formSetters = {
     setAgentName,
     setSystemPrompt,
     setEmailFormatTemplate,
     setLlmModel,
     setSelectedKnowledgeId,
-    setSelectedToolId,
+    setSelectedToolIds,
     setSelectedInboxId,
+    setSelectedFlowId,
     setReplyActionMode,
     setAutoSendMinConfidence,
     setSelectedRoutingRuleIds,
@@ -442,15 +534,12 @@ export default function EmailAiAgents() {
     agentName.trim() &&
     systemPrompt.trim() &&
     llmModel &&
-    selectedKnowledgeId &&
-    selectedToolId &&
     selectedInboxId &&
-    teamInboxes.length > 0 &&
-    knowledgeAutoCompleteItems.length > 0 &&
-    toolAutoCompleteItems.length > 0;
+    teamInboxes.length > 0;
 
   const handleOpenCreateSheet = () => {
     resetAgentFormState(formSetters);
+    setOriginalFlowId(null);
     setSheetMode("create");
     setEditingAgentId(null);
     setIsLoadingAgentDetails(false);
@@ -460,6 +549,7 @@ export default function EmailAiAgents() {
 
   const handleOpenEditSheet = async (agentId: string) => {
     resetAgentFormState(formSetters);
+    setOriginalFlowId(null);
     setSheetMode("edit");
     setEditingAgentId(agentId);
     setIsAgentSheetOpen(true);
@@ -471,6 +561,7 @@ export default function EmailAiAgents() {
 
       if (data.success && data.agent) {
         populateAgentFormFromDetails(data.agent, formSetters);
+        setOriginalFlowId(data.agent.flow_id || null);
       } else {
         toast.error(data.message || "Failed to load email AI agent.", {
           position: "top-center",
@@ -479,10 +570,9 @@ export default function EmailAiAgents() {
         setEditingAgentId(null);
       }
     } catch (error: unknown) {
-      toast.error(
-        getApiErrorMessage(error, "Failed to load email AI agent."),
-        { position: "top-center" },
-      );
+      toast.error(getApiErrorMessage(error, "Failed to load email AI agent."), {
+        position: "top-center",
+      });
       setIsAgentSheetOpen(false);
       setEditingAgentId(null);
     } finally {
@@ -498,18 +588,6 @@ export default function EmailAiAgents() {
 
     if (!selectedInboxId) {
       toast.error("Please select a Gmail inbox.", { position: "top-center" });
-      return;
-    }
-
-    if (!selectedKnowledgeId) {
-      toast.error("Please select a knowledge base.", {
-        position: "top-center",
-      });
-      return;
-    }
-
-    if (!selectedToolId) {
-      toast.error("Please select a tool.", { position: "top-center" });
       return;
     }
 
@@ -532,16 +610,22 @@ export default function EmailAiAgents() {
     }
 
     if (selectedRoutingRuleIds.length > MAX_ATTACHED_RULES) {
-      toast.error(`You can attach up to ${MAX_ATTACHED_RULES} smart routing setups.`, {
-        position: "top-center",
-      });
+      toast.error(
+        `You can attach up to ${MAX_ATTACHED_RULES} smart routing setups.`,
+        {
+          position: "top-center",
+        },
+      );
       return;
     }
 
     if (selectedRecipientRuleIds.length > MAX_ATTACHED_RULES) {
-      toast.error(`You can attach up to ${MAX_ATTACHED_RULES} smart recipient setups.`, {
-        position: "top-center",
-      });
+      toast.error(
+        `You can attach up to ${MAX_ATTACHED_RULES} smart recipient setups.`,
+        {
+          position: "top-center",
+        },
+      );
       return;
     }
 
@@ -552,6 +636,12 @@ export default function EmailAiAgents() {
         auto_send_min_confidence: autoSendMinConfidence,
       };
 
+      const flowIdForSave = resolveFlowIdForSave(
+        sheetMode,
+        selectedFlowId,
+        originalFlowId,
+      );
+
       const data =
         sheetMode === "edit" && editingAgentId
           ? await updateEmailAiAgent(
@@ -561,11 +651,12 @@ export default function EmailAiAgents() {
               systemPrompt,
               llmModel,
               selectedKnowledgeId,
-              [selectedToolId],
+              selectedToolIds,
               replyAction,
               selectedRoutingRuleIds,
               selectedRecipientRuleIds,
               emailFormatTemplate,
+              flowIdForSave,
             )
           : await createEmailAiAgent(
               agentName,
@@ -573,11 +664,12 @@ export default function EmailAiAgents() {
               systemPrompt,
               llmModel,
               selectedKnowledgeId,
-              [selectedToolId],
+              selectedToolIds,
               replyAction,
               selectedRoutingRuleIds,
               selectedRecipientRuleIds,
               emailFormatTemplate,
+              flowIdForSave,
             );
 
       if (data.success) {
@@ -585,13 +677,21 @@ export default function EmailAiAgents() {
         setIsAgentSheetOpen(false);
         resetAgentFormState(formSetters);
         setEditingAgentId(null);
+        setOriginalFlowId(null);
         setSheetMode("create");
-        await fetchAgents();
+        await Promise.all([
+          fetchAgents(),
+          fetchTeamEmailFlowsForStore(teamID, dispatch),
+        ]);
+        const flowSyncedMessage =
+          data.flow_synced === true
+            ? " Linked workflow graph was updated."
+            : "";
         toast.success(
-          data.message ||
+          (data.message ||
             (wasEdit
               ? "Email AI agent updated successfully."
-              : "Email AI agent created successfully."),
+              : "Email AI agent created successfully.")) + flowSyncedMessage,
           { position: "top-center" },
         );
       } else {
@@ -644,10 +744,9 @@ export default function EmailAiAgents() {
         position: "top-center",
       });
     } catch (error: unknown) {
-      toast.error(
-        getApiErrorMessage(error, "Failed to start inbox sync."),
-        { position: "top-center" },
-      );
+      toast.error(getApiErrorMessage(error, "Failed to start inbox sync."), {
+        position: "top-center",
+      });
       await fetchAgents();
     } finally {
       setSyncingAgentId(null);
@@ -660,6 +759,8 @@ export default function EmailAiAgents() {
       setIsSaving(false);
       setIsLoadingAgentDetails(false);
       setEditingAgentId(null);
+      setOriginalFlowId(null);
+      resetAgentFormState(formSetters);
       setSheetMode("create");
     }
   };
@@ -754,7 +855,9 @@ export default function EmailAiAgents() {
                               <div
                                 className="flex items-center justify-center"
                                 onClick={(event) => event.stopPropagation()}
-                                onPointerDown={(event) => event.stopPropagation()}
+                                onPointerDown={(event) =>
+                                  event.stopPropagation()
+                                }
                               >
                                 <Tooltip>
                                   <TooltipTrigger asChild>
@@ -808,7 +911,11 @@ export default function EmailAiAgents() {
             <SheetTitle>
               <div className="flex items-center justify-start">
                 <Bot className="inline mr-2" size={18} />
-                <p>{sheetMode === "edit" ? "Edit Email Agent" : "Create Email Agent"}</p>
+                <p>
+                  {sheetMode === "edit"
+                    ? "Edit Email Agent"
+                    : "Create Email Agent"}
+                </p>
               </div>
             </SheetTitle>
             <SheetDescription>
@@ -824,87 +931,87 @@ export default function EmailAiAgents() {
                 <Spinner className="border-gray-700" />
               </div>
             ) : (
-            <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-[8px]">
-              <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
-                Agent Name
-              </p>
-              <CustomInput
-                type="text"
-                placeholder="Enter agent name"
-                value={agentName}
-                onChange={(e) => setAgentName(e.target.value)}
-                className="mt-[2px] min-h-[40px] w-full"
-              />
-            </div>
-
-            <div className="flex flex-col gap-[8px]">
-              <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
-                Gmail Inbox
-              </p>
-              {isLoadingInboxes ? (
-                <div className="flex items-center justify-center min-h-[40px]">
-                  <Spinner className="border-gray-700" />
+              <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-[8px]">
+                  <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
+                    Agent Name
+                  </p>
+                  <CustomInput
+                    type="text"
+                    placeholder="Enter agent name"
+                    value={agentName}
+                    onChange={(e) => setAgentName(e.target.value)}
+                    className="mt-[2px] min-h-[40px] w-full"
+                  />
                 </div>
-              ) : teamInboxes.length === 0 ? (
-                <p className="text-[12px] text-gray-500">
-                  No Gmail inboxes found. Connect an inbox on the Inbox page
-                  first.
-                </p>
-              ) : (
-                <AutoComplete
-                  items={inboxItems}
-                  value={selectedInboxId}
-                  placeholder="Select a Gmail inbox..."
-                  searchPlaceholder="Search inbox..."
-                  emptyMessage="No inbox found."
-                  onChange={(value) => setSelectedInboxId(value)}
-                  className="text-[13px] font-[500]"
-                  listMaxHeightClass="max-h-[200px]"
-                />
-              )}
-            </div>
 
-            <div className="flex flex-col gap-[8px]">
-              <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
-                LLM Model
-              </p>
-              <AutoComplete
-                items={llmModelItems}
-                value={llmModel}
-                placeholder="Select LLM model..."
-                searchPlaceholder="Search model..."
-                emptyMessage="No model found."
-                onChange={(value) => setLlmModel(value)}
-                className="text-[13px] font-[500]"
-                listMaxHeightClass="max-h-[200px]"
-              />
-            </div>
+                <div className="flex flex-col gap-[8px]">
+                  <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
+                    Gmail Inbox
+                  </p>
+                  {isLoadingInboxes ? (
+                    <div className="flex items-center justify-center min-h-[40px]">
+                      <Spinner className="border-gray-700" />
+                    </div>
+                  ) : teamInboxes.length === 0 ? (
+                    <p className="text-[12px] text-gray-500">
+                      No Gmail inboxes found. Connect an inbox on the Inbox page
+                      first.
+                    </p>
+                  ) : (
+                    <AutoComplete
+                      items={inboxItems}
+                      value={selectedInboxId}
+                      placeholder="Select a Gmail inbox..."
+                      searchPlaceholder="Search inbox..."
+                      emptyMessage="No inbox found."
+                      onChange={(value) => setSelectedInboxId(value)}
+                      className="text-[13px] font-[500]"
+                      listMaxHeightClass="max-h-[200px]"
+                    />
+                  )}
+                </div>
 
-            <div className="flex flex-col gap-[8px]">
-              <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
-                System Prompt
-              </p>
-              <CustomTextareaPrimary
-                placeholder="Enter your system prompt here..."
-                value={systemPrompt}
-                onChange={(e) => setSystemPrompt(e.target.value)}
-                rows={6}
-                resizable={true}
-                className="mt-[2px] min-h-[120px] w-full"
-              />
-            </div>
+                <div className="flex flex-col gap-[8px]">
+                  <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
+                    LLM Model
+                  </p>
+                  <AutoComplete
+                    items={llmModelItems}
+                    value={llmModel}
+                    placeholder="Select LLM model..."
+                    searchPlaceholder="Search model..."
+                    emptyMessage="No model found."
+                    onChange={(value) => setLlmModel(value)}
+                    className="text-[13px] font-[500]"
+                    listMaxHeightClass="max-h-[200px]"
+                  />
+                </div>
 
-            <div className="flex flex-col gap-[8px]">
-              <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
-                Email Format Template
-              </p>
-              <p className="text-[12px] text-gray-500 ml-[2px]">
-                Optional. Describe how reply emails should be structured — tone,
-                greeting, body layout, and sign-off.
-              </p>
-              <CustomTextareaPrimary
-                placeholder={`Use a professional tone.
+                <div className="flex flex-col gap-[8px]">
+                  <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
+                    System Prompt
+                  </p>
+                  <CustomTextareaPrimary
+                    placeholder="Enter your system prompt here..."
+                    value={systemPrompt}
+                    onChange={(e) => setSystemPrompt(e.target.value)}
+                    rows={6}
+                    resizable={true}
+                    className="mt-[2px] min-h-[120px] w-full"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-[8px]">
+                  <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
+                    Email Format Template
+                  </p>
+                  <p className="text-[12px] text-gray-500 ml-[2px]">
+                    Optional. Describe how reply emails should be structured —
+                    tone, greeting, body layout, and sign-off.
+                  </p>
+                  <CustomTextareaPrimary
+                    placeholder={`Use a professional tone.
 
 Greeting: Hi {customer_name},
 
@@ -913,150 +1020,193 @@ Body: 2-3 short paragraphs answering the question.
 Closing:
 Best regards,
 Support Team`}
-                value={emailFormatTemplate}
-                onChange={(e) => setEmailFormatTemplate(e.target.value)}
-                rows={6}
-                resizable={true}
-                className="mt-[2px] min-h-[120px] w-full"
-              />
-            </div>
-
-            <div className="flex flex-col gap-[8px]">
-              <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
-                Knowledge Base
-              </p>
-              {isLoadingFormData ? (
-                <div className="flex items-center justify-center min-h-[40px]">
-                  <Spinner className="border-gray-700" />
+                    value={emailFormatTemplate}
+                    onChange={(e) => setEmailFormatTemplate(e.target.value)}
+                    rows={6}
+                    resizable={true}
+                    className="mt-[2px] min-h-[120px] w-full"
+                  />
                 </div>
-              ) : knowledgeAutoCompleteItems.length === 0 ? (
-                <p className="text-[12px] text-gray-500">
-                  No knowledge bases found. Create one before setting up an
-                  agent.
-                </p>
-              ) : (
-                <AutoComplete
-                  items={knowledgeAutoCompleteItems}
-                  value={selectedKnowledgeId}
-                  placeholder="Select a knowledge base..."
-                  searchPlaceholder="Search knowledge..."
-                  emptyMessage="No knowledge found."
-                  onChange={(value) => setSelectedKnowledgeId(value)}
-                  className="text-[13px] font-[500]"
-                  listMaxHeightClass="max-h-[200px]"
-                />
-              )}
-            </div>
 
-            <div className="flex flex-col gap-[8px]">
-              <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
-                Tool
-              </p>
-              {isLoadingFormData ? (
-                <div className="flex items-center justify-center min-h-[40px]">
-                  <Spinner className="border-gray-700" />
+                <div className="flex flex-col gap-[8px]">
+                  <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
+                    Knowledge Base
+                  </p>
+                  <p className="text-[12px] text-gray-500 ml-[2px]">
+                    Optional. Select a knowledge base for RAG, or leave empty.
+                  </p>
+                  {isLoadingFormData ? (
+                    <div className="flex items-center justify-center min-h-[40px]">
+                      <Spinner className="border-gray-700" />
+                    </div>
+                  ) : knowledgeAutoCompleteItems.length === 0 ? (
+                    <p className="text-[12px] text-gray-500">
+                      No knowledge bases found. You can still save the agent
+                      without one.
+                    </p>
+                  ) : (
+                    <AutoComplete
+                      items={knowledgeAutoCompleteItems}
+                      value={selectedKnowledgeId}
+                      placeholder="Select a knowledge base (optional)..."
+                      searchPlaceholder="Search knowledge..."
+                      emptyMessage="No knowledge found."
+                      onChange={(value) => setSelectedKnowledgeId(value)}
+                      clearable
+                      className="text-[13px] font-[500]"
+                      listMaxHeightClass="max-h-[200px]"
+                    />
+                  )}
                 </div>
-              ) : toolAutoCompleteItems.length === 0 ? (
-                <p className="text-[12px] text-gray-500">
-                  No active tools found. Register a tool before setting up an
-                  agent.
-                </p>
-              ) : (
-                <AutoComplete
-                  items={toolAutoCompleteItems}
-                  value={selectedToolId}
-                  placeholder="Select a tool..."
-                  searchPlaceholder="Search tool..."
-                  emptyMessage="No tool found."
-                  onChange={(value) => setSelectedToolId(value)}
-                  className="text-[13px] font-[500]"
-                  listMaxHeightClass="max-h-[200px]"
-                />
-              )}
-            </div>
 
-            <div className="flex flex-col gap-[8px]">
-              <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
-                Smart Routing
-              </p>
-              <p className="text-[12px] text-gray-500 ml-[2px]">
-                Choose when the AI should route emails to each department.
-              </p>
-              {isLoadingFormData ? (
-                <div className="flex items-center justify-center min-h-[40px]">
-                  <Spinner className="border-gray-700" />
+                <div className="flex flex-col gap-[8px]">
+                  <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
+                    Tools
+                  </p>
+                  <p className="text-[12px] text-gray-500 ml-[2px]">
+                    Optional. Select tools the agent can call.
+                  </p>
+                  {isLoadingFormData ? (
+                    <div className="flex items-center justify-center min-h-[40px]">
+                      <Spinner className="border-gray-700" />
+                    </div>
+                  ) : toolAutoCompleteItems.length === 0 ? (
+                    <p className="text-[12px] text-gray-500">
+                      No active tools found. You can still save the agent
+                      without tools.
+                    </p>
+                  ) : (
+                    <EmailUserMultiSelect
+                      items={toolAutoCompleteItems}
+                      selectedIds={selectedToolIds}
+                      onChange={setSelectedToolIds}
+                      placeholder="Select tools (optional)..."
+                      searchPlaceholder="Search tools..."
+                      emptyMessage="No tool found."
+                      className="text-[13px] font-[500]"
+                    />
+                  )}
                 </div>
-              ) : routingRuleAutoCompleteItems.length === 0 ? (
-                <p className="text-[12px] text-gray-500">
-                  Nothing set up yet. Add smart routing on the Smart Routing
-                  page first.
-                </p>
-              ) : (
-                <EmailUserMultiSelect
-                  items={routingRuleAutoCompleteItems}
-                  selectedIds={selectedRoutingRuleIds}
-                  onChange={setSelectedRoutingRuleIds}
-                  placeholder="Select smart routing..."
-                  searchPlaceholder="Search smart routing..."
-                  emptyMessage="No match found."
-                  className="text-[13px] font-[500]"
-                />
-              )}
-            </div>
 
-            <div className="flex flex-col gap-[8px]">
-              <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
-                Smart Recipients
-              </p>
-              <p className="text-[12px] text-gray-500 ml-[2px]">
-                Choose when the AI should add people to CC or BCC on replies.
-              </p>
-              {isLoadingFormData ? (
-                <div className="flex items-center justify-center min-h-[40px]">
-                  <Spinner className="border-gray-700" />
+                <div className="flex flex-col gap-[8px]">
+                  <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
+                    Smart Routing
+                  </p>
+                  <p className="text-[12px] text-gray-500 ml-[2px]">
+                    Choose when the AI should route emails to each department.
+                  </p>
+                  {isLoadingFormData ? (
+                    <div className="flex items-center justify-center min-h-[40px]">
+                      <Spinner className="border-gray-700" />
+                    </div>
+                  ) : routingRuleAutoCompleteItems.length === 0 ? (
+                    <p className="text-[12px] text-gray-500">
+                      Nothing set up yet. Add smart routing on the Smart Routing
+                      page first.
+                    </p>
+                  ) : (
+                    <EmailUserMultiSelect
+                      items={routingRuleAutoCompleteItems}
+                      selectedIds={selectedRoutingRuleIds}
+                      onChange={setSelectedRoutingRuleIds}
+                      placeholder="Select smart routing..."
+                      searchPlaceholder="Search smart routing..."
+                      emptyMessage="No match found."
+                      className="text-[13px] font-[500]"
+                    />
+                  )}
                 </div>
-              ) : recipientRuleAutoCompleteItems.length === 0 ? (
-                <p className="text-[12px] text-gray-500">
-                  Nothing set up yet. Add smart recipients on the Smart
-                  Recipients page first.
-                </p>
-              ) : (
-                <EmailUserMultiSelect
-                  items={recipientRuleAutoCompleteItems}
-                  selectedIds={selectedRecipientRuleIds}
-                  onChange={setSelectedRecipientRuleIds}
-                  placeholder="Select smart recipients..."
-                  searchPlaceholder="Search smart recipients..."
-                  emptyMessage="No match found."
-                  className="text-[13px] font-[500]"
-                />
-              )}
-            </div>
 
-            <EmailAgentReplyAction
-              mode={replyActionMode}
-              autoSendMinConfidence={autoSendMinConfidence}
-              onModeChange={setReplyActionMode}
-              onConfidenceChange={setAutoSendMinConfidence}
-            />
-            </div>
+                <div className="flex flex-col gap-[8px]">
+                  <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
+                    Smart Recipients
+                  </p>
+                  <p className="text-[12px] text-gray-500 ml-[2px]">
+                    Choose when the AI should add people to CC or BCC on
+                    replies.
+                  </p>
+                  {isLoadingFormData ? (
+                    <div className="flex items-center justify-center min-h-[40px]">
+                      <Spinner className="border-gray-700" />
+                    </div>
+                  ) : recipientRuleAutoCompleteItems.length === 0 ? (
+                    <p className="text-[12px] text-gray-500">
+                      Nothing set up yet. Add smart recipients on the Smart
+                      Recipients page first.
+                    </p>
+                  ) : (
+                    <EmailUserMultiSelect
+                      items={recipientRuleAutoCompleteItems}
+                      selectedIds={selectedRecipientRuleIds}
+                      onChange={setSelectedRecipientRuleIds}
+                      placeholder="Select smart recipients..."
+                      searchPlaceholder="Search smart recipients..."
+                      emptyMessage="No match found."
+                      className="text-[13px] font-[500]"
+                    />
+                  )}
+                </div>
+
+                <EmailAgentReplyAction
+                  mode={replyActionMode}
+                  autoSendMinConfidence={autoSendMinConfidence}
+                  onModeChange={setReplyActionMode}
+                  onConfidenceChange={setAutoSendMinConfidence}
+                />
+
+                <div className="flex flex-col gap-[8px]">
+                  <p className="text-[14px] font-[500] ml-[2px] text-gray-600">
+                    Workflow
+                  </p>
+                  <p className="text-[12px] text-gray-500 ml-[2px]">
+                    Optional. Leave empty on create to auto-generate a default
+                    workflow. On edit, pick an unattached workflow to switch
+                    links.
+                  </p>
+                  {isLoadingFormData ? (
+                    <div className="flex items-center justify-center min-h-[40px]">
+                      <Spinner className="border-gray-700" />
+                    </div>
+                  ) : workflowAutoCompleteItems.length === 0 ? (
+                    <p className="text-[12px] text-gray-500">
+                      {sheetMode === "edit" && originalFlowId
+                        ? "This agent keeps its current linked workflow."
+                        : "No unattached workflows available. A default workflow will be created on save."}
+                    </p>
+                  ) : (
+                    <AutoComplete
+                      items={workflowAutoCompleteItems}
+                      value={selectedFlowId}
+                      placeholder={
+                        sheetMode === "edit"
+                          ? "Keep current workflow..."
+                          : "Auto-create default workflow..."
+                      }
+                      searchPlaceholder="Search workflows..."
+                      emptyMessage="No workflow found."
+                      onChange={(value) => setSelectedFlowId(value)}
+                      clearable
+                      className="text-[13px] font-[500]"
+                      listMaxHeightClass="max-h-[200px]"
+                    />
+                  )}
+                </div>
+              </div>
             )}
           </div>
 
           <div className="shrink-0 border-t border-gray-100 px-4 py-4 bg-background">
             <PrimaryButton
               onClick={handleSaveAgent}
-              disabled={
-                isSaving ||
-                isLoadingAgentDetails ||
-                !isFormValid
-              }
+              disabled={isSaving || isLoadingAgentDetails || !isFormValid}
               className="w-full font-[600] flex items-center justify-center gap-2 min-h-[40px] text-[13px]"
             >
               {isSaving ? (
                 <Spinner className="border-white" />
               ) : (
-                <span>{sheetMode === "edit" ? "Update agent" : "Create agent"}</span>
+                <span>
+                  {sheetMode === "edit" ? "Update agent" : "Create agent"}
+                </span>
               )}
             </PrimaryButton>
           </div>

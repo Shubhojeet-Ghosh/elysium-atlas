@@ -21,7 +21,6 @@ import {
   getEmailThread,
   listTeamThreads,
   sendThreadDraft,
-  type EmailAiAction,
   type EmailPagination,
   type EmailThread,
   type EmailThreadMessage,
@@ -31,6 +30,12 @@ import {
 import { listTeamDepartments } from "@/utils/emailDepartmentsApi";
 import type { EmailDepartment } from "@/store/types/EmailDepartmentsTypes";
 import { formatDateTime12hr, formatSmartDateUTC } from "@/utils/formatDate";
+import {
+  getMessageAiHint,
+  getThreadListBadge,
+  getThreadListBadgeClasses,
+  hasDraftReady,
+} from "@/utils/emailThreadAiUi";
 import EmailTablePagination from "@/components/ElysiumAtlas/email/EmailTablePagination";
 import EmailMessageHtmlBody from "@/components/ElysiumAtlas/email/EmailMessageHtmlBody";
 import EmailThreadDraftPanel from "@/components/ElysiumAtlas/email/EmailThreadDraftPanel";
@@ -250,14 +255,12 @@ function threadFromSummary(
     has_unread: summary.has_unread,
     department_id: summary.department_id,
     assigned_user_id: summary.assigned_user_id,
+    is_ai_processing: summary.is_ai_processing,
+    ai_status: summary.ai_status,
     action_required: summary.action_required,
     ai_action: summary.ai_action,
     updated_at: "",
   };
-}
-
-function hasDraftReady(aiAction?: EmailAiAction | null): boolean {
-  return aiAction?.status === "draft_ready";
 }
 
 function formatGmailMessageTime(dateString: string): string {
@@ -324,30 +327,6 @@ function stripHtml(html: string): string {
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function getMessageAiHint(
-  message: EmailThreadMessage,
-  isTriggerMessage: boolean,
-): string | null {
-  if (message.direction === "outbound" && message.ai_reply?.assisted) {
-    if (message.ai_reply.mode === "auto") {
-      return "Sent using AI";
-    }
-    if (message.ai_reply.mode === "reviewed") {
-      return "Drafted by AI, sent by you";
-    }
-    return "AI-assisted reply";
-  }
-
-  if (
-    message.direction === "inbound" &&
-    (isTriggerMessage || message.ai_outcome?.type === "draft_created")
-  ) {
-    return "AI drafted a reply to this email";
-  }
-
-  return null;
 }
 
 function EmailMessageStarsIcon({ label }: { label: string }) {
@@ -429,11 +408,7 @@ function EmailThreadMessageItem({
   const aiHint = getMessageAiHint(message, isTriggerMessage);
 
   return (
-    <article
-      className={`border-b border-gray-200 px-2 py-3 ${
-        isTriggerMessage ? "bg-serene-purple/10 border-l-2 border-l-serene-purple/50" : ""
-      }`}
-    >
+    <article className="border-b border-gray-200 px-2 py-3">
       {!isExpanded ? (
         <button
           type="button"
@@ -718,24 +693,26 @@ function EmailThreadDetail({
           <div className="flex items-center justify-center py-16">
             <Spinner className="border-serene-purple h-6 w-6" />
           </div>
-        ) : messages.length === 0 ? (
-          <div className="py-16 text-center text-[13px] text-gray-500">
-            No messages in this thread yet.
-          </div>
         ) : (
           <div>
-            {messages.map((message) => (
-              <EmailThreadMessageItem
-                key={message.message_id}
-                message={message}
-                isExpanded={expandedMessageIds.has(message.message_id)}
-                isTriggerMessage={
-                  Boolean(triggerMessageId) &&
-                  message.message_id === triggerMessageId
-                }
-                onToggle={() => toggleMessageExpanded(message.message_id)}
-              />
-            ))}
+            {messages.length === 0 && !showDraftPanel ? (
+              <div className="py-16 text-center text-[13px] text-gray-500">
+                No messages in this thread yet.
+              </div>
+            ) : (
+              messages.map((message) => (
+                <EmailThreadMessageItem
+                  key={message.message_id}
+                  message={message}
+                  isExpanded={expandedMessageIds.has(message.message_id)}
+                  isTriggerMessage={
+                    Boolean(triggerMessageId) &&
+                    message.message_id === triggerMessageId
+                  }
+                  onToggle={() => toggleMessageExpanded(message.message_id)}
+                />
+              ))
+            )}
 
             {showDraftPanel && summary.ai_action && (
               <EmailThreadDraftPanel
@@ -1073,7 +1050,7 @@ export default function EmailInbox() {
                         const timestamp = thread.last_message_at
                           ? formatSmartDateUTC(thread.last_message_at)
                           : "—";
-                        const needsAttention = Boolean(thread.action_required);
+                        const listBadge = getThreadListBadge(thread);
 
                         return (
                           <button
@@ -1081,11 +1058,7 @@ export default function EmailInbox() {
                             type="button"
                             onClick={() => handleSelectThread(thread)}
                             className={`grid w-full grid-cols-[minmax(120px,200px)_minmax(180px,1fr)_minmax(64px,96px)] items-center gap-3 border-b border-gray-100 px-3 py-2 text-left cursor-pointer transition-colors hover:bg-gray-50 ${
-                              needsAttention
-                                ? "bg-serene-purple/10"
-                                : thread.has_unread
-                                  ? "bg-white"
-                                  : "bg-gray-50/40"
+                              thread.has_unread ? "bg-white" : "bg-gray-50/40"
                             }`}
                           >
                             <span
@@ -1101,16 +1074,18 @@ export default function EmailInbox() {
                             <span className="min-w-0 truncate text-[13px]">
                               <span
                                 className={
-                                  thread.has_unread || needsAttention
+                                  thread.has_unread || listBadge
                                     ? "font-semibold text-deep-onyx"
                                     : "font-normal text-gray-800"
                                 }
                               >
                                 {subject}
                               </span>
-                              {needsAttention && (
-                                <span className="ml-2 inline-flex items-center rounded-full bg-serene-purple/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-serene-purple">
-                                  Needs your attention
+                              {listBadge && (
+                                <span
+                                  className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${getThreadListBadgeClasses(listBadge.tone)}`}
+                                >
+                                  {listBadge.label}
                                 </span>
                               )}
                               {snippet && (

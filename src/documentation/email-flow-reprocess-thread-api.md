@@ -3,6 +3,7 @@
 Re-run the **full email AI flow** on an **existing** Gmail thread without sending a new inbound email. Use this to test workflow nodes, regenerate a draft, or debug a thread end-to-end.
 
 **Related:**
+
 - [email-flow-nodes.md](./email-flow-nodes.md) — per-node I/O and pipeline order
 - [email-flow-plan.md](./email-flow-plan.md) — architecture and Mongo collections
 - [email-ai-agent-setup.md](./email-ai-agent-setup.md) — agent configuration
@@ -29,11 +30,11 @@ http://localhost:7000/elysium-agents
 POST /email-flows/v1/reprocess-thread
 ```
 
-| Item | Value |
-| ---- | ----- |
-| Auth | **None** (public test route — no JWT) |
-| Content-Type | `application/json` |
-| Behaviour | **Fire-and-forget** — returns immediately; pipeline runs in a background task |
+| Item         | Value                                                                         |
+| ------------ | ----------------------------------------------------------------------------- |
+| Auth         | **None** (public test route — no JWT)                                         |
+| Content-Type | `application/json`                                                            |
+| Behaviour    | **Fire-and-forget** — returns immediately; pipeline runs in a background task |
 
 ---
 
@@ -50,10 +51,20 @@ POST /email-flows/v1/reprocess-thread
 
 ```
 start → load_thread_context → read_kb → read_tools → ai_department_router
-  → ai_recipients_generator → generate_email
+  → ai_recipients_generator → generate_email → save_gmail_draft → stop
 ```
 
-Poll **`POST /email-flows/v1/get-run`** with the returned `run_id` to see progress and the final draft, routing, recipients, etc.
+When `agent.reply_action.mode === "draft"` (default), **`save_gmail_draft`** creates a Gmail draft, sets `email-threads.ai_action`, and sets `ai_outcome` on the trigger inbound.
+
+When `agent.reply_action.mode === "auto_send"`, the tail is **`send_email`** instead of `save_gmail_draft`:
+
+```
+… → generate_email → send_email → stop
+```
+
+**`send_email`:** if `draft.confidence >= auto_send_min_confidence` → direct Gmail send + `ai_action.status: "sent"`; else draft fallback with `ai_action.type: "draft_fallback"`.
+
+Poll **`POST /email-flows/v1/get-run`** with the returned `run_id` to see progress and the final draft, routing, recipients, etc. For inbox UX, poll **`list-team-threads`** / **`get-thread`** — see [email-draft-review-ui.md](./email-draft-review-ui.md) and [email-ai-agent-setup.md](./email-ai-agent-setup.md) (`ai_action`, `action_required`).
 
 ---
 
@@ -69,13 +80,13 @@ Poll **`POST /email-flows/v1/get-run`** with the returned `run_id` to see progre
 }
 ```
 
-| Field | Required | Default | Description |
-| ----- | -------- | ------- | ----------- |
-| `agent_id` | Yes | — | Mongo `_id` of the email AI agent (`email-ai-agents`) |
-| `thread_id` | Yes | — | Gmail thread id (stored on `email-threads`) |
-| `trigger_message_id` | No | `""` | Mongo message `_id` or `gmail_message_id` for the inbound message to reply to. If omitted, the **Start** node picks a trigger automatically (see below). |
-| `force_reprocess` | No | `true` | Controls idempotency vs forced re-run (see dedicated section below). |
-| `message_limit` | No | `10` | Max messages loaded by **Load Thread Context** (1–100). |
+| Field                | Required | Default | Description                                                                                                                                              |
+| -------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent_id`           | Yes      | —       | Mongo `_id` of the email AI agent (`email-ai-agents`)                                                                                                    |
+| `thread_id`          | Yes      | —       | Gmail thread id (stored on `email-threads`)                                                                                                              |
+| `trigger_message_id` | No       | `""`    | Mongo message `_id` or `gmail_message_id` for the inbound message to reply to. If omitted, the **Start** node picks a trigger automatically (see below). |
+| `force_reprocess`    | No       | `true`  | Controls idempotency vs forced re-run (see dedicated section below).                                                                                     |
+| `message_limit`      | No       | `10`    | Max messages loaded by **Load Thread Context** (1–100).                                                                                                  |
 
 ---
 
@@ -87,34 +98,34 @@ This flag is passed to the **Start** node. It controls whether the flow behaves 
 
 Use when you want to **always run the pipeline**, even if this thread was already processed.
 
-| Behaviour | Detail |
-| --------- | ------ |
+| Behaviour         | Detail                                                                                               |
+| ----------------- | ---------------------------------------------------------------------------------------------------- |
 | Trigger selection | If `trigger_message_id` is set → that message. Otherwise → **latest inbound** message on the thread. |
-| Idempotency | **Disabled** — ignores `processing_status` and existing `flow_run_id` on the trigger message. |
-| Start node | Proceeds and marks the trigger message `processing_status: "processing"`. |
-| Downstream nodes | Full pipeline runs (KB, tools, routing, recipients, generate email). |
-| Typical use | Manual testing, “Regenerate reply” in dev, debugging after code changes. |
+| Idempotency       | **Disabled** — ignores `processing_status` and existing `flow_run_id` on the trigger message.        |
+| Start node        | Proceeds and marks the trigger message `processing_status: "processing"`.                            |
+| Downstream nodes  | Full pipeline runs (KB, tools, routing, recipients, generate email).                                 |
+| Typical use       | Manual testing, “Regenerate reply” in dev, debugging after code changes.                             |
 
 ### `force_reprocess: false` (production-like guard)
 
 Use when you only want to process a message that **has not been handled yet** — similar to what sync will do on a **new pending inbound**.
 
-| Behaviour | Detail |
-| --------- | ------ |
+| Behaviour         | Detail                                                                                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Trigger selection | If `trigger_message_id` is set → that message. Otherwise → **latest inbound with `processing_status: "pending"`**. If none pending → falls back to latest inbound. |
-| Idempotency | **Enabled** — Start **skips** the run when: |
-| | • Trigger message `processing_status` is **not** `"pending"` (e.g. already `"completed"` or `"processing"`) |
-| | • Trigger message already has a **`flow_run_id`** |
-| Start node | Returns `status: "skipped"` with a `skip_reason`. |
-| Downstream nodes | **Not executed** — run ends early with `status: "skipped"`. |
-| Typical use | Simulating production “process this new email once”; avoiding duplicate drafts/sends on the same inbound. |
+| Idempotency       | **Enabled** — Start **skips** the run when:                                                                                                                        |
+|                   | • Trigger message `processing_status` is **not** `"pending"` (e.g. already `"completed"` or `"processing"`)                                                        |
+|                   | • Trigger message already has a **`flow_run_id`**                                                                                                                  |
+| Start node        | Returns `status: "skipped"` with a `skip_reason`.                                                                                                                  |
+| Downstream nodes  | **Not executed** — run ends early with `status: "skipped"`.                                                                                                        |
+| Typical use       | Simulating production “process this new email once”; avoiding duplicate drafts/sends on the same inbound.                                                          |
 
 **Skip reasons (poll `get-run` → `node_logs[0]`):**
 
-| `skip_reason` | Meaning |
-| ------------- | ------- |
+| `skip_reason`                                           | Meaning                                                      |
+| ------------------------------------------------------- | ------------------------------------------------------------ |
 | `processing_status is 'completed', expected 'pending'.` | That inbound was already processed (or is in another state). |
-| `Trigger message already has a flow_run_id.` | A previous flow run already claimed this message. |
+| `Trigger message already has a flow_run_id.`            | A previous flow run already claimed this message.            |
 
 **Example:** A customer email was processed yesterday (`processing_status: "completed"`). Calling reprocess with `force_reprocess: false` → run **`skipped`**, no new draft. Calling with `force_reprocess: true` → full pipeline runs again.
 
@@ -161,13 +172,13 @@ POST /elysium-agents/email-flows/v1/get-run
 
 ### Run status lifecycle
 
-| `status` | Meaning |
-| -------- | ------- |
-| `queued` | Run created; background worker not started or about to start |
-| `running` | Pipeline in progress |
-| `completed` | All nodes finished successfully |
-| `failed` | A node failed or an unexpected background error occurred |
-| `skipped` | Start node skipped (usually `force_reprocess: false` + already processed) |
+| `status`    | Meaning                                                                   |
+| ----------- | ------------------------------------------------------------------------- |
+| `queued`    | Run created; background worker not started or about to start              |
+| `running`   | Pipeline in progress                                                      |
+| `completed` | All nodes finished successfully                                           |
+| `failed`    | A node failed or an unexpected background error occurred                  |
+| `skipped`   | Start node skipped (usually `force_reprocess: false` + already processed) |
 
 Poll until `status` is terminal (`completed`, `failed`, or `skipped`).
 
@@ -188,7 +199,11 @@ Poll until `status` is terminal (`completed`, `failed`, or `skipped`).
       { "node_id": "read_tools", "status": "ok" },
       { "node_id": "ai_department_router", "status": "ok" },
       { "node_id": "ai_recipients_generator", "status": "ok" },
-      { "node_id": "generate_email", "status": "ok", "output": { "llm_prompt_text": "..." } }
+      {
+        "node_id": "generate_email",
+        "status": "ok",
+        "output": { "llm_prompt_text": "..." }
+      }
     ],
     "context": {
       "compressed_query": "...",
@@ -212,12 +227,12 @@ Poll until `status` is terminal (`completed`, `failed`, or `skipped`).
 
 ## Error responses (immediate — before background starts)
 
-| HTTP | `message` | Cause |
-| ---- | --------- | ----- |
-| `400` | `Invalid agent_id.` | Malformed Mongo id |
-| `400` | `thread_id is required.` | Empty thread id |
-| `404` | `Email AI agent not found.` | Unknown `agent_id` |
-| `500` | Queue/server error | Unexpected failure creating the run |
+| HTTP  | `message`                   | Cause                               |
+| ----- | --------------------------- | ----------------------------------- |
+| `400` | `Invalid agent_id.`         | Malformed Mongo id                  |
+| `400` | `thread_id is required.`    | Empty thread id                     |
+| `404` | `Email AI agent not found.` | Unknown `agent_id`                  |
+| `500` | Queue/server error          | Unexpected failure creating the run |
 
 Validation errors return synchronously (no `run_id`).
 
@@ -292,31 +307,31 @@ await reprocessThread("674abc...", "6a253934...", { forceReprocess: false });
 
 ## Related APIs
 
-| API | Path | Purpose |
-| --- | ---- | ------- |
-| Get run | `POST /email-flows/v1/get-run` | Poll run status, `node_logs`, final `context` |
-| List thread runs | `POST /email-flows/v1/list-thread-runs` | History of runs for a thread |
+| API                  | Path                                               | Purpose                                              |
+| -------------------- | -------------------------------------------------- | ---------------------------------------------------- |
+| Get run              | `POST /email-flows/v1/get-run`                     | Poll run status, `node_logs`, final `context`        |
+| List thread runs     | `POST /email-flows/v1/list-thread-runs`            | History of runs for a thread                         |
 | Preview load context | `POST /email-flows/v1/preview-load-thread-context` | **Only** Load Thread Context — not the full pipeline |
 
 ---
 
 ## Mongo collections
 
-| Collection | What gets written |
-| ---------- | ----------------- |
-| `email-flow-runs` | One document per reprocess: `run_id`, `status`, `node_logs[]`, final `context` |
+| Collection              | What gets written                                                                            |
+| ----------------------- | -------------------------------------------------------------------------------------------- |
+| `email-flow-runs`       | One document per reprocess: `run_id`, `status`, `node_logs[]`, final `context`               |
 | `email-thread-messages` | Start node updates trigger message `processing_status` / `flow_run_id` when the run proceeds |
 
 ---
 
 ## Quick reference
 
-| | |
-| --- | --- |
-| **Method** | `POST` |
-| **Path** | `/elysium-agents/email-flows/v1/reprocess-thread` |
-| **Auth** | None |
-| **Response** | `202` — `{ run_id, status: "queued", ... }` |
-| **Poll** | `POST /email-flows/v1/get-run` with `{ run_id }` |
-| **`force_reprocess: true`** | Always run (testing) |
+|                              |                                                     |
+| ---------------------------- | --------------------------------------------------- |
+| **Method**                   | `POST`                                              |
+| **Path**                     | `/elysium-agents/email-flows/v1/reprocess-thread`   |
+| **Auth**                     | None                                                |
+| **Response**                 | `202` — `{ run_id, status: "queued", ... }`         |
+| **Poll**                     | `POST /email-flows/v1/get-run` with `{ run_id }`    |
+| **`force_reprocess: true`**  | Always run (testing)                                |
 | **`force_reprocess: false`** | Skip if inbound already processed (production-like) |

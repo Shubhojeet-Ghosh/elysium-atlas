@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Check, ChevronsUpDown, Search } from "lucide-react";
+import { useState, useEffect, useRef, type MouseEvent as ReactMouseEvent } from "react";
+import { Check, ChevronsUpDown, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 
@@ -22,6 +22,7 @@ interface AutoCompleteProps {
   className?: string;
   searchPlaceholder?: string;
   listMaxHeightClass?: string;
+  clearable?: boolean;
 }
 
 export default function AutoComplete({
@@ -34,6 +35,7 @@ export default function AutoComplete({
   className,
   searchPlaceholder = "Search...",
   listMaxHeightClass = "max-h-[300px]",
+  clearable = false,
 }: AutoCompleteProps) {
   const [open, setOpen] = useState(false);
   const [selectedValue, setSelectedValue] = useState(defaultValue);
@@ -47,7 +49,7 @@ export default function AutoComplete({
   }, [value]);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: globalThis.MouseEvent) => {
       if (
         containerRef.current &&
         !containerRef.current.contains(event.target as Node)
@@ -67,10 +69,21 @@ export default function AutoComplete({
   const selectedItem = items.find((item) => item.value === selectedValue);
 
   const handleSelect = (itemValue: string) => {
-    setSelectedValue(itemValue);
-    onChange?.(itemValue);
+    if (clearable && itemValue === selectedValue) {
+      setSelectedValue("");
+      onChange?.("");
+    } else {
+      setSelectedValue(itemValue);
+      onChange?.(itemValue);
+    }
     setOpen(false);
     setSearchQuery("");
+  };
+
+  const handleClear = (event: ReactMouseEvent) => {
+    event.stopPropagation();
+    setSelectedValue("");
+    onChange?.("");
   };
 
   return (
@@ -99,7 +112,27 @@ export default function AutoComplete({
               : placeholder}
           </span>
         </div>
-        <ChevronsUpDown className="h-4 w-4 opacity-50" />
+        <div className="flex shrink-0 items-center gap-1">
+          {clearable && selectedItem && (
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label="Clear selection"
+              onClick={handleClear}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setSelectedValue("");
+                  onChange?.("");
+                }
+              }}
+              className="rounded-sm p-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <X className="h-3.5 w-3.5" />
+            </span>
+          )}
+          <ChevronsUpDown className="h-4 w-4 opacity-50" />
+        </div>
       </button>
 
       {open && (

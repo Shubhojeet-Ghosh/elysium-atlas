@@ -9,6 +9,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { EmailAiAction } from "@/utils/emailAiAgentsApi";
+import {
+  getAutoSentBannerText,
+  getDraftFallbackBannerText,
+  hasAutoSentAction,
+} from "@/utils/emailThreadAiUi";
 
 function parseEmailAddress(raw: string): { name: string; email: string } {
   const match = raw.match(/^(.+?)\s*<([^>]+)>$/);
@@ -42,6 +47,9 @@ export default function EmailThreadDraftPanel({
   isSending,
   onSend,
 }: EmailThreadDraftPanelProps) {
+  const isAutoSent = hasAutoSentAction(aiAction);
+  const isDraftFallback =
+    aiAction.status === "draft_ready" && aiAction.type === "draft_fallback";
   const toLine = formatRecipientLine(aiAction.recipients?.to);
   const ccLine = formatRecipientLine(aiAction.recipients?.cc);
   const bccLine = formatRecipientLine(aiAction.recipients?.bcc);
@@ -50,9 +58,31 @@ export default function EmailThreadDraftPanel({
     typeof aiAction.confidence === "number"
       ? Math.round(aiAction.confidence * 100)
       : null;
+  const threshold =
+    typeof aiAction.auto_send_min_confidence === "number"
+      ? Math.round(aiAction.auto_send_min_confidence * 100)
+      : null;
+
+  const bannerText = isAutoSent
+    ? getAutoSentBannerText(aiAction)
+    : isDraftFallback
+      ? getDraftFallbackBannerText(aiAction)
+      : null;
 
   return (
     <div className="mx-2 mb-4 mt-2 rounded-xl border border-gray-200 bg-white shadow-sm">
+      {bannerText && (
+        <div
+          className={`border-b px-4 py-2.5 text-[12px] font-medium ${
+            isAutoSent
+              ? "border-teal-green/20 bg-teal-green/10 text-teal-green"
+              : "border-serene-purple/20 bg-serene-purple/10 text-serene-purple"
+          }`}
+        >
+          {bannerText}
+        </div>
+      )}
+
       <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-2.5">
         <Reply size={16} className="shrink-0 text-gray-500" />
         <div className="min-w-0 flex-1 text-[13px] text-gray-700">
@@ -79,7 +109,9 @@ export default function EmailThreadDraftPanel({
               </span>
             </TooltipTrigger>
             <TooltipContent side="top">
-              {confidence}% confidence — AI-generated reply
+              {threshold !== null && isDraftFallback
+                ? `${confidence}% confidence (threshold ${threshold}%)`
+                : `${confidence}% confidence — AI-generated reply`}
             </TooltipContent>
           </Tooltip>
         )}
@@ -109,19 +141,24 @@ export default function EmailThreadDraftPanel({
       )}
 
       <div className="px-4 py-4 text-[14px] leading-relaxed text-gray-900 whitespace-pre-wrap">
-        {bodyText || "Draft content is not available. Open Gmail to review the draft."}
+        {bodyText ||
+          (isAutoSent
+            ? "Reply content is not available yet. Sync may still be in progress."
+            : "Draft content is not available. Open Gmail to review the draft.")}
       </div>
 
-      <div className="flex items-center gap-2 border-t border-gray-100 px-4 py-3">
-        <PrimaryButton
-          type="button"
-          onClick={onSend}
-          disabled={isSending}
-          className="min-h-[40px] min-w-[88px] font-[600] text-[13px]"
-        >
-          {isSending ? <Spinner className="border-white" /> : "Send"}
-        </PrimaryButton>
-      </div>
+      {!isAutoSent && (
+        <div className="flex items-center gap-2 border-t border-gray-100 px-4 py-3">
+          <PrimaryButton
+            type="button"
+            onClick={onSend}
+            disabled={isSending}
+            className="min-h-[40px] min-w-[88px] font-[600] text-[13px]"
+          >
+            {isSending ? <Spinner className="border-white" /> : "Send"}
+          </PrimaryButton>
+        </div>
+      )}
     </div>
   );
 }
