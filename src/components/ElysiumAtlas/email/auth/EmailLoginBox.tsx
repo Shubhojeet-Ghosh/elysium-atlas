@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import CustomInput from "@/components/inputs/CustomInput";
 import { toast } from "sonner";
 import fastApiAxios from "@/utils/fastapi_axios";
@@ -169,7 +170,7 @@ export default function EmailLoginBox() {
               <span className="text-[12px]">Log in...</span>
             )}
           </button>
-          {/* <p className="text-center text-[13px] text-gray-600 dark:text-gray-400 mt-2">
+          <p className="text-center text-[13px] text-gray-600 dark:text-gray-400 mt-2">
             Need an account?{" "}
             <Link
               href="/email/auth/register-user"
@@ -177,7 +178,7 @@ export default function EmailLoginBox() {
             >
               Register user
             </Link>
-          </p> */}
+          </p>
         </div>
       </div>
     </form>

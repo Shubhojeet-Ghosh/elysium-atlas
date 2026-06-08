@@ -18,6 +18,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/store";
 import { setEmailDepartments } from "@/store/reducers/emailDepartmentsSlice";
 import {
+  assignEmailThread,
   getEmailThread,
   listTeamThreads,
   sendThreadDraft,
@@ -27,6 +28,7 @@ import {
   type EmailThreadSummary,
   type EmailMessageDirection,
 } from "@/utils/emailAiAgentsApi";
+import type { EmailUserRole } from "@/store/types/EmailUserTypes";
 import { listTeamDepartments } from "@/utils/emailDepartmentsApi";
 import type { EmailDepartment } from "@/store/types/EmailDepartmentsTypes";
 import { formatDateTime12hr, formatSmartDateUTC } from "@/utils/formatDate";
@@ -38,6 +40,7 @@ import {
 } from "@/utils/emailThreadAiUi";
 import EmailTablePagination from "@/components/ElysiumAtlas/email/EmailTablePagination";
 import EmailMessageHtmlBody from "@/components/ElysiumAtlas/email/EmailMessageHtmlBody";
+import EmailThreadAssignDialog from "@/components/ElysiumAtlas/email/EmailThreadAssignDialog";
 import EmailThreadDraftPanel from "@/components/ElysiumAtlas/email/EmailThreadDraftPanel";
 
 const THREADS_PAGE_SIZE = 20;
@@ -254,7 +257,9 @@ function threadFromSummary(
     message_count: summary.message_count,
     has_unread: summary.has_unread,
     department_id: summary.department_id,
+    department_name: summary.department_name,
     assigned_user_id: summary.assigned_user_id,
+    assigned_user: summary.assigned_user,
     is_ai_processing: summary.is_ai_processing,
     ai_status: summary.ai_status,
     action_required: summary.action_required,
@@ -500,15 +505,19 @@ function EmailThreadMessageItem({
 interface EmailThreadDetailProps {
   teamId: string;
   thread: EmailThread;
+  userRole: EmailUserRole | "";
   onBack: () => void;
   onDraftSent?: () => void;
+  onThreadAssigned?: () => void;
 }
 
 function EmailThreadDetail({
   teamId,
   thread,
+  userRole,
   onBack,
   onDraftSent,
+  onThreadAssigned,
 }: EmailThreadDetailProps) {
   const departments = useAppSelector(
     (state) => state.emailDepartments.departments,
@@ -527,6 +536,8 @@ function EmailThreadDetail({
     new Set(),
   );
   const [isSendingDraft, setIsSendingDraft] = useState(false);
+  const [isAssigningThread, setIsAssigningThread] = useState(false);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
 
   const loadThreadMessages = useCallback(
     async (page: number, append = false) => {
@@ -614,7 +625,9 @@ function EmailThreadDetail({
     message_count: thread.message_count,
     has_unread: thread.has_unread,
     department_id: thread.department_id,
+    department_name: thread.department_name,
     assigned_user_id: thread.assigned_user_id,
+    assigned_user: thread.assigned_user,
     action_required: thread.action_required,
     ai_action: thread.ai_action,
   };
@@ -623,10 +636,30 @@ function EmailThreadDetail({
   const showDraftPanel =
     summary.action_required && hasDraftReady(summary.ai_action);
 
-  const handleSendDraft = async () => {
+  const handleSendDraft = async ({
+    bodyText,
+    cc,
+    bcc,
+    isEdited,
+  }: {
+    bodyText: string;
+    cc: string[];
+    bcc: string[];
+    isEdited: boolean;
+  }) => {
+    if (isEdited && !bodyText.trim()) {
+      toast.error("Draft body cannot be empty.", { position: "top-center" });
+      return;
+    }
+
     setIsSendingDraft(true);
     try {
-      const data = await sendThreadDraft(teamId, thread.thread_id);
+      const data = await sendThreadDraft(teamId, thread.thread_id, {
+        isEdited,
+        bodyText,
+        cc,
+        bcc,
+      });
 
       if (!data.success) {
         throw new Error(data.message || "Failed to send draft.");
@@ -646,17 +679,72 @@ function EmailThreadDetail({
     }
   };
 
-  const departmentName = getDepartmentName(departments, summary.department_id);
+  const departmentName =
+    summary.department_name?.trim() ||
+    getDepartmentName(departments, summary.department_id);
   const assignedUserId = summary.assigned_user_id?.trim();
-  const assignmentLabel = assignedUserId
-    ? assignedUserId === currentUserId
-      ? "Assigned to you"
-      : "Assigned"
-    : undefined;
+  const assignedUserName =
+    summary.assigned_user?.name?.trim() ||
+    summary.assigned_user?.email?.trim();
+  const isAdmin = userRole === "admin";
+  const isMember = userRole === "member";
+  const canAssignToSelf =
+    isMember && Boolean(currentUserId) && assignedUserId !== currentUserId;
+  const canAssignAsAdmin = isAdmin;
+  const showAssignControl = canAssignToSelf || canAssignAsAdmin;
+
+  const handleAssignThread = async (userId: string) => {
+    if (!userId.trim()) {
+      return;
+    }
+
+    setIsAssigningThread(true);
+    try {
+      const data = await assignEmailThread(teamId, thread.thread_id, userId);
+
+      if (!data.success) {
+        throw new Error(data.message || "Failed to assign thread.");
+      }
+
+      toast.success(data.message || "Email thread assigned successfully.", {
+        position: "top-center",
+      });
+
+      if (data.data?.thread) {
+        setThreadSummary((current) =>
+          current
+            ? {
+                ...current,
+                ...data.data?.thread,
+              }
+            : data.data?.thread || null,
+        );
+      } else {
+        await loadThreadMessages(1);
+      }
+
+      setIsAssignDialogOpen(false);
+      onThreadAssigned?.();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to assign thread."), {
+        position: "top-center",
+      });
+    } finally {
+      setIsAssigningThread(false);
+    }
+  };
+
+  const handleAssignToSelf = () => {
+    if (!currentUserId) {
+      return;
+    }
+
+    void handleAssignThread(currentUserId);
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 pb-3">
+      <div className="flex shrink-0 items-center justify-between pb-3">
         <button
           type="button"
           onClick={onBack}
@@ -665,28 +753,77 @@ function EmailThreadDetail({
         >
           <ArrowLeft size={18} className="text-gray-700" />
         </button>
+        {showAssignControl && (
+          <div>
+            {canAssignAsAdmin ? (
+              <button
+                type="button"
+                onClick={() => setIsAssignDialogOpen(true)}
+                disabled={isAssigningThread}
+                className="inline-flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+              >
+                {assignedUserId ? "Reassign" : "Assign"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleAssignToSelf}
+                disabled={isAssigningThread}
+                className="inline-flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+              >
+                {isAssigningThread ? (
+                  <Spinner className="border-serene-purple h-3.5 w-3.5" />
+                ) : (
+                  "Assign to me"
+                )}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="shrink-0 pb-4 flex items-start justify-between gap-4">
         <h1 className="min-w-0 text-[22px] font-normal leading-tight text-gray-900">
           {summary.subject || "(No subject)"}
         </h1>
-        <div className="shrink-0 pt-1 text-right text-[13px] text-gray-500 whitespace-nowrap">
-          {departmentName && (
-            <div>
-              For{" "}
-              <span className="font-semibold text-gray-700">
-                {departmentName}
-              </span>
+        {(departmentName || assignedUserName) && (
+          <div className="shrink-0 pt-1 text-right text-[13px] text-gray-500">
+            <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 whitespace-nowrap">
+              {departmentName && (
+                <div>
+                  For{" "}
+                  <span className="font-semibold text-gray-700">
+                    {departmentName}
+                  </span>
+                </div>
+              )}
+              {assignedUserName && (
+                <div className="text-[12px] text-gray-500">
+                  Assigned to:{" "}
+                  <span className="font-medium text-gray-700">
+                    {assignedUserId === currentUserId
+                      ? "you"
+                      : assignedUserName}
+                  </span>
+                </div>
+              )}
             </div>
-          )}
-          {assignmentLabel && (
-            <div className="mt-0.5 text-[12px] text-gray-400">
-              {assignmentLabel}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
+
+      {canAssignAsAdmin && (
+        <EmailThreadAssignDialog
+          open={isAssignDialogOpen}
+          onOpenChange={setIsAssignDialogOpen}
+          teamId={teamId}
+          departmentId={summary.department_id}
+          departmentName={departmentName}
+          initialUserId={assignedUserId}
+          isAssigning={isAssigningThread}
+          onAssign={(userId) => void handleAssignThread(userId)}
+        />
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoadingMessages ? (
@@ -1133,8 +1270,10 @@ export default function EmailInbox() {
             <EmailThreadDetail
               teamId={teamID}
               thread={selectedThread}
+              userRole={userRole}
               onBack={handleBackToList}
               onDraftSent={() => fetchThreads(threadPage, true)}
+              onThreadAssigned={() => fetchThreads(threadPage, true)}
             />
           </div>
         )}

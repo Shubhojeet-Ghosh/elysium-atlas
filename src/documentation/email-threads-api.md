@@ -5,6 +5,7 @@ Inbox list, thread detail (messages), send AI draft, Mongo collections, paginati
 **Prerequisites:** Agent created and synced ? see [email-ai-agent-setup.md](./email-ai-agent-setup.md).
 
 **Related:**
+
 - [email-ai-agent-setup.md](./email-ai-agent-setup.md) ? create agent, trigger sync, reply_action
 - [email-draft-review-ui.md](./email-draft-review-ui.md) ? inbox badges, draft panel UX
 - [email-routing-rules-api.md](./email-routing-rules-api.md) ? thread `department_id` visibility
@@ -54,14 +55,14 @@ Sorted by `last_message_at` descending (newest conversations first).
 
 **Thread visibility (enforced server-side):**
 
-| User role | Rule |
-| --------- | ---- |
-| `admin` | Sees **all** threads for the team (any `department_id` / `assigned_user_id`) |
-| `member` | `department_id` empty ? **hidden** |
-| `member` | `department_id` does not match member's department ? **hidden** |
-| `member` | `department_id` matches + `assigned_user_id` empty ? visible to **all members in that department** |
-| `member` | `department_id` matches + `assigned_user_id` set to another user ? **hidden** |
-| `member` | `department_id` matches + `assigned_user_id` is this member ? visible |
+| User role | Rule                                                                                                              |
+| --------- | ----------------------------------------------------------------------------------------------------------------- |
+| `admin`   | Sees **all** threads for the team (any `department_id` / `assigned_user_id`)                                      |
+| `member`  | `assigned_user_id` is this member ? **visible** (even if thread `department_id` differs from member's department) |
+| `member`  | `department_id` empty ? **hidden** (unless assigned above)                                                        |
+| `member`  | `department_id` does not match member's department ? **hidden** (unless assigned above)                           |
+| `member`  | `department_id` matches + `assigned_user_id` empty ? visible to **all members in that department**                |
+| `member`  | `department_id` matches + `assigned_user_id` set to another user ? **hidden**                                     |
 
 `team_id` in the request body must match the JWT `team_id`.
 
@@ -86,8 +87,14 @@ Sorted by `last_message_at` descending (newest conversations first).
       "last_message_at": "2026-06-06T14:30:00Z",
       "message_count": 3,
       "has_unread": true,
-      "department_id": "",
-      "assigned_user_id": "",
+      "department_id": "674a1b2c3d4e5f6789012345",
+      "department_name": "Sales",
+      "assigned_user_id": "674b2c3d4e5f6789012346",
+      "assigned_user": {
+        "user_id": "674b2c3d4e5f6789012346",
+        "name": "Jane Doe",
+        "email": "jane@example.com"
+      },
       "is_ai_processing": false,
       "action_required": true,
       "ai_status": {
@@ -112,7 +119,11 @@ Sorted by `last_message_at` descending (newest conversations first).
           "cc": ["shubhojeet.official@gmail.com"],
           "bcc": [],
           "cc_users": [
-            { "user_id": "6a23597fc25333c86ca81440", "email": "shubhojeet.official@gmail.com", "name": "Shubh" }
+            {
+              "user_id": "6a23597fc25333c86ca81440",
+              "email": "shubhojeet.official@gmail.com",
+              "name": "Shubh"
+            }
           ],
           "bcc_users": [],
           "matched_recipient_rules": [
@@ -156,10 +167,10 @@ No `body_text` / `body_html` here ? use `get-thread` for full content.
 
 After a flow run, threads include denormalized **`ai_action`**. Use **`action_required`** for actionable UI (`draft_ready` only). Covers draft mode, auto-send (`sent`), and draft fallback (`draft_fallback`).
 
-| Field | Type | Meaning |
-| ----- | ---- | ------- |
-| `action_required` | boolean | `true` when `ai_action.status === "draft_ready"` ? show **Review draft** / actionable UI |
-| `ai_action` | object \| null | Denormalized draft metadata from `save_gmail_draft` (null when no pending action) |
+| Field             | Type           | Meaning                                                                                  |
+| ----------------- | -------------- | ---------------------------------------------------------------------------------------- |
+| `action_required` | boolean        | `true` when `ai_action.status === "draft_ready"` ? show **Review draft** / actionable UI |
+| `ai_action`       | object \| null | Denormalized draft metadata from `save_gmail_draft` (null when no pending action)        |
 
 **Frontend:** filter or badge threads where `action_required === true` ? e.g. **?Draft ready ? review?**.
 
@@ -169,17 +180,16 @@ Full UI guide (inbox badge, thread draft panel, **Send from app**): **[email-dra
 
 While a flow run is active, poll **`list-team-threads`** or **`get-thread`** for thread-level progress (use **`is_ai_processing`** on inbox rows).
 
-| Field | Type | Meaning |
-| ----- | ---- | ------- |
-| `is_ai_processing` | boolean | `true` when `ai_status.current_status === "processing"` |
-| `ai_status` | object \| null | In-flight or last-known AI run state |
+| Field              | Type           | Meaning                                                 |
+| ------------------ | -------------- | ------------------------------------------------------- |
+| `is_ai_processing` | boolean        | `true` when `ai_status.current_status === "processing"` |
+| `ai_status`        | object \| null | In-flight or last-known AI run state                    |
 
 **`ai_status.current_status`:** `processing` (Start node) ? `idle` (success) or `failed` (see `last_error`).
 
 When a new run starts while `draft_ready` `ai_action` exists, the prior action is marked **`superseded`**.
 
-Full badge copy and filters: **[email-draft-review-ui.md](./email-draft-review-ui.md)** §1.
-
+Full badge copy and filters: **[email-draft-review-ui.md](./email-draft-review-ui.md)** ï¿½1.
 
 ---
 
@@ -230,8 +240,14 @@ Same thread visibility rules as **List Team Threads** apply here. Returns `403` 
     "snippet": "Thanks for your reply...",
     "message_count": 3,
     "has_unread": true,
-    "department_id": "",
-    "assigned_user_id": "",
+    "department_id": "674a1b2c3d4e5f6789012345",
+    "department_name": "Sales",
+    "assigned_user_id": "674b2c3d4e5f6789012346",
+    "assigned_user": {
+      "user_id": "674b2c3d4e5f6789012346",
+      "name": "Jane Doe",
+      "email": "jane@example.com"
+    },
     "is_ai_processing": false,
     "action_required": true,
     "ai_status": {
@@ -327,24 +343,24 @@ Same thread visibility rules as **List Team Threads** apply here. Returns `403` 
 
 ### Message AI fields
 
-| Field | When set | Meaning |
-| ----- | -------- | ------- |
-| `processing_status` | Sync + flow | `pending` ? `processing` ? `completed` / `failed` / `skipped` |
-| `flow_run_id` | Flow Start | Links to `email-flow-runs.run_id` |
-| `processed_at` | Flow complete | When processing finished |
-| `ai_outcome` | `save_gmail_draft` | On the **trigger inbound** only ? `{ type: "draft_created", gmail_draft_id, recipients, ... }` |
-| `ai_reply` | `send-thread-draft` | On **outbound** only ? AI-assisted send metadata (see below) |
+| Field               | When set            | Meaning                                                                                        |
+| ------------------- | ------------------- | ---------------------------------------------------------------------------------------------- |
+| `processing_status` | Sync + flow         | `pending` ? `processing` ? `completed` / `failed` / `skipped`                                  |
+| `flow_run_id`       | Flow Start          | Links to `email-flow-runs.run_id`                                                              |
+| `processed_at`      | Flow complete       | When processing finished                                                                       |
+| `ai_outcome`        | `save_gmail_draft`  | On the **trigger inbound** only ? `{ type: "draft_created", gmail_draft_id, recipients, ... }` |
+| `ai_reply`          | `send-thread-draft` | On **outbound** only ? AI-assisted send metadata (see below)                                   |
 
 **`ai_reply` (outbound messages only):**
 
-| Field | Value |
-| ----- | ----- |
-| `assisted` | `true` |
-| `mode` | `"reviewed"` ? sent via app after AI draft; `"auto"` ? future auto-send |
-| `flow_run_id` | Source flow run |
-| `agent_id` | Agent that generated the draft |
-| `confidence` | Model confidence from generation |
-| `gmail_draft_id` | Gmail draft that was sent |
+| Field            | Value                                                                   |
+| ---------------- | ----------------------------------------------------------------------- |
+| `assisted`       | `true`                                                                  |
+| `mode`           | `"reviewed"` ? sent via app after AI draft; `"auto"` ? future auto-send |
+| `flow_run_id`    | Source flow run                                                         |
+| `agent_id`       | Agent that generated the draft                                          |
+| `confidence`     | Model confidence from generation                                        |
+| `gmail_draft_id` | Gmail draft that was sent                                               |
 
 **Frontend:** show chip **?AI ? reviewed?** on outbound when `message.ai_reply?.assisted && message.ai_reply.mode === "reviewed"`.
 
@@ -354,12 +370,12 @@ Use `thread.ai_action.body_text` for the draft preview in the thread view (plain
 
 ---
 
-## 3. Send Thread AI Draft
+## 3. Assign Thread
 
-Send the pending Gmail draft from your app (Gmail `drafts.send`). See **[email-draft-review-ui.md](./email-draft-review-ui.md)** for the full UX flow.
+Assign a thread to a team user by updating `email-threads.assigned_user_id`.
 
 ```
-POST /elysium-agents/email-ai-agents/v1/send-thread-draft
+POST /elysium-agents/email-ai-agents/v1/assign-thread
 ```
 
 **Headers:** `Authorization: Bearer <jwt>`
@@ -369,9 +385,110 @@ POST /elysium-agents/email-ai-agents/v1/send-thread-draft
 ```json
 {
   "team_id": "team_123",
+  "thread_id": "18f3abc123",
+  "user_id": "674b2c3d4e5f6789012346"
+}
+```
+
+| Field       | Required | Description                             |
+| ----------- | -------- | --------------------------------------- |
+| `team_id`   | Yes      | Must match JWT `team_id`                |
+| `thread_id` | Yes      | Gmail thread id                         |
+| `user_id`   | Yes      | Team user to assign (`email-users._id`) |
+
+**Role rules:**
+
+| Role     | Can assign to                                 |
+| -------- | --------------------------------------------- |
+| `admin`  | Any user in the team (any department)         |
+| `member` | **Only their own** `user_id` (assign to self) |
+
+Caller must already be able to access the thread (same rules as `get-thread`).
+
+**Success `200`:**
+
+```json
+{
+  "success": true,
+  "message": "Email thread assigned successfully.",
+  "data": {
+    "thread_id": "18f3abc123",
+    "assigned_user_id": "674b2c3d4e5f6789012346",
+    "assigned_user": {
+      "user_id": "674b2c3d4e5f6789012346",
+      "name": "Jane Doe",
+      "email": "jane@example.com"
+    },
+    "thread": {
+      "thread_id": "18f3abc123",
+      "department_id": "674a1b2c3d4e5f6789012345",
+      "department_name": "Sales",
+      "assigned_user_id": "674b2c3d4e5f6789012346",
+      "assigned_user": {
+        "user_id": "674b2c3d4e5f6789012346",
+        "name": "Jane Doe",
+        "email": "jane@example.com"
+      }
+    }
+  }
+}
+```
+
+| Status | Meaning                                                             |
+| ------ | ------------------------------------------------------------------- |
+| `403`  | Member tried to assign someone else, or caller cannot access thread |
+| `404`  | Thread or assignee user not found                                   |
+| `400`  | Assignee not in team                                                |
+
+After assign, re-fetch `list-team-threads` or `get-thread` â€” both include `assigned_user_id` and hydrated `assigned_user` (plus `department_name` when `department_id` is set).
+
+---
+
+## 4. Send Thread AI Draft
+
+Send the pending Gmail draft from your app. See **[email-draft-review-ui.md](./email-draft-review-ui.md)** for the full UX flow.
+
+| `is_edited`       | Behaviour                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------ |
+| `false` (default) | Gmail `drafts.send` on the existing AI draft                                         |
+| `true`            | Gmail `drafts.update` with `body_text` (+ optional `cc` / `bcc`), then `drafts.send` |
+
+```
+POST /elysium-agents/email-ai-agents/v1/send-thread-draft
+```
+
+**Headers:** `Authorization: Bearer <jwt>`
+
+**Body ï¿½ unchanged draft:**
+
+```json
+{
+  "team_id": "team_123",
   "thread_id": "18f3abc123"
 }
 ```
+
+**Body ï¿½ user edited draft in app:**
+
+```json
+{
+  "team_id": "team_123",
+  "thread_id": "18f3abc123",
+  "is_edited": true,
+  "body_text": "Hi ï¿½ updated reply body.\n\nThanks,\nSupport",
+  "cc": ["manager@example.com"],
+  "bcc": []
+}
+```
+
+| Field       | Required               | Notes                                                              |
+| ----------- | ---------------------- | ------------------------------------------------------------------ |
+| `team_id`   | Yes                    | Must match JWT                                                     |
+| `thread_id` | Yes                    | Gmail thread id                                                    |
+| `is_edited` | No                     | Default `false`                                                    |
+| `body_text` | When `is_edited: true` | Full plain-text body from review UI                                |
+| `cc`        | No                     | Full Cc list when edited; omit to keep `ai_action.recipients.cc`   |
+| `bcc`       | No                     | Full Bcc list when edited; omit to keep `ai_action.recipients.bcc` |
 
 **Success `200`:**
 
@@ -386,6 +503,7 @@ POST /elysium-agents/email-ai-agents/v1/send-thread-draft
     "gmail_thread_id": "18f3abc123",
     "label_ids": ["SENT"],
     "ai_action_status": "resolved",
+    "is_edited": true,
     "ai_reply": {
       "assisted": true,
       "mode": "reviewed",
@@ -398,18 +516,19 @@ POST /elysium-agents/email-ai-agents/v1/send-thread-draft
 }
 ```
 
-Sets `thread.ai_action.status` to **`resolved`** and tags the sent outbound row in **`email-thread-messages`** with **`ai_reply`**.
+Sets `thread.ai_action.status` to **`resolved`** and tags the sent outbound row in **`email-thread-messages`** with **`ai_reply`** (using edited body/recipients when `is_edited: true`).
 
-| Status | Meaning |
-| ------ | ------- |
-| `409` | No pending draft on this thread |
-| `403` | User cannot access thread |
+| Status | Meaning                               |
+| ------ | ------------------------------------- |
+| `409`  | No pending draft on this thread       |
+| `403`  | User cannot access thread             |
+| `422`  | `is_edited: true` without `body_text` |
 
 After send, optionally **`trigger-sync`** on the agent so the outbound message appears in `get-thread` messages.
 
 ---
 
-## 4. MongoDB: `email-threads`
+## 5. MongoDB: `email-threads`
 
 Thread summary for inbox list.
 
@@ -453,16 +572,18 @@ Thread summary for inbox list.
 }
 ```
 
-| Field | Description |
-| ----- | ----------- |
-| `department_id` | Department assigned to this thread. Empty until assigned ? **members cannot see** unassigned threads. When set, only members in that department can see it (unless `assigned_user_id` restricts further). |
-| `assigned_user_id` | Team user assigned to this thread. Empty until assigned. When empty, all members in the thread's department can see it. When set, only that user (plus admins) can see it. |
-| `ai_status` | Thread-level flow progress (`processing` / `idle` / `failed`). Exposed as `is_ai_processing` on API responses. |
-| `ai_action` | Latest AI outcome on this thread. See [email-draft-review-ui.md](./email-draft-review-ui.md) for `status` / `type` combinations. |
+| Field              | Description                                                                                                                                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `department_id`    | Department assigned to this thread. Empty until assigned ? **members cannot see** unassigned threads. When set, only members in that department can see it (unless `assigned_user_id` restricts further). |
+| `department_name`  | Hydrated on list/get APIs when `department_id` is set                                                                                                                                                     |
+| `assigned_user_id` | Team user assigned to this thread. Empty until assigned. When empty, all members in the thread's department can see it. When set, only that user (plus admins) can see it.                                |
+| `assigned_user`    | Hydrated on list/get APIs when `assigned_user_id` is set: `{ user_id, name, email }`; `null` when unassigned                                                                                              |
+| `ai_status`        | Thread-level flow progress (`processing` / `idle` / `failed`). Exposed as `is_ai_processing` on API responses.                                                                                            |
+| `ai_action`        | Latest AI outcome on this thread. See [email-draft-review-ui.md](./email-draft-review-ui.md) for `status` / `type` combinations.                                                                          |
 
 ---
 
-## 5. MongoDB: `email-thread-messages`
+## 6. MongoDB: `email-thread-messages`
 
 One document per email (inbound or outbound).
 
@@ -506,17 +627,17 @@ One document per email (inbound or outbound).
 
 `direction: "outbound"` when Gmail `labelIds` contains `SENT`.
 
-| Field | Description |
-| ----- | ----------- |
-| `processing_status` | Flow lifecycle on inbound messages (`pending` on new sync inserts) |
-| `ai_outcome` | Inbound trigger only ? draft was created for this customer email |
-| `ai_reply` | Outbound only ? AI assisted this sent reply (`mode: reviewed` or `auto`) |
+| Field               | Description                                                              |
+| ------------------- | ------------------------------------------------------------------------ |
+| `processing_status` | Flow lifecycle on inbound messages (`pending` on new sync inserts)       |
+| `ai_outcome`        | Inbound trigger only ? draft was created for this customer email         |
+| `ai_reply`          | Outbound only ? AI assisted this sent reply (`mode: reviewed` or `auto`) |
 
 **Gmail draft visibility:** drafts are created via Gmail API on the linked inbox account. The user sees them in **Gmail** on that thread (draft reply in the conversation). OAuth must include `gmail.compose` ? reconnect the inbox if an existing connection predates this scope.
 
 ---
 
-## 6. Frontend guide ? pagination
+## 7. Frontend guide ? pagination
 
 ### Pagination shape (both APIs)
 
@@ -631,7 +752,8 @@ const knowledgeRes = await fetch(`${BASE}/email-knowledge/v1/create`, {
   body: JSON.stringify({
     team_id: teamId,
     title: "Return Policy",
-    knowledge_text: "Our return policy allows customers to return products within 30 days...",
+    knowledge_text:
+      "Our return policy allows customers to return products within 30 days...",
   }),
 });
 const { knowledge } = await knowledgeRes.json();
@@ -704,34 +826,35 @@ async function syncInbox(agentId) {
 
 ### Email AI agent APIs
 
-| API               | Method | Path                                    | Auth | Body |
-| ----------------- | ------ | --------------------------------------- | ---- | ---- |
+| API               | Method | Path                                    | Auth | Body                                                                                                                                                          |
+| ----------------- | ------ | --------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Create agent      | `POST` | `/email-ai-agents/v1/create`            | JWT  | `{ name, gmail_account_id, system_prompt, knowledge_id, tool_ids, llm_model, email_format_template?, reply_action?, routing_rule_ids?, recipient_rule_ids? }` |
-| Get agent         | `POST` | `/email-ai-agents/v1/get-agent`         | No   | `{ agent_id }` |
-| Update agent      | `POST` | `/email-ai-agents/v1/update`            | JWT  | `{ agent_id, name, ?, email_format_template?, reply_action?, routing_rule_ids?, recipient_rule_ids? }` ? agent ? flow sync when `flow_id` set (planned) |
-| List team agents  | `POST` | `/email-ai-agents/v1/list-team-agents`  | No   | `{ team_id }` |
-| Trigger sync      | `POST` | `/email-ai-agents/v1/trigger-sync`      | JWT  | `{ agent_id }` |
-| List team threads | `POST` | `/email-ai-agents/v1/list-team-threads` | JWT  | `{ team_id, page?, limit? }` |
-| Get thread        | `POST` | `/email-ai-agents/v1/get-thread`        | JWT  | `{ team_id, thread_id, page?, limit? }` |
-| Send AI draft     | `POST` | `/email-ai-agents/v1/send-thread-draft` | JWT  | `{ team_id, thread_id }` |
+| Get agent         | `POST` | `/email-ai-agents/v1/get-agent`         | No   | `{ agent_id }`                                                                                                                                                |
+| Update agent      | `POST` | `/email-ai-agents/v1/update`            | JWT  | `{ agent_id, name, ?, email_format_template?, reply_action?, routing_rule_ids?, recipient_rule_ids? }` ? agent ? flow sync when `flow_id` set (planned)       |
+| List team agents  | `POST` | `/email-ai-agents/v1/list-team-agents`  | No   | `{ team_id }`                                                                                                                                                 |
+| Trigger sync      | `POST` | `/email-ai-agents/v1/trigger-sync`      | JWT  | `{ agent_id }`                                                                                                                                                |
+| List team threads | `POST` | `/email-ai-agents/v1/list-team-threads` | JWT  | `{ team_id, page?, limit? }`                                                                                                                                  |
+| Get thread        | `POST` | `/email-ai-agents/v1/get-thread`        | JWT  | `{ team_id, thread_id, page?, limit? }`                                                                                                                       |
+| Assign thread     | `POST` | `/email-ai-agents/v1/assign-thread`     | JWT  | `{ team_id, thread_id, user_id }`                                                                                                                             |
+| Send AI draft     | `POST` | `/email-ai-agents/v1/send-thread-draft` | JWT  | `{ team_id, thread_id, is_edited?, body_text?, cc?, bcc? }`                                                                                                   |
 
 ### Related APIs (knowledge & tools)
 
-| API               | Method | Path                                    | Auth | Docs |
-| ----------------- | ------ | --------------------------------------- | ---- | ---- |
-| Create knowledge  | `POST` | `/email-knowledge/v1/create`            | No   | [email-knowledge-api.md](./email-knowledge-api.md) |
-| Query knowledge   | `POST` | `/email-knowledge/v1/query`             | No   | [email-knowledge-api.md](./email-knowledge-api.md) |
-| Register tool     | `POST` | `/email-tool-definitions/v1/create`     | No   | [email-tool-definitions-api.md](./email-tool-definitions-api.md) |
-| Get ticket status | `POST` | `/email-tools/v1/get-ticket-status`     | No   | [email-tools-api.md](./email-tools-api.md) |
-| Create ticket     | `GET`  | `/email-tools/v1/create-ticket`         | No   | [email-tools-api.md](./email-tools-api.md) |
+| API               | Method | Path                                | Auth | Docs                                                             |
+| ----------------- | ------ | ----------------------------------- | ---- | ---------------------------------------------------------------- |
+| Create knowledge  | `POST` | `/email-knowledge/v1/create`        | No   | [email-knowledge-api.md](./email-knowledge-api.md)               |
+| Query knowledge   | `POST` | `/email-knowledge/v1/query`         | No   | [email-knowledge-api.md](./email-knowledge-api.md)               |
+| Register tool     | `POST` | `/email-tool-definitions/v1/create` | No   | [email-tool-definitions-api.md](./email-tool-definitions-api.md) |
+| Get ticket status | `POST` | `/email-tools/v1/get-ticket-status` | No   | [email-tools-api.md](./email-tools-api.md)                       |
+| Create ticket     | `GET`  | `/email-tools/v1/create-ticket`     | No   | [email-tools-api.md](./email-tools-api.md)                       |
 
-| Collection | Purpose |
-| ---------- | ------- |
-| `email-ai-agents` | Agent config: inbox, system_prompt, email_format_template, knowledge_id, tool_ids, llm_model, reply_action, routing_rule_ids, recipient_rule_ids, flow_id, sync state |
-| `email-knowledge` | Knowledge metadata (text + vectors in Qdrant) |
-| `email-tools` | Registered external tool definitions for LLM |
-| `email-threads` | Thread summaries for inbox list |
-| `email-thread-messages` | Full message bodies per thread |
+| Collection              | Purpose                                                                                                                                                               |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `email-ai-agents`       | Agent config: inbox, system_prompt, email_format_template, knowledge_id, tool_ids, llm_model, reply_action, routing_rule_ids, recipient_rule_ids, flow_id, sync state |
+| `email-knowledge`       | Knowledge metadata (text + vectors in Qdrant)                                                                                                                         |
+| `email-tools`           | Registered external tool definitions for LLM                                                                                                                          |
+| `email-threads`         | Thread summaries for inbox list                                                                                                                                       |
+| `email-thread-messages` | Full message bodies per thread                                                                                                                                        |
 
 ---
 
@@ -741,16 +864,16 @@ The old `email-inbound-messages` collection and `list-agent-messages` API are re
 
 ---
 
-
 ---
 
 ## Quick reference
 
-| API | Method | Path | Auth | Body |
-| --- | ------ | ---- | ---- | ---- |
-| List team threads | `POST` | `/email-ai-agents/v1/list-team-threads` | JWT | `{ team_id, page?, limit? }` |
-| Get thread | `POST` | `/email-ai-agents/v1/get-thread` | JWT | `{ team_id, thread_id, page?, limit? }` |
-| Send AI draft | `POST` | `/email-ai-agents/v1/send-thread-draft` | JWT | `{ team_id, thread_id }` |
+| API               | Method | Path                                    | Auth | Body                                                        |
+| ----------------- | ------ | --------------------------------------- | ---- | ----------------------------------------------------------- |
+| List team threads | `POST` | `/email-ai-agents/v1/list-team-threads` | JWT  | `{ team_id, page?, limit? }`                                |
+| Get thread        | `POST` | `/email-ai-agents/v1/get-thread`        | JWT  | `{ team_id, thread_id, page?, limit? }`                     |
+| Assign thread     | `POST` | `/email-ai-agents/v1/assign-thread`     | JWT  | `{ team_id, thread_id, user_id }`                           |
+| Send AI draft     | `POST` | `/email-ai-agents/v1/send-thread-draft` | JWT  | `{ team_id, thread_id, is_edited?, body_text?, cc?, bcc? }` |
 
 ---
 

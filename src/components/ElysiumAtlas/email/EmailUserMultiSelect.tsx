@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 interface EmailUserMultiSelectItem {
   value: string;
   label: string;
+  description?: string;
 }
 
 interface EmailUserMultiSelectProps {
@@ -65,13 +66,14 @@ export default function EmailUserMultiSelect({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredItems = useMemo(
-    () =>
-      items.filter((item) =>
-        item.label.toLowerCase().includes(searchQuery.toLowerCase()),
-      ),
-    [items, searchQuery],
-  );
+  const filteredItems = useMemo(() => {
+    const query = searchQuery.toLowerCase();
+    return items.filter(
+      (item) =>
+        item.label.toLowerCase().includes(query) ||
+        item.description?.toLowerCase().includes(query),
+    );
+  }, [items, searchQuery]);
 
   const toggleSelection = (itemValue: string) => {
     if (selectedIds.includes(itemValue)) {
@@ -144,7 +146,14 @@ export default function EmailUserMultiSelect({
                       className,
                     )}
                   >
-                    <span className="pr-2 text-[13px]">{item.label}</span>
+                    <div className="min-w-0 pr-2">
+                      <div className="truncate text-[13px]">{item.label}</div>
+                      {item.description && (
+                        <div className="truncate text-[11px] text-muted-foreground">
+                          {item.description}
+                        </div>
+                      )}
+                    </div>
                     <Check
                       className={cn(
                         "h-4 w-4 shrink-0",

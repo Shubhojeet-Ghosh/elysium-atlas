@@ -126,6 +126,12 @@ export interface EmailAiAgent {
   updated_at?: string;
 }
 
+export interface EmailAssignedUser {
+  user_id: string;
+  name: string;
+  email: string;
+}
+
 export interface EmailThread {
   thread_id: string;
   agent_id: string;
@@ -139,7 +145,9 @@ export interface EmailThread {
   message_count: number;
   has_unread: boolean;
   department_id?: string;
+  department_name?: string;
   assigned_user_id?: string;
+  assigned_user?: EmailAssignedUser | null;
   is_ai_processing?: boolean;
   ai_status?: EmailAiStatus | null;
   action_required?: boolean;
@@ -179,7 +187,9 @@ export interface EmailThreadSummary {
   message_count: number;
   has_unread: boolean;
   department_id?: string;
+  department_name?: string;
   assigned_user_id?: string;
+  assigned_user?: EmailAssignedUser | null;
   is_ai_processing?: boolean;
   ai_status?: EmailAiStatus | null;
   action_required?: boolean;
@@ -398,14 +408,68 @@ export async function getEmailThread(
   return response.data as GetThreadResponse;
 }
 
-export async function sendThreadDraft(teamId: string, threadId: string) {
+export interface SendThreadDraftOptions {
+  isEdited?: boolean;
+  bodyText?: string;
+  cc?: string[];
+  bcc?: string[];
+}
+
+export async function sendThreadDraft(
+  teamId: string,
+  threadId: string,
+  options?: SendThreadDraftOptions,
+) {
+  const payload: Record<string, unknown> = {
+    team_id: teamId,
+    thread_id: threadId,
+  };
+
+  if (options?.isEdited) {
+    payload.is_edited = true;
+    payload.body_text = options.bodyText;
+    if (options.cc !== undefined) {
+      payload.cc = options.cc;
+    }
+    if (options.bcc !== undefined) {
+      payload.bcc = options.bcc;
+    }
+  }
+
   const response = await fastApiAxios.post(
     "/elysium-agents/email-ai-agents/v1/send-thread-draft",
-    { team_id: teamId, thread_id: threadId },
+    payload,
     {
       headers: getEmailAuthHeaders(),
     },
   );
 
   return response.data as SendThreadDraftResponse;
+}
+
+export interface AssignThreadResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    thread_id: string;
+    assigned_user_id: string;
+    assigned_user?: EmailAssignedUser;
+    thread?: EmailThreadSummary;
+  };
+}
+
+export async function assignEmailThread(
+  teamId: string,
+  threadId: string,
+  userId: string,
+) {
+  const response = await fastApiAxios.post(
+    "/elysium-agents/email-ai-agents/v1/assign-thread",
+    { team_id: teamId, thread_id: threadId, user_id: userId },
+    {
+      headers: getEmailAuthHeaders(),
+    },
+  );
+
+  return response.data as AssignThreadResponse;
 }
