@@ -5,6 +5,7 @@ import { Link } from "lucide-react";
 import CustomInput from "@/components/inputs/CustomInput";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { setAgentIcon } from "@/store/reducers/agentSlice";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 interface AgentAvatarLinkTabProps {
   imageUrl: string;
@@ -18,6 +19,7 @@ export default function AgentAvatarLinkTab({
   isActive,
 }: AgentAvatarLinkTabProps) {
   const dispatch = useAppDispatch();
+  const readOnly = useAgentReadOnly();
   const agentIcon = useAppSelector((state) => state.agent.agent_icon);
   // Snapshot the icon value at mount — used to restore when the URL is invalid or cleared
   const originalIconRef = useRef<string | null>(agentIcon);
@@ -63,13 +65,12 @@ export default function AgentAvatarLinkTab({
             onLoad={() => {
               setImgValid(true);
               setImgTried(true);
-              dispatch(setAgentIcon(imageUrl));
+              if (!readOnly) dispatch(setAgentIcon(imageUrl));
             }}
             onError={() => {
               setImgValid(false);
               setImgTried(true);
-              // Restore original — don't create a diff for an invalid URL
-              dispatch(setAgentIcon(originalIconRef.current));
+              if (!readOnly) dispatch(setAgentIcon(originalIconRef.current));
             }}
           />
         )}
@@ -82,12 +83,14 @@ export default function AgentAvatarLinkTab({
           placeholder="https://example.com/avatar.png"
           value={imageUrl}
           onChange={(e) => {
+            if (readOnly) return;
             setImgValid(false);
             setImgTried(false);
             // Don't dispatch here — wait for probe onLoad/onError to confirm validity
             setImageUrl(e.target.value.trimStart());
           }}
           inputClassName="font-[400] px-[12px] py-[8px]"
+          disabled={readOnly}
         />
         {imageUrl && imgTried && !imgValid && (
           <p className="text-[11px] text-red-400 text-right">

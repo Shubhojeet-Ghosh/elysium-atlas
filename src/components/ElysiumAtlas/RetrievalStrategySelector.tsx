@@ -2,12 +2,14 @@ import { useAppSelector, useAppDispatch } from "@/store";
 import { setRetrievalStrategy } from "@/store/reducers/agentSlice";
 import AutoComplete from "@/components/ui/AutoComplete";
 import { RETRIEVAL_STRATEGIES } from "@/lib/retrievalStrategyConfig";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 export default function RetrievalStrategySelector() {
   const retrievalStrategy = useAppSelector(
     (state) => state.agent.retrievalStrategy,
   );
   const dispatch = useAppDispatch();
+  const readOnly = useAgentReadOnly();
 
   const strategyItems = RETRIEVAL_STRATEGIES.map((strategy) => ({
     value: strategy.value,
@@ -34,6 +36,7 @@ export default function RetrievalStrategySelector() {
           emptyMessage="No strategy found."
           onChange={(value) => dispatch(setRetrievalStrategy(value))}
           className="text-[13px] font-[500]"
+          disabled={readOnly}
         />
       </div>
     </div>

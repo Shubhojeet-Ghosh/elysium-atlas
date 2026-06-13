@@ -68,12 +68,14 @@ interface ColorPickerRowProps {
   label: string;
   value: string;
   onChange: (color: string) => void;
+  disabled?: boolean;
 }
 
 export default function ColorPickerRow({
   label,
   value,
   onChange,
+  disabled = false,
 }: ColorPickerRowProps) {
   const normalized = normalizeHex(value);
 
@@ -181,7 +183,8 @@ export default function ColorPickerRow({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="flex-1 flex items-center gap-3 border border-border rounded-[10px] px-3 py-2.5 bg-background hover:bg-muted/40 transition-colors cursor-pointer text-left"
+            disabled={disabled}
+            className="flex-1 flex items-center gap-3 border border-border rounded-[10px] px-3 py-2.5 bg-background hover:bg-muted/40 transition-colors cursor-pointer text-left disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-background"
           >
             {/* Color swatch circle */}
             <div

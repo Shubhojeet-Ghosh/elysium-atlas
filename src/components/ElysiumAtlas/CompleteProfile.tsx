@@ -16,17 +16,27 @@ import {
   setUserEmail as setUserEmailAction,
 } from "@/store/reducers/userProfileSlice";
 
+function getSuggestedTeamName(firstName: string): string {
+  const trimmed = firstName.trim();
+  if (!trimmed) return "";
+  return `${trimmed}'s Team`;
+}
+
 export default function CompleteProfile() {
   const dispatch = useAppDispatch();
   const isProfileComplete = useAppSelector(
     (state: any) => state.userProfile.isProfileComplete,
   );
   const userID = useAppSelector((state: any) => state.userProfile.userID);
+  const teamSelectionPending = useAppSelector(
+    (state) => state.teams.selectionPending,
+  );
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [teamName, setTeamName] = useState("");
+  const [isTeamNameCustomized, setIsTeamNameCustomized] = useState(false);
   const [errors, setErrors] = useState({
     firstName: "",
     lastName: "",
@@ -35,8 +45,8 @@ export default function CompleteProfile() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Don't render if profile is complete or userID is not set
-  if (isProfileComplete || !userID) {
+  // Don't render if profile is complete, team selection is pending, or userID is not set
+  if (isProfileComplete || teamSelectionPending || !userID) {
     return null;
   }
 
@@ -203,7 +213,11 @@ export default function CompleteProfile() {
                   placeholder="Enter your first name"
                   value={firstName}
                   onChange={(e) => {
-                    setFirstName(e.target.value);
+                    const nextFirstName = e.target.value;
+                    setFirstName(nextFirstName);
+                    if (!isTeamNameCustomized) {
+                      setTeamName(getSuggestedTeamName(nextFirstName));
+                    }
                     if (errors.firstName) {
                       setErrors({ ...errors, firstName: "" });
                     }
@@ -295,6 +309,7 @@ export default function CompleteProfile() {
                 placeholder="Enter your team name"
                 value={teamName}
                 onChange={(e) => {
+                  setIsTeamNameCustomized(true);
                   setTeamName(e.target.value);
                   if (errors.teamName) {
                     setErrors({ ...errors, teamName: "" });

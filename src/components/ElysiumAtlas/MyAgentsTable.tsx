@@ -44,9 +44,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useCanManageAgents } from "@/hooks/useCanManageAgents";
 
 export default function MyAgentsTable() {
   const agents = useAppSelector((state) => state.userAgents.myAgents);
+  const canManageAgents = useCanManageAgents();
   const dispatch = useAppDispatch();
   const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
@@ -260,6 +262,7 @@ export default function MyAgentsTable() {
                         {["active", "inactive", "failed"].includes(
                           agent.agent_status.toLowerCase(),
                         ) ? (
+                          canManageAgents ? (
                           <div className="mx-auto flex items-center justify-center h-[30px] w-[30px]">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -293,6 +296,7 @@ export default function MyAgentsTable() {
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
+                          ) : null
                         ) : (
                           <div className="mx-auto flex items-center justify-center h-[30px] w-[30px]">
                             <CircularProgress

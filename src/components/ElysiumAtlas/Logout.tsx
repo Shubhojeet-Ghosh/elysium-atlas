@@ -5,7 +5,13 @@ import Cookies from "js-cookie";
 import NProgress from "nprogress";
 import { useAppDispatch } from "@/store";
 import { resetAgentBuilder } from "@/store/reducers/agentBuilderSlice";
+import { resetUserAgent } from "@/store/reducers/agentSlice";
+import { resetAgentChat } from "@/store/reducers/agentChatSlice";
 import { resetUserProfile } from "@/store/reducers/userProfileSlice";
+import { resetUserPlan } from "@/store/reducers/userPlanSlice";
+import { resetTeams } from "@/store/reducers/teamsSlice";
+import { resetMyAgents } from "@/store/reducers/userAgentsSlice";
+import { clearTeamSelectionPending } from "@/utils/authLogin";
 
 interface LogoutProps {
   onClick?: () => void;
@@ -20,10 +26,16 @@ export default function Logout({ onClick }: LogoutProps) {
 
     // Reset all Redux state
     dispatch(resetAgentBuilder());
+    dispatch(resetMyAgents());
+    dispatch(resetUserAgent());
+    dispatch(resetAgentChat());
     dispatch(resetUserProfile());
+    dispatch(resetUserPlan());
+    dispatch(resetTeams());
 
     // Clear the session token cookie
     Cookies.remove("elysium_atlas_session_token");
+    clearTeamSelectionPending();
 
     // Small delay to show progress, then redirect
     setTimeout(() => {

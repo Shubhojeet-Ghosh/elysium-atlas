@@ -5,11 +5,17 @@ import { useDispatch } from "react-redux";
 import { setCurrentStep } from "@/store/reducers/agentBuilderSlice";
 import ChatInterface from "./ChatInterface";
 import { resetAgentBuilder } from "@/store/reducers/agentBuilderSlice";
+import { useCanManageAgents } from "@/hooks/useCanManageAgents";
 
 export default function CreateAgentCard() {
   const [isHovered, setIsHovered] = useState(false);
   const router = useRouter();
   const dispatch = useDispatch();
+  const canManageAgents = useCanManageAgents();
+
+  if (!canManageAgents) {
+    return null;
+  }
 
   const handleCreateAgent = () => {
     dispatch(resetAgentBuilder());

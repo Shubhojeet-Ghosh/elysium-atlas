@@ -2,10 +2,12 @@ import CustomTextareaPrimary from "@/components/inputs/CustomTextareaPrimary";
 import InfoIcon from "@/components/ui/InfoIcon";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { setWelcomeMessage } from "@/store/reducers/agentSlice";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 export default function WelcomeMessage() {
   const welcomeMessage = useAppSelector((state) => state.agent.welcomeMessage);
   const dispatch = useAppDispatch();
+  const readOnly = useAgentReadOnly();
 
   return (
     <div className="flex flex-col gap-2">
@@ -26,6 +28,8 @@ export default function WelcomeMessage() {
         value={welcomeMessage}
         onChange={(e) => dispatch(setWelcomeMessage(e.target.value))}
         rows={6}
+        disabled={readOnly}
+        readOnly={readOnly}
       />
     </div>
   );

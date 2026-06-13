@@ -7,9 +7,11 @@ import {
   setTextColor,
 } from "@/store/reducers/agentSlice";
 import ColorPickerRow from "./ColorPickerRow";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 export default function AgentColorsRight() {
   const dispatch = useAppDispatch();
+  const readOnly = useAgentReadOnly();
   const primaryColor = useAppSelector((state) => state.agent.primary_color);
   const textColor = useAppSelector((state) => state.agent.text_color);
 
@@ -24,6 +26,7 @@ export default function AgentColorsRight() {
               dispatch(setPrimaryColor(color));
               dispatch(setSecondaryColor(color));
             }}
+            disabled={readOnly}
           />
         </div>
         <div className="px-4 py-1">
@@ -31,6 +34,7 @@ export default function AgentColorsRight() {
             label="Text Color"
             value={textColor}
             onChange={(color) => dispatch(setTextColor(color))}
+            disabled={readOnly}
           />
         </div>
       </div>

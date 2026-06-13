@@ -4,6 +4,7 @@ import { Agent, UserAgentsState } from "../types/UserAgentsTypes";
 const initialState: UserAgentsState = {
   myAgents: [],
   trigger_fetch_agents: 0,
+  hasCompletedInitialAgentsFetch: false,
 };
 
 const userAgentsSlice = createSlice({
@@ -31,6 +32,10 @@ const userAgentsSlice = createSlice({
     },
     resetMyAgents: (state) => {
       state.myAgents = [];
+      state.hasCompletedInitialAgentsFetch = false;
+    },
+    setInitialAgentsFetchComplete: (state) => {
+      state.hasCompletedInitialAgentsFetch = true;
     },
     updateVisitorCounts: (
       state,
@@ -59,6 +64,7 @@ export const {
   removeAgent,
   updateAgent,
   resetMyAgents,
+  setInitialAgentsFetchComplete,
   updateVisitorCounts,
   triggerFetchAgents,
 } = userAgentsSlice.actions;

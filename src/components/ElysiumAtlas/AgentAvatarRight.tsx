@@ -11,6 +11,7 @@ import AgentAvatarLinkTab from "./AgentAvatarLinkTab";
 import AgentAvatarImageTab from "./AgentAvatarImageTab";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { setAgentIcon } from "@/store/reducers/agentSlice";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 interface AgentAvatarRightProps {
   avatarFile: File | null;
@@ -24,6 +25,7 @@ export default function AgentAvatarRight({
   clearSignal,
 }: AgentAvatarRightProps) {
   const dispatch = useAppDispatch();
+  const readOnly = useAgentReadOnly();
   const agentIcon = useAppSelector((state) => state.agent.agent_icon);
   const initialized = useRef(false);
   // Always-current ref so the clearSignal effect reads the post-clear Redux value
@@ -97,6 +99,7 @@ export default function AgentAvatarRight({
 
   return (
     <div className="lg:w-[60%] w-full flex flex-col items-start lg:items-center p-[24px] gap-[20px]">
+      {!readOnly && (
       <CustomTabs value={activeTab} onValueChange={setActiveTab}>
         <CustomTabsList className="w-fit">
           <CustomTabsTrigger
@@ -115,6 +118,7 @@ export default function AgentAvatarRight({
           </CustomTabsTrigger>
         </CustomTabsList>
       </CustomTabs>
+      )}
 
       <div
         className={`w-full max-w-[480px] ${activeTab === "link" ? "block" : "hidden"}`}

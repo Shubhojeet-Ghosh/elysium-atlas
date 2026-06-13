@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Cookies from "js-cookie";
 import { useAppDispatch } from "@/store";
 import { setAppVersion } from "@/store/reducers/settingsSlice";
 import packageJson from "../../../package.json";
@@ -24,7 +25,10 @@ export default function TopNav() {
 
   // Fetch user plan info
   useEffect(() => {
-    fetchUserPlan(dispatch);
+    const sessionToken = Cookies.get("elysium_atlas_session_token");
+    if (sessionToken) {
+      fetchUserPlan(dispatch);
+    }
   }, [dispatch]);
 
   // Close dropdown when clicking outside

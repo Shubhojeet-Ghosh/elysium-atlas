@@ -1,10 +1,12 @@
 import CustomInput from "@/components/inputs/CustomInput";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { setAgentName } from "@/store/reducers/agentSlice";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 export default function AgentNameField() {
   const dispatch = useAppDispatch();
   const agentName = useAppSelector((state) => state.agent.agentName);
+  const readOnly = useAgentReadOnly();
 
   return (
     <div className="flex flex-col gap-2 w-full">
@@ -23,6 +25,7 @@ export default function AgentNameField() {
         placeholder="Enter agent name"
         value={agentName}
         onChange={(e) => dispatch(setAgentName(e.target.value))}
+        disabled={readOnly}
       />
     </div>
   );

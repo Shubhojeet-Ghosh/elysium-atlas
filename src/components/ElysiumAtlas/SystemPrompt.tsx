@@ -3,10 +3,12 @@ import CustomTextareaPrimary from "@/components/inputs/CustomTextareaPrimary";
 import InfoIcon from "@/components/ui/InfoIcon";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { setSystemPrompt } from "@/store/reducers/agentSlice";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 export default function SystemPrompt() {
   const systemPrompt = useAppSelector((state) => state.agent.systemPrompt);
   const dispatch = useAppDispatch();
+  const readOnly = useAgentReadOnly();
 
   return (
     <div className="flex flex-col gap-2">
@@ -28,6 +30,8 @@ export default function SystemPrompt() {
         value={systemPrompt}
         onChange={(e) => dispatch(setSystemPrompt(e.target.value))}
         rows={6}
+        disabled={readOnly}
+        readOnly={readOnly}
       />
     </div>
   );

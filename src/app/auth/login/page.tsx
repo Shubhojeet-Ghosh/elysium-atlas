@@ -1,4 +1,5 @@
 import LoginBox from "@/components/ElysiumAtlas/auth/LoginBox";
+import SelectTeamDialog from "@/components/ElysiumAtlas/auth/SelectTeamDialog";
 import Logo from "@/components/ElysiumAtlas/LogoComponent";
 import ThemeToggle from "@/components/ElysiumAtlas/ThemeToggle";
 import { loginPageMetadata } from "./metadata";
@@ -15,6 +16,7 @@ export default function ElysiumAtlasAuthPage() {
       <div className="flex items-center justify-center md:mt-[100px] mt-[60px] lg:px-[20px] px-0">
         <LoginBox />
       </div>
+      <SelectTeamDialog />
     </>
   );
 }

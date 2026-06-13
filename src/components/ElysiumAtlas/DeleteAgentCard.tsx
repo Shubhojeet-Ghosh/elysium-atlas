@@ -17,14 +17,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 export default function DeleteAgentCard() {
   const agentID = useAppSelector((state) => state.agent.agentID);
   const agentName = useAppSelector((state) => state.agent.agentName);
   const router = useRouter();
+  const readOnly = useAgentReadOnly();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  if (readOnly) {
+    return null;
+  }
 
   const handleDelete = async () => {
     if (!agentID) return;

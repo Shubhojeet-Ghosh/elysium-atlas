@@ -48,11 +48,13 @@ const FILES_PER_PAGE = 6; // 3 rows × 2 columns
 interface AgentFilesListProps {
   isLoadingFiles: boolean;
   onRemoveFile: (fileName: string) => void;
+  readOnly?: boolean;
 }
 
 export default function AgentFilesList({
   isLoadingFiles,
   onRemoveFile,
+  readOnly = false,
 }: AgentFilesListProps) {
   const dispatch = useDispatch();
   const knowledgeBaseFiles = useSelector(
@@ -331,6 +333,7 @@ export default function AgentFilesList({
 
           {/* Master Checkbox, Clear Selected, and Pagination */}
           <div className="flex items-center justify-between mb-3 px-[10px] flex-wrap gap-2">
+            {!readOnly && (
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <Checkbox
@@ -387,6 +390,7 @@ export default function AgentFilesList({
                 </>
               )}
             </div>
+            )}
             {/* Delete File Dialog */}
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
               <DialogContent className="sm:max-w-[425px]">
@@ -492,10 +496,13 @@ export default function AgentFilesList({
                 return (
                   <div
                     key={item.name}
-                    onClick={() => handleToggleCheckbox(originalIndex)}
-                    className="group flex items-center justify-between gap-2 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 w-full cursor-pointer"
+                    onClick={() => {
+                      if (!readOnly) handleToggleCheckbox(originalIndex);
+                    }}
+                    className={`group flex items-center justify-between gap-2 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 w-full ${readOnly ? "" : "cursor-pointer"}`}
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {!readOnly && (
                       <Checkbox
                         id={`file-${originalIndex}`}
                         checked={item.checked ?? true}
@@ -505,6 +512,7 @@ export default function AgentFilesList({
                         onClick={(e) => e.stopPropagation()}
                         className="shrink-0 border-2 border-gray-300 dark:border-gray-500 data-[state=checked]:border-serene-purple data-[state=checked]:bg-serene-purple data-[state=checked]:text-white dark:data-[state=checked]:text-black"
                       />
+                      )}
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
                         <FileText
                           size={20}
@@ -578,6 +586,7 @@ export default function AgentFilesList({
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      {!readOnly && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -592,6 +601,7 @@ export default function AgentFilesList({
                           <X className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 group-hover/btn:text-danger-red transition-colors" />
                         )}
                       </button>
+                      )}
                     </div>
                   </div>
                 );

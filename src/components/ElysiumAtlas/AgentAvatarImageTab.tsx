@@ -29,6 +29,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import PrimaryButton from "@/components/ui/PrimaryButton";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 interface AgentAvatarImageTabProps {
   preview: string | null;
@@ -44,6 +45,7 @@ export default function AgentAvatarImageTab({
   setAvatarFile,
 }: AgentAvatarImageTabProps) {
   const dispatch = useAppDispatch();
+  const readOnly = useAgentReadOnly();
   const agentIcon = useAppSelector((state) => state.agent.agent_icon);
   const agentID = useAppSelector((state) => state.agent.agentID);
   const triggerGetAgentDetails = useAppSelector(
@@ -77,6 +79,7 @@ export default function AgentAvatarImageTab({
     accept: { "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp"] },
     maxSize: 2 * 1024 * 1024,
     multiple: false,
+    disabled: readOnly,
   });
 
   const handleClear = async () => {
@@ -137,6 +140,7 @@ export default function AgentAvatarImageTab({
                 : preview || agentIcon}
             </p>
           </div>
+          {!readOnly && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Dialog
@@ -183,10 +187,12 @@ export default function AgentAvatarImageTab({
               <p>Remove agent avatar</p>
             </TooltipContent>
           </Tooltip>
+          )}
         </div>
       )}
 
       {/* Dropzone */}
+      {!readOnly && (
       <div
         {...getRootProps()}
         className={`flex flex-row items-center gap-[16px] w-full border rounded-[12px] p-[16px] cursor-pointer transition-colors duration-200 ${
@@ -227,6 +233,7 @@ export default function AgentAvatarImageTab({
           </p>
         </div>
       </div>
+      )}
     </div>
   );
 }

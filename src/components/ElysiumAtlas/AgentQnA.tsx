@@ -15,9 +15,11 @@ import CancelButton from "../ui/CancelButton";
 import AgentQnAList from "./AgentQnAList";
 import { toast } from "sonner";
 import AgentKnowledgeBaseQnA from "./AgentKnowledgeBaseQnA";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 export default function AgentQnA() {
   const dispatch = useDispatch();
+  const readOnly = useAgentReadOnly();
   const knowledgeBaseQnA = useSelector(
     (state: RootState) => state.agent.knowledgeBaseQnA
   );
@@ -86,7 +88,7 @@ export default function AgentQnA() {
     <>
       <AgentKnowledgeBaseQnA />
       <div className="flex flex-col">
-        {/* Add/Edit Form */}
+        {!readOnly && (
         <div className="flex flex-col gap-[16px]">
           <div className="flex flex-col gap-[4px]">
             <div className="lg:text-[14px] text-[12px] font-bold mt-[4px] flex items-center gap-1.5">
@@ -151,6 +153,7 @@ export default function AgentQnA() {
             )}
           </div>
         </div>
+        )}
 
         {/* List of QnA Entries */}
         <AgentQnAList />

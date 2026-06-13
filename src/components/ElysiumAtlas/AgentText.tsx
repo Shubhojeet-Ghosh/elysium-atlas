@@ -15,9 +15,11 @@ import CancelButton from "../ui/CancelButton";
 import AgentTextList from "./AgentTextList";
 import { toast } from "sonner";
 import AgentKnowledgeBaseText from "./AgentKnowledgeBaseText";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 export default function AgentText() {
   const dispatch = useDispatch();
+  const readOnly = useAgentReadOnly();
   const knowledgeBaseText = useSelector(
     (state: RootState) => state.agent.knowledgeBaseText
   );
@@ -81,7 +83,7 @@ export default function AgentText() {
     <>
       <AgentKnowledgeBaseText />
       <div className="flex flex-col">
-        {/* Add/Edit Form */}
+        {!readOnly && (
         <div className="flex flex-col gap-[16px]">
           <div className="flex flex-col gap-[4px]">
             <div className="lg:text-[14px] text-[12px] font-bold mt-[4px] flex items-center gap-1.5">
@@ -132,6 +134,7 @@ export default function AgentText() {
             )}
           </div>
         </div>
+        )}
 
         {/* List of Text Entries */}
         <AgentTextList />

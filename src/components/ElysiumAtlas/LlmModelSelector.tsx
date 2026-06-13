@@ -15,12 +15,14 @@ import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { setTemperature } from "@/store/reducers/agentSlice";
 import { AVAILABLE_MODELS } from "@/lib/llmConfig";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 export default function LlmModelSelector() {
   const [open, setOpen] = useState(false);
   const temperature = useAppSelector((state) => state.agent.temperature);
   const llmModel = useAppSelector((state) => state.agent.llmModel);
   const dispatch = useAppDispatch();
+  const readOnly = useAgentReadOnly();
 
   const modelItems = AVAILABLE_MODELS.map((model) => ({
     value: model.model_code,
@@ -45,13 +47,20 @@ export default function LlmModelSelector() {
           <CustomSelector
             label="LLM Model"
             value={llmModel}
-            className="px-[10px] py-[12px] "
-            onClick={() => setOpen(true)}
+            className={`px-[10px] py-[12px] ${readOnly ? "pointer-events-none opacity-60" : ""}`}
+            onClick={() => {
+              if (!readOnly) setOpen(true);
+            }}
           />
         </div>
       </div>
 
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!readOnly) setOpen(nextOpen);
+        }}
+      >
         <SheetContent className="min-w-full lg:min-w-[480px] md:min-w-full z-[110] px-[4px]">
           <SheetHeader>
             <SheetTitle>
@@ -73,6 +82,7 @@ export default function LlmModelSelector() {
               emptyMessage="No model found."
               onChange={(value) => dispatch(setLlmModel(value))}
               className="text-[13px] font-[500]"
+              disabled={readOnly}
             />
           </div>
           <div className="mt-4 px-4">
@@ -91,6 +101,7 @@ export default function LlmModelSelector() {
               max={1.0}
               min={0.0}
               step={0.01}
+              disabled={readOnly}
               className={cn("w-full mt-[10px] cursor-pointer")}
             />
           </div>

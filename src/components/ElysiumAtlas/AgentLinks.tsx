@@ -17,9 +17,11 @@ import { toast } from "sonner";
 import fastApiAxios from "@/utils/fastapi_axios";
 import Cookies from "js-cookie";
 import { cleanAndDeduplicateLinks } from "@/utils/linkUtils";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 export default function AgentLinks() {
   const dispatch = useDispatch();
+  const readOnly = useAgentReadOnly();
   const baseURL = useSelector((state: RootState) => state.agent.baseURL);
   const agentID = useSelector((state: RootState) => state.agent.agentID);
   const knowledgeBaseLinks = useSelector(
@@ -202,22 +204,27 @@ export default function AgentLinks() {
           value={baseURL}
           onChange={(e) => dispatch(setBaseURL(e.target.value))}
           className="flex-1 px-[12px] py-[10px]"
+          disabled={readOnly}
         />
-        <PrimaryButton
-          className="text-[12px] font-semibold flex items-center justify-center gap-2 min-w-[110px] min-h-[41px] shrink-0"
-          onClick={handleExtractLinks}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <Spinner className="border-white dark:border-deep-onyx" />
-          ) : (
-            <span>Extract Links</span>
-          )}
-        </PrimaryButton>
-        <AgentAddSitemapDialog />
+        {!readOnly && (
+          <>
+            <PrimaryButton
+              className="text-[12px] font-semibold flex items-center justify-center gap-2 min-w-[110px] min-h-[41px] shrink-0"
+              onClick={handleExtractLinks}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Spinner className="border-white dark:border-deep-onyx" />
+              ) : (
+                <span>Extract Links</span>
+              )}
+            </PrimaryButton>
+            <AgentAddSitemapDialog />
+          </>
+        )}
       </div>
       <div className="mt-[2px]">
-        <AgentLinksList isLoadingLinks={isLoadingLinks} />
+        <AgentLinksList isLoadingLinks={isLoadingLinks} readOnly={readOnly} />
       </div>
     </div>
   );

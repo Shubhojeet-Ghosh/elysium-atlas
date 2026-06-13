@@ -53,10 +53,12 @@ const LINKS_PER_PAGE = 6; // 3 rows × 2 columns
 
 interface AgentLinksListProps {
   isLoadingLinks: boolean;
+  readOnly?: boolean;
 }
 
 export default function AgentLinksList({
   isLoadingLinks,
+  readOnly = false,
 }: AgentLinksListProps) {
   const dispatch = useDispatch();
   const knowledgeBaseLinks = useSelector(
@@ -446,13 +448,15 @@ export default function AgentLinksList({
             </div>
             {knowledgeBaseLinks.length > 0 && (
               <div className="flex items-center gap-2">
-                <OutlineButton
-                  className="text-[12px] font-bold px-3 py-1 h-8"
-                  onClick={() => setManualLinkDialogOpen(true)}
-                >
-                  <span className="text-[18px]">+</span>{" "}
-                  <span className="hidden md:inline">Add More</span>
-                </OutlineButton>
+                {!readOnly && (
+                  <OutlineButton
+                    className="text-[12px] font-bold px-3 py-1 h-8"
+                    onClick={() => setManualLinkDialogOpen(true)}
+                  >
+                    <span className="text-[18px]">+</span>{" "}
+                    <span className="hidden md:inline">Add More</span>
+                  </OutlineButton>
+                )}
                 <div className="relative w-[200px]">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                   <CustomInput
@@ -469,6 +473,7 @@ export default function AgentLinksList({
 
           {/* Master Checkbox, Clear Selected, and Pagination */}
           <div className="flex items-center justify-between mb-3 px-[10px] flex-wrap gap-2">
+            {!readOnly && (
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <Checkbox
@@ -565,6 +570,7 @@ export default function AgentLinksList({
                 </>
               )}
             </div>
+            )}
             {/* Delete Link Dialog */}
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
               <DialogContent className="sm:max-w-[425px]">
@@ -741,10 +747,13 @@ export default function AgentLinksList({
                 return (
                   <div
                     key={item.link}
-                    onClick={() => handleToggleCheckbox(originalIndex)}
-                    className="group flex items-center justify-between gap-2 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 w-full cursor-pointer"
+                    onClick={() => {
+                      if (!readOnly) handleToggleCheckbox(originalIndex);
+                    }}
+                    className={`group flex items-center justify-between gap-2 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 w-full ${readOnly ? "" : "cursor-pointer"}`}
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {!readOnly && (
                       <Checkbox
                         id={`link-${originalIndex}`}
                         checked={item.checked}
@@ -754,6 +763,7 @@ export default function AgentLinksList({
                         onClick={(e) => e.stopPropagation()}
                         className="shrink-0 border-2 border-gray-300 dark:border-gray-500 data-[state=checked]:border-serene-purple data-[state=checked]:bg-serene-purple data-[state=checked]:text-white dark:data-[state=checked]:text-black"
                       />
+                      )}
                       <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <Tooltip>
@@ -818,7 +828,7 @@ export default function AgentLinksList({
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {item.status === "existing" && (
+                      {!readOnly && item.status === "existing" && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
@@ -842,6 +852,7 @@ export default function AgentLinksList({
                           </TooltipContent>
                         </Tooltip>
                       )}
+                      {!readOnly && (
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <button
@@ -873,6 +884,7 @@ export default function AgentLinksList({
                           </p>
                         </TooltipContent>
                       </Tooltip>
+                      )}
                       <Link
                         href={item.link}
                         target="_blank"

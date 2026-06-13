@@ -2,14 +2,18 @@
 import CreateAgentCard from "@/components/ElysiumAtlas/CreateAgentCard";
 import LogoComponent from "./LogoComponent";
 import { useAppSelector } from "@/store";
+import { useCanManageAgents } from "@/hooks/useCanManageAgents";
 
 export default function BuildAgent() {
   const agents = useAppSelector((state) => state.userAgents.myAgents);
+  const hasCompletedInitialAgentsFetch = useAppSelector(
+    (state) => state.userAgents.hasCompletedInitialAgentsFetch,
+  );
+  const canManageAgents = useCanManageAgents();
 
-  if (agents.length > 0) {
+  if (!hasCompletedInitialAgentsFetch || agents.length > 0 || !canManageAgents) {
     return null;
-  }
-  return (
+  }  return (
     <div className="w-full h-full">
       <div className=" flex flex-col">
         <div className="lg:text-[22px] text-[18px] font-bold flex flex-wrap items-center gap-1 md:gap-2">

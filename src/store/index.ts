@@ -11,6 +11,7 @@ import { userAgentsReducer } from "./reducers/userAgentsSlice";
 import { agentReducer } from "./reducers/agentSlice";
 import { agentChatReducer } from "./reducers/agentChatSlice";
 import { userPlanReducer } from "./reducers/userPlanSlice";
+import { teamsReducer } from "./reducers/teamsSlice";
 
 // Noop storage logic to handle SSR issues
 const createNoopStorage = () => {
@@ -67,6 +68,12 @@ const userPlanPersistConfig = {
   storage: storage,
 };
 
+const teamsPersistConfig = {
+  key: "teams",
+  storage: storage,
+  whitelist: ["list"],
+};
+
 // Apply persistReducer to settings and userAgents
 const persistedSettingsReducer = persistReducer(
   settingsPersistConfig,
@@ -94,6 +101,10 @@ const persistedUserPlanReducer = persistReducer(
   userPlanPersistConfig,
   userPlanReducer,
 );
+const persistedTeamsReducer = persistReducer(
+  teamsPersistConfig,
+  teamsReducer,
+);
 
 // Configure Redux Store
 export const store = configureStore({
@@ -105,6 +116,7 @@ export const store = configureStore({
     agent: persistedAgentReducer,
     agentChat: persistedAgentChatReducer,
     userPlan: persistedUserPlanReducer,
+    teams: persistedTeamsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

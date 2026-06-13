@@ -49,6 +49,7 @@ import { isEquivalent, normalizeValue } from "@/utils/comparisonUtils";
 import { toast } from "sonner";
 import { SquareArrowOutUpRight } from "lucide-react";
 import axios from "axios";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 import {
   getSectionLabel,
   isNoTabSection,
@@ -270,6 +271,7 @@ export default function MyAgent({
     (state) => state.agent.triggerFetchAgentQnA,
   );
   const currentAgentDetails = useCurrentAgentDetails();
+  const readOnly = useAgentReadOnly();
 
   const handleTabChange = useCallback(
     (newTab: string) => {
@@ -879,7 +881,7 @@ export default function MyAgent({
         />
       )}
       {section === "live-visitors" && <AgentLiveVisitors />}
-      {mappedInitial && (
+      {mappedInitial && !readOnly && (
         <UnsavedChangesBar
           initial={mappedInitial}
           current={currentAgentDetails}

@@ -44,6 +44,7 @@ import Cookies from "js-cookie";
 import { toast } from "sonner";
 import NProgress from "nprogress";
 import { formatDateTime12hr } from "@/utils/formatDate";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 const TEXTS_PER_PAGE = 10;
 
@@ -59,6 +60,7 @@ export default function AgentTextList({
   onRemove: _onRemove,
 }: AgentTextListProps = {}) {
   const dispatch = useDispatch();
+  const readOnly = useAgentReadOnly();
   const knowledgeBaseText = useSelector(
     (state: RootState) => state.agent.knowledgeBaseText,
   );
@@ -451,7 +453,9 @@ export default function AgentTextList({
                       <TableHead className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 font-[600] py-2 lg:px-4 px-0 whitespace-nowrap">
                         Last updated
                       </TableHead>
+                      {!readOnly && (
                       <TableHead className="w-[60px] md:w-[80px] text-right font-[600] py-2 lg:px-4 px-0 whitespace-nowrap"></TableHead>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -528,6 +532,7 @@ export default function AgentTextList({
                             <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-2 lg:px-4 px-0 text-[12px] whitespace-nowrap">
                               {formatDateTime12hr(item.lastUpdated)}
                             </TableCell>
+                            {!readOnly && (
                             <TableCell className="w-[60px] md:w-[80px] text-right py-2 lg:px-4 px-0 whitespace-nowrap">
                               <button
                                 onClick={(e) => {
@@ -542,6 +547,7 @@ export default function AgentTextList({
                                 <Trash2 size={14} />
                               </button>
                             </TableCell>
+                            )}
                           </TableRow>
                         );
                       },
@@ -596,10 +602,11 @@ export default function AgentTextList({
       >
         <SheetContent className="min-w-full lg:min-w-[480px] md:min-w-full z-[110] px-[4px]">
           <SheetHeader>
-            <SheetTitle>Edit Text Entry</SheetTitle>
+            <SheetTitle>{readOnly ? "View Text Entry" : "Edit Text Entry"}</SheetTitle>
             <SheetDescription className="font-medium">
-              Make changes to your text entry here. Click save when you&apos;re
-              done.
+              {readOnly
+                ? "View the content of this text entry."
+                : "Make changes to your text entry here. Click save when you're done."}
             </SheetDescription>
           </SheetHeader>
           <div className="grid flex-1 auto-rows-min gap-6 px-4 py-6">
@@ -618,8 +625,9 @@ export default function AgentTextList({
                     : ""
                 }`}
                 disabled={
-                  selectedIndex !== null &&
-                  knowledgeBaseText[selectedIndex]?.status !== "new"
+                  readOnly ||
+                  (selectedIndex !== null &&
+                  knowledgeBaseText[selectedIndex]?.status !== "new")
                 }
               />
             </div>
@@ -632,10 +640,13 @@ export default function AgentTextList({
                 onChange={(e) => setText(e.target.value)}
                 className="w-full"
                 rows={8}
+                disabled={readOnly}
+                readOnly={readOnly}
               />
             </div>
           </div>
           <SheetFooter className="flex-col gap-2">
+            {!readOnly && (
             <PrimaryButton
               type="button"
               onClick={handleUpdate}
@@ -644,12 +655,13 @@ export default function AgentTextList({
             >
               Save changes
             </PrimaryButton>
+            )}
             <SheetClose asChild>
               <CancelButton
                 type="button"
                 className="w-full text-[12px] font-semibold "
               >
-                Cancel
+                {readOnly ? "Close" : "Cancel"}
               </CancelButton>
             </SheetClose>
           </SheetFooter>

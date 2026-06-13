@@ -24,6 +24,12 @@ import { setTheme } from "@/store/reducers/settingsSlice";
 import Logout from "@/components/ElysiumAtlas/Logout";
 import PlanBadge from "@/components/ElysiumAtlas/PlanBadge";
 import Link from "next/link";
+import type { TeamRole, UserTeam } from "@/types/auth";
+import { useActiveTeamRole } from "@/hooks/useActiveTeamRole";
+
+function formatTeamRoleLabel(role: TeamRole): string {
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
 interface DropdownProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -35,6 +41,14 @@ export default function Dropdown({ open, onOpenChange }: DropdownProps) {
   const firstName = useAppSelector((state: any) => state.userProfile.firstName);
   const lastName = useAppSelector((state: any) => state.userProfile.lastName);
   const userEmail = useAppSelector((state: any) => state.userProfile.userEmail);
+  const teamID = useAppSelector((state: any) => state.userProfile.teamID);
+  const teams = useAppSelector((state: any) => state.teams.list);
+  const activeTeamRole = useActiveTeamRole();
+
+  const activeTeam = teams.find((team: UserTeam) => team.team_id === teamID);
+  const activeTeamName = activeTeam?.team_name?.trim() || null;
+  const displayRole =
+    activeTeamRole ?? activeTeam?.role ?? null;
 
   // Generate username for display
   const userName =
@@ -72,15 +86,40 @@ export default function Dropdown({ open, onOpenChange }: DropdownProps) {
   if (!open) return null;
 
   return (
-    <div className="absolute right-0 top-full mt-1 w-64 bg-pure-mist dark:bg-deep-onyx border border-gray-200 dark:border-serene-purple rounded-md shadow-lg z-50">
+    <div className="absolute right-0 top-full mt-1 w-64 max-w-[calc(100vw-1.5rem)] overflow-hidden bg-pure-mist dark:bg-deep-onyx border border-gray-200 dark:border-serene-purple rounded-md shadow-lg z-50">
       {/* User Info Section */}
-      <div className="px-4 py-3 border-b border-gray-200 dark:border-serene-purple">
-        <div className="font-semibold text-deep-onyx dark:text-pure-mist text-[14px]">
+      <div className="px-4 py-3 border-b border-gray-200 dark:border-serene-purple min-w-0 overflow-hidden">
+        <div className="font-semibold text-deep-onyx dark:text-pure-mist text-[14px] truncate">
           {userName}
         </div>
-        <div className="text-gray-600 dark:text-gray-400 text-[12px] mt-0.5">
+        <div className="text-gray-600 dark:text-gray-400 text-[12px] mt-0.5 truncate">
           {userEmail || "No email provided"}
         </div>
+        {activeTeamName ? (
+          <div className="flex items-center gap-2 mt-0.5 min-w-0">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="min-w-0 flex-1 truncate text-gray-500 dark:text-gray-400 text-[12px]">
+                  {activeTeamName}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs break-all">
+                {activeTeamName}
+              </TooltipContent>
+            </Tooltip>
+            {displayRole ? (
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium leading-none ${
+                  displayRole === "owner" || displayRole === "admin"
+                    ? "bg-serene-purple/10 text-serene-purple dark:bg-serene-purple/25 dark:text-pure-mist"
+                    : "bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400"
+                }`}
+              >
+                {formatTeamRoleLabel(displayRole)}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {/* Menu Items Section */}

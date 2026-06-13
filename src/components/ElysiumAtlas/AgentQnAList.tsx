@@ -43,6 +43,7 @@ import Cookies from "js-cookie";
 import { toast } from "sonner";
 import NProgress from "nprogress";
 import { formatDateTime12hr } from "@/utils/formatDate";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 const QNA_PER_PAGE = 10;
 
@@ -58,6 +59,7 @@ export default function KnowledgeBaseQnAList({
   onRemove: _onRemove,
 }: KnowledgeBaseQnAListProps = {}) {
   const dispatch = useAppDispatch();
+  const readOnly = useAgentReadOnly();
   const knowledgeBaseQnA = useAppSelector(
     (state) => state.agent.knowledgeBaseQnA,
   );
@@ -463,7 +465,9 @@ export default function KnowledgeBaseQnAList({
                       <TableHead className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 font-[600] py-2 lg:px-4 px-0 whitespace-nowrap">
                         Last updated
                       </TableHead>
+                      {!readOnly && (
                       <TableHead className="w-[60px] md:w-[80px] text-right font-[600] py-2 lg:px-4 px-0 whitespace-nowrap"></TableHead>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -525,6 +529,7 @@ export default function KnowledgeBaseQnAList({
                           <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-2 lg:px-4 px-0 text-[12px] whitespace-nowrap">
                             {formatDateTime12hr(item.lastUpdated)}
                           </TableCell>
+                          {!readOnly && (
                           <TableCell className="w-[60px] md:w-[80px] text-right py-2 lg:px-4 px-0 whitespace-nowrap">
                             <button
                               onClick={(e) => {
@@ -536,6 +541,7 @@ export default function KnowledgeBaseQnAList({
                               <Trash2 size={14} />
                             </button>
                           </TableCell>
+                          )}
                         </TableRow>
                       );
                     })}
@@ -565,10 +571,11 @@ export default function KnowledgeBaseQnAList({
       >
         <SheetContent className="min-w-full lg:min-w-[480px] md:min-w-full z-[110] px-[4px]">
           <SheetHeader>
-            <SheetTitle>Edit QnA Entry</SheetTitle>
+            <SheetTitle>{readOnly ? "View QnA Entry" : "Edit QnA Entry"}</SheetTitle>
             <SheetDescription className="font-medium">
-              Make changes to your QnA entry here. Click save when you&apos;re
-              done.
+              {readOnly
+                ? "View the content of this QnA entry."
+                : "Make changes to your QnA entry here. Click save when you're done."}
             </SheetDescription>
           </SheetHeader>
           <div className="grid flex-1 auto-rows-min gap-6 px-4 py-6">
@@ -587,8 +594,9 @@ export default function KnowledgeBaseQnAList({
                     : ""
                 }`}
                 disabled={
-                  selectedIndex !== null &&
-                  knowledgeBaseQnA[selectedIndex]?.status !== "new"
+                  readOnly ||
+                  (selectedIndex !== null &&
+                  knowledgeBaseQnA[selectedIndex]?.status !== "new")
                 }
               />
             </div>
@@ -602,6 +610,8 @@ export default function KnowledgeBaseQnAList({
                   onChange={(e) => setQuestion(e.target.value)}
                   className="w-full"
                   rows={4}
+                  disabled={readOnly}
+                  readOnly={readOnly}
                 />
               </div>
               <div className="grid gap-3">
@@ -613,11 +623,14 @@ export default function KnowledgeBaseQnAList({
                   onChange={(e) => setAnswer(e.target.value)}
                   className="w-full"
                   rows={4}
+                  disabled={readOnly}
+                  readOnly={readOnly}
                 />
               </div>
             </div>
           </div>
           <SheetFooter className="flex-col gap-2">
+            {!readOnly && (
             <PrimaryButton
               type="button"
               onClick={handleUpdate}
@@ -626,12 +639,13 @@ export default function KnowledgeBaseQnAList({
             >
               Save changes
             </PrimaryButton>
+            )}
             <SheetClose asChild>
               <CancelButton
                 type="button"
                 className="w-full text-[12px] font-semibold "
               >
-                Cancel
+                {readOnly ? "Close" : "Cancel"}
               </CancelButton>
             </SheetClose>
           </SheetFooter>

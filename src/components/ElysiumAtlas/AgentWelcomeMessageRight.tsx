@@ -3,9 +3,11 @@
 import { useAppDispatch, useAppSelector } from "@/store";
 import { setWelcomeMessage } from "@/store/reducers/agentSlice";
 import CustomTextareaPrimary from "@/components/inputs/CustomTextareaPrimary";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 export default function AgentWelcomeMessageRight() {
   const dispatch = useAppDispatch();
+  const readOnly = useAgentReadOnly();
   const welcomeMessage = useAppSelector((state) => state.agent.welcomeMessage);
 
   return (
@@ -17,6 +19,8 @@ export default function AgentWelcomeMessageRight() {
           onChange={(e) => dispatch(setWelcomeMessage(e.target.value))}
           rows={4}
           resizable={true}
+          disabled={readOnly}
+          readOnly={readOnly}
         />
       </div>
     </div>

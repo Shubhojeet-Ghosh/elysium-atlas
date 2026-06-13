@@ -31,7 +31,6 @@ const navItems: NavItem[] = [
     name: "Team",
     href: "/team",
     icon: Users,
-    disabled: true,
   },
   {
     name: "Settings",

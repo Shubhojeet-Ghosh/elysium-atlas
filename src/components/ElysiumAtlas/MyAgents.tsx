@@ -5,6 +5,7 @@ import fastApiAxios from "@/utils/fastapi_axios";
 import { useAppDispatch, useAppSelector } from "@/store";
 import {
   setMyAgents,
+  setInitialAgentsFetchComplete,
   updateVisitorCounts,
 } from "@/store/reducers/userAgentsSlice";
 import Cookies from "js-cookie";
@@ -13,6 +14,8 @@ import type { Socket } from "socket.io-client";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import { Plus } from "lucide-react";
 import MyAgentsTable from "./MyAgentsTable";
+import MyAgentsSkeleton from "./MyAgentsSkeleton";
+import { useCanManageAgents } from "@/hooks/useCanManageAgents";
 import { useRouter } from "next/navigation";
 import { resetAgentBuilder } from "@/store/reducers/agentBuilderSlice";
 import NProgress from "nprogress";
@@ -21,11 +24,15 @@ export default function MyAgents() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const agents = useAppSelector((state) => state.userAgents.myAgents);
+  const hasCompletedInitialAgentsFetch = useAppSelector(
+    (state) => state.userAgents.hasCompletedInitialAgentsFetch,
+  );
   const triggerFetch = useAppSelector(
     (state) => state.userAgents.trigger_fetch_agents,
   );
   const teamID = useAppSelector((state) => state.userProfile.teamID);
   const userID = useAppSelector((state) => state.userProfile.userID);
+  const canManageAgents = useCanManageAgents();
   const [socket, setSocket] = useState<Socket | null>(null);
 
   // Placeholder handler for button
@@ -44,7 +51,10 @@ export default function MyAgents() {
     async function fetchAgentsAndMaybePoll() {
       try {
         const token = Cookies.get("elysium_atlas_session_token");
-        if (!token) return;
+        if (!token) {
+          if (isMounted) dispatch(setInitialAgentsFetchComplete());
+          return;
+        }
         const res = await fastApiAxios.post(
           "/elysium-agents/elysium-atlas/agent/v1/list-agents",
           {},
@@ -72,6 +82,10 @@ export default function MyAgents() {
         }
       } catch (err) {
         console.error("Error fetching agents:", err);
+      } finally {
+        if (isMounted) {
+          dispatch(setInitialAgentsFetchComplete());
+        }
       }
     }
 
@@ -129,8 +143,34 @@ export default function MyAgents() {
     };
   }, [teamID, userID]);
 
+  if (!hasCompletedInitialAgentsFetch && agents.length === 0) {
+    return <MyAgentsSkeleton />;
+  }
+
   if (agents.length === 0) {
-    return null;
+    return (
+      <div className="w-full h-full">
+        <div className="flex flex-col">
+          <div className="lg:text-[22px] text-[18px] font-bold flex justify-between items-center">
+            <div>Agents</div>
+            {canManageAgents && (
+              <PrimaryButton
+                onClick={handleBuildNewAgent}
+                className="font-[600] flex items-center justify-center gap-2 min-w-[100px] min-h-[40px] text-[13px]"
+              >
+                <Plus size={16} className="-ml-1" />
+                <span>New Agent</span>
+              </PrimaryButton>
+            )}
+          </div>
+          <p className="mt-6 text-[14px] text-gray-500 dark:text-gray-400">
+            {canManageAgents
+              ? "No agents yet. Create your first agent to get started."
+              : "No agents in this team yet."}
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -138,13 +178,15 @@ export default function MyAgents() {
       <div className="flex flex-col">
         <div className="lg:text-[22px] text-[18px] font-bold flex justify-between items-center">
           <div>Agents</div>
-          <PrimaryButton
-            onClick={handleBuildNewAgent}
-            className="font-[600] flex items-center justify-center gap-2 min-w-[100px] min-h-[40px] text-[13px]"
-          >
-            <Plus size={16} className="-ml-1" />
-            <span>New Agent</span>
-          </PrimaryButton>
+          {canManageAgents && (
+            <PrimaryButton
+              onClick={handleBuildNewAgent}
+              className="font-[600] flex items-center justify-center gap-2 min-w-[100px] min-h-[40px] text-[13px]"
+            >
+              <Plus size={16} className="-ml-1" />
+              <span>New Agent</span>
+            </PrimaryButton>
+          )}
         </div>
         <MyAgentsTable />
       </div>

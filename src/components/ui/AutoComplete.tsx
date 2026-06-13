@@ -20,6 +20,7 @@ interface AutoCompleteProps {
   onChange?: (value: string) => void;
   className?: string;
   searchPlaceholder?: string;
+  disabled?: boolean;
 }
 
 export default function AutoComplete({
@@ -31,6 +32,7 @@ export default function AutoComplete({
   onChange,
   className,
   searchPlaceholder = "Search...",
+  disabled = false,
 }: AutoCompleteProps) {
   const [open, setOpen] = useState(false);
   const [selectedValue, setSelectedValue] = useState(defaultValue);
@@ -74,7 +76,10 @@ export default function AutoComplete({
     <div ref={containerRef} className="relative w-full">
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        disabled={disabled}
+        onClick={() => {
+          if (!disabled) setOpen(!open);
+        }}
         className={cn(
           "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer",
           className

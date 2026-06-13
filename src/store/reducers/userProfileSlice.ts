@@ -1,9 +1,11 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { UserProfileState } from "../types/UserProfileTypes";
+import type { TeamRole } from "@/types/auth";
 
 const initialState: UserProfileState = {
   userID: "",
   teamID: "",
+  teamRole: null,
   firstName: "",
   lastName: "",
   userEmail: "",
@@ -20,6 +22,9 @@ const userProfileSlice = createSlice({
     },
     setTeamID: (state, action: PayloadAction<string>) => {
       state.teamID = action.payload;
+    },
+    setTeamRole: (state, action: PayloadAction<TeamRole | null>) => {
+      state.teamRole = action.payload;
     },
     setUserEmail: (state, action: PayloadAction<string>) => {
       state.userEmail = action.payload;
@@ -39,6 +44,7 @@ const userProfileSlice = createSlice({
     resetUserProfile: (state) => {
       state.userID = "";
       state.teamID = "";
+      state.teamRole = null;
       state.firstName = "";
       state.lastName = "";
       state.userEmail = "";
@@ -55,6 +61,7 @@ export const {
   resetUserProfile,
   setUserID,
   setTeamID,
+  setTeamRole,
   setUserEmail,
 } = userProfileSlice.actions;
 

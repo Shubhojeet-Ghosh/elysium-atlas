@@ -19,6 +19,7 @@ import { Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Pill from "@/components/ui/Pill";
 import AgentFilesList from "./AgentFilesList";
+import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 interface AgentFilesProps {
   documentFiles: File[];
@@ -30,6 +31,7 @@ export default function AgentFiles({
   setDocumentFiles,
 }: AgentFilesProps) {
   const dispatch = useDispatch();
+  const readOnly = useAgentReadOnly();
   const agentID = useSelector((state: RootState) => state.agent.agentID);
   const knowledgeBaseFiles = useSelector(
     (state: RootState) => state.agent.knowledgeBaseFiles,
@@ -174,13 +176,16 @@ export default function AgentFiles({
 
   return (
     <div className="flex flex-col">
-      <SimpleFileUpload
-        documentFiles={documentFiles}
-        setDocumentFiles={setDocumentFiles}
-      />
+      {!readOnly && (
+        <SimpleFileUpload
+          documentFiles={documentFiles}
+          setDocumentFiles={setDocumentFiles}
+        />
+      )}
       <div className="mt-[2px]">
         <AgentFilesList
           isLoadingFiles={isLoadingFiles}
+          readOnly={readOnly}
           onRemoveFile={(fileName) => {
             // Remove from Redux
             dispatch(removeKnowledgeBaseFile(fileName));

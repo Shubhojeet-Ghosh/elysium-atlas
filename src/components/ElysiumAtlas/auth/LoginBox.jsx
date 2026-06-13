@@ -5,24 +5,19 @@ import { GoogleIcon } from "@/components/TechStacks/Icons.tsx";
 import { toast } from "sonner";
 import nodeExpressAxios from "@/utils/node_express_apis";
 import Spinner from "@/components/ui/Spinner";
-import Cookies from "js-cookie";
 import { useAppDispatch } from "@/store";
-import {
-  setFirstName,
-  setLastName,
-  setProfilePicture,
-  setIsProfileComplete,
-  resetUserProfile,
-  setUserID,
-  setTeamID,
-  setUserEmail,
-} from "@/store/reducers/userProfileSlice";
+import { resetUserProfile } from "@/store/reducers/userProfileSlice";
+import { resetTeams } from "@/store/reducers/teamsSlice";
 
 import {
   openGoogleOAuth,
   getGoogleAccessTokenFromHash,
 } from "@/utils/googleAuth";
 import { getRedirectUrl } from "@/utils/redirectUtils";
+import {
+  handlePhase1LoginResult,
+  parsePhase1LoginResponse,
+} from "@/utils/authLogin";
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 const REDIRECT_URI =
@@ -58,43 +53,23 @@ export default function LoginBox() {
       );
       // console.log(res);
       const response_data = res.data;
-      if (response_data.success) {
-        if (response_data.user) {
-          Cookies.set(
-            "elysium_atlas_session_token",
-            response_data.sessionToken,
-            {
-              path: "/",
-              expires: 1,
-            },
-          );
+      const loginResult = parsePhase1LoginResponse(response_data);
+      const outcome = handlePhase1LoginResult(
+        dispatch,
+        loginResult,
+        getRedirectUrl(),
+      );
 
-          dispatch(
-            setProfilePicture(response_data?.user?.profile_image_url || ""),
-          );
-          dispatch(setUserID(response_data?.user?.user_id || ""));
-          dispatch(setTeamID(response_data?.user?.team_id || ""));
-          dispatch(setUserEmail(response_data?.user?.email || ""));
-          dispatch(setFirstName(response_data?.user?.first_name || ""));
-          dispatch(setLastName(response_data?.user?.last_name || ""));
-          dispatch(
-            setIsProfileComplete(response_data?.is_profile_complete ?? true),
-          );
-
-          toast.success("Logged in successfully!", {
-            position: "top-center",
-          });
-
-          setTimeout(() => {
-            window.location.href = getRedirectUrl();
-          }, 150);
-        } else {
-          toast.success("Magic link sent to your email", {
-            position: "top-center",
-          });
-        }
-      } else {
-        toast.error(response_data.message, {
+      if (outcome === "direct") {
+        toast.success("Logged in successfully!", {
+          position: "top-center",
+        });
+      } else if (outcome === "magic_link_sent") {
+        toast.success("Magic link sent to your email", {
+          position: "top-center",
+        });
+      } else if (outcome === "error") {
+        toast.error(loginResult.message || response_data.message, {
           position: "top-center",
         });
       }
@@ -111,6 +86,7 @@ export default function LoginBox() {
 
   useEffect(() => {
     dispatch(resetUserProfile());
+    dispatch(resetTeams());
     const verifyGoogleLogin = async () => {
       try {
         const accessToken = getGoogleAccessTokenFromHash();
@@ -125,35 +101,19 @@ export default function LoginBox() {
             },
           );
           const response_data = res.data;
-          if (response_data.success) {
-            Cookies.set(
-              "elysium_atlas_session_token",
-              response_data.sessionToken,
-              {
-                path: "/",
-                expires: 1,
-              },
-            );
+          const loginResult = parsePhase1LoginResponse(response_data);
+          const outcome = handlePhase1LoginResult(
+            dispatch,
+            loginResult,
+            getRedirectUrl(),
+          );
 
-            dispatch(
-              setProfilePicture(response_data?.user?.profile_image_url || ""),
-            );
-            dispatch(setUserID(response_data?.user?.user_id || ""));
-            dispatch(setTeamID(response_data?.user?.team_id || ""));
-            dispatch(setUserEmail(response_data?.user?.email || ""));
-            dispatch(setFirstName(response_data?.user?.first_name || ""));
-            dispatch(setLastName(response_data?.user?.last_name || ""));
-            dispatch(
-              setIsProfileComplete(response_data?.is_profile_complete ?? true),
-            );
+          if (outcome === "direct") {
             toast.success("Logged in successfully!", {
               position: "top-center",
             });
-            setTimeout(() => {
-              window.location.href = getRedirectUrl();
-            }, 150);
-          } else {
-            toast.error(response_data.message, {
+          } else if (outcome === "error") {
+            toast.error(loginResult.message || response_data.message, {
               position: "top-center",
             });
           }
