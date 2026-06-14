@@ -111,7 +111,9 @@ export default function AgentChatSpace() {
     prevAgentOpenRef.current = isAgentOpen;
 
     if (isAgentOpen && !wasOpen && agent_id && chat_session_id) {
-      fetchChatSession({ silent: true });
+      // Use non-silent fetch on reopen so MainChatSpace waits for fresh
+      // history before snapshotting the unread separator.
+      fetchChatSession();
     }
   }, [isAgentOpen, agent_id, chat_session_id, fetchChatSession]);
 
