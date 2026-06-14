@@ -2,8 +2,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
-import { X, Search, ExternalLink, Trash2 } from "lucide-react";
-import Link from "next/link";
+import { X, Search, Trash2, FileText } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -29,42 +28,39 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  toggleKnowledgeBaseLink,
-  toggleAllKnowledgeBaseLinks,
-  removeKnowledgeBaseLink,
-  setKnowledgeBaseLinks,
+  toggleKnowledgeBaseFile,
+  toggleAllKnowledgeBaseFiles,
+  setKnowledgeBaseFiles,
 } from "@/store/reducers/agentBuilderSlice";
-import { KnowledgeBaseLink } from "@/store/types/AgentBuilderTypes";
 import CustomInput from "@/components/inputs/CustomInput";
-import { toast } from "sonner";
-import OutlineButton from "@/components/ui/OutlineButton";
-import PrimaryButton from "@/components/ui/PrimaryButton";
-import Spinner from "@/components/ui/Spinner";
 import Badge from "@/components/ui/Badge";
-import fastApiAxios from "@/utils/fastapi_axios";
+import PrimaryButton from "@/components/ui/PrimaryButton";
 import TablePaginationControls from "./TablePaginationControls";
 import { useClientSideTablePagination } from "@/hooks/useClientSideTablePagination";
 
-export default function KnowledgeBaseLinksList() {
+interface KnowledgeBaseFilesListProps {
+  onRemoveFile: (fileName: string) => void;
+}
+
+export default function KnowledgeBaseFilesList({
+  onRemoveFile,
+}: KnowledgeBaseFilesListProps) {
   const dispatch = useDispatch();
-  const knowledgeBaseLinks = useSelector(
-    (state: RootState) => state.agentBuilder.knowledgeBaseLinks,
+  const knowledgeBaseFiles = useSelector(
+    (state: RootState) => state.agentBuilder.knowledgeBaseFiles,
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
-  const [manualLinkDialogOpen, setManualLinkDialogOpen] = useState(false);
-  const [manualLink, setManualLink] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [showRightGradient, setShowRightGradient] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const filteredLinks = useMemo(() => {
-    if (!searchTerm.trim()) return knowledgeBaseLinks;
+  const filteredFiles = useMemo(() => {
+    if (!searchTerm.trim()) return knowledgeBaseFiles;
     const lowerSearchTerm = searchTerm.toLowerCase();
-    return knowledgeBaseLinks.filter((item) =>
-      item.link.toLowerCase().includes(lowerSearchTerm),
+    return knowledgeBaseFiles.filter((item) =>
+      item.name.toLowerCase().includes(lowerSearchTerm),
     );
-  }, [knowledgeBaseLinks, searchTerm]);
+  }, [knowledgeBaseFiles, searchTerm]);
 
   const {
     currentPage,
@@ -74,11 +70,11 @@ export default function KnowledgeBaseLinksList() {
     total,
     pageSize,
     pageSizeOptions,
-    paginatedItems: currentLinks,
+    paginatedItems: currentFiles,
     handlePageChange,
     handlePageSizeChange,
     resetPage,
-  } = useClientSideTablePagination(filteredLinks);
+  } = useClientSideTablePagination(filteredFiles);
 
   useEffect(() => {
     resetPage();
@@ -98,89 +94,46 @@ export default function KnowledgeBaseLinksList() {
       container.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleScroll);
     };
-  }, [currentLinks]);
+  }, [currentFiles]);
 
   const allChecked = useMemo(() => {
-    if (knowledgeBaseLinks.length === 0) return false;
-    return knowledgeBaseLinks.every((item) => item.checked);
-  }, [knowledgeBaseLinks]);
+    if (knowledgeBaseFiles.length === 0) return false;
+    return knowledgeBaseFiles.every((item) => item.checked);
+  }, [knowledgeBaseFiles]);
 
   const hasUnchecked = useMemo(
-    () => knowledgeBaseLinks.some((item) => !item.checked),
-    [knowledgeBaseLinks],
+    () => knowledgeBaseFiles.some((item) => !item.checked),
+    [knowledgeBaseFiles],
   );
 
   const hasChecked = useMemo(
-    () => knowledgeBaseLinks.some((item) => item.checked),
-    [knowledgeBaseLinks],
+    () => knowledgeBaseFiles.some((item) => item.checked),
+    [knowledgeBaseFiles],
   );
 
-  const checkedLinksCount = useMemo(
-    () => knowledgeBaseLinks.filter((item) => item.checked).length,
-    [knowledgeBaseLinks],
+  const checkedFilesCount = useMemo(
+    () => knowledgeBaseFiles.filter((item) => item.checked).length,
+    [knowledgeBaseFiles],
   );
-
-  const handleRemoveLink = (linkToRemove: string) => {
-    dispatch(removeKnowledgeBaseLink(linkToRemove));
-  };
 
   const handleToggleCheckbox = (index: number) => {
-    dispatch(toggleKnowledgeBaseLink(index));
+    dispatch(toggleKnowledgeBaseFile(index));
   };
 
   const handleToggleAll = () => {
-    dispatch(toggleAllKnowledgeBaseLinks(!allChecked));
+    dispatch(toggleAllKnowledgeBaseFiles(!allChecked));
   };
 
   const handleConfirmClearSelected = () => {
-    const uncheckedLinks = knowledgeBaseLinks.filter((item) => !item.checked);
-    dispatch(setKnowledgeBaseLinks(uncheckedLinks));
+    const toRemove = knowledgeBaseFiles.filter((item) => item.checked);
+    const uncheckedFiles = knowledgeBaseFiles.filter((item) => !item.checked);
+    dispatch(setKnowledgeBaseFiles(uncheckedFiles));
+    toRemove.forEach((f) => onRemoveFile(f.name));
     setClearDialogOpen(false);
   };
 
-  const handleAddManualLink = async () => {
-    if (!manualLink.trim()) {
-      toast.error("Please enter a valid link");
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const pingResponse = await fastApiAxios.post(
-        "/elysium-agents/elysium-atlas/v1/ping-url",
-        { url: manualLink.trim() },
-      );
-      if (pingResponse.data.success && pingResponse.data.data.reachable) {
-        const normalizedUrl = pingResponse.data.data.normalized_url;
-        const exists = knowledgeBaseLinks.some(
-          (item) => item.link === normalizedUrl,
-        );
-        if (!exists) {
-          const newLink: KnowledgeBaseLink = {
-            link: normalizedUrl,
-            checked: true,
-            status: "new",
-            updated_at: null,
-          };
-          dispatch(setKnowledgeBaseLinks([newLink, ...knowledgeBaseLinks]));
-          setManualLink("");
-          toast.success("Link added successfully");
-        } else {
-          toast.error("Link already exists in the list.");
-        }
-      } else {
-        toast.error(
-          "URL is not reachable. Please check the URL and try again.",
-        );
-      }
-    } catch (error: any) {
-      toast.error(
-        error.response?.data?.message ||
-          error.message ||
-          "Failed to validate URL. Please try again.",
-      );
-    } finally {
-      setIsLoading(false);
-    }
+  const handleRemoveFile = (fileName: string) => {
+    onRemoveFile(fileName);
   };
 
   const highlightMatch = (text: string, term: string) => {
@@ -200,39 +153,38 @@ export default function KnowledgeBaseLinksList() {
     );
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
+  };
+
   const emptyMessage = searchTerm
-    ? `No links found matching "${searchTerm}"`
-    : "No links added yet";
+    ? `No files found matching "${searchTerm}"`
+    : "No files added yet";
 
   return (
     <div className="flex flex-col mt-6">
       <div className="flex items-center justify-between mb-4">
         <div className="lg:text-[14px] text-[12px] font-bold text-deep-onyx dark:text-pure-mist">
-          Links ({knowledgeBaseLinks.length})
+          Files ({knowledgeBaseFiles.length})
           {searchTerm && (
             <span className="text-gray-500 dark:text-gray-400 font-normal ml-1">
-              ({filteredLinks.length} found)
+              ({filteredFiles.length} found)
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <OutlineButton
-            className="text-[12px] font-bold px-3 py-1 h-8"
-            onClick={() => setManualLinkDialogOpen(true)}
-          >
-            <span className="text-[18px]">+</span>{" "}
-            <span className="hidden md:inline">Add More</span>
-          </OutlineButton>
-          <div className="relative w-[200px]">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-            <CustomInput
-              type="text"
-              placeholder="Search links..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-[11px] h-8"
-            />
-          </div>
+        <div className="relative w-[200px] md:w-[300px]">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+          <CustomInput
+            type="text"
+            placeholder="Search files..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-[11px] h-8"
+          />
         </div>
       </div>
 
@@ -240,14 +192,14 @@ export default function KnowledgeBaseLinksList() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Checkbox
-              id="master-checkbox"
+              id="master-checkbox-files"
               checked={allChecked}
               onCheckedChange={handleToggleAll}
-              disabled={knowledgeBaseLinks.length === 0}
+              disabled={knowledgeBaseFiles.length === 0}
               className="border-2 border-gray-300 dark:border-gray-500 data-[state=checked]:border-serene-purple data-[state=checked]:bg-serene-purple data-[state=checked]:text-white dark:data-[state=checked]:text-black"
             />
             <label
-              htmlFor="master-checkbox"
+              htmlFor="master-checkbox-files"
               className="text-[12px] font-semibold text-deep-onyx dark:text-pure-mist cursor-pointer min-w-[70px]"
             >
               {hasUnchecked ? "Select All" : "Unselect All"}
@@ -265,10 +217,10 @@ export default function KnowledgeBaseLinksList() {
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[425px]">
                   <DialogHeader>
-                    <DialogTitle>Clear Selected Links</DialogTitle>
+                    <DialogTitle>Clear Selected Files</DialogTitle>
                     <DialogDescription>
-                      This will remove {checkedLinksCount}{" "}
-                      {checkedLinksCount === 1 ? "link" : "links"} from your
+                      This will remove {checkedFilesCount}{" "}
+                      {checkedFilesCount === 1 ? "file" : "files"} from your
                       knowledge base.
                     </DialogDescription>
                   </DialogHeader>
@@ -290,45 +242,6 @@ export default function KnowledgeBaseLinksList() {
             </>
           )}
         </div>
-        <Dialog
-          open={manualLinkDialogOpen}
-          onOpenChange={setManualLinkDialogOpen}
-        >
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Add Manual Link</DialogTitle>
-              <DialogDescription>
-                Add a single link to your knowledge base manually.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-[4px] py-4">
-              <p className="font-bold text-[13px]">Link URL</p>
-              <CustomInput
-                type="url"
-                placeholder="Enter link URL (e.g., https://example.com/page)"
-                value={manualLink}
-                onChange={(e) => setManualLink(e.target.value)}
-                className="w-full px-[12px] py-[10px]"
-              />
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <OutlineButton className="text-[12px]">Back</OutlineButton>
-              </DialogClose>
-              <PrimaryButton
-                className="min-w-[80px] text-[12px] font-semibold flex items-center justify-center gap-2"
-                onClick={handleAddManualLink}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <Spinner className="border-white dark:border-deep-onyx" />
-                ) : (
-                  <span>Add</span>
-                )}
-              </PrimaryButton>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
 
       <TablePaginationControls
@@ -354,41 +267,42 @@ export default function KnowledgeBaseLinksList() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-[40px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap" />
                   <TableHead className="min-w-[260px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
-                    URL
+                    File name
                   </TableHead>
                   <TableHead className="min-w-[120px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap text-center">
                     Status
                   </TableHead>
-                  <TableHead className="w-[100px] text-right font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
-                    Actions
+                  <TableHead className="min-w-[120px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
+                    Size
                   </TableHead>
+                  <TableHead className="w-[60px] text-right font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {currentLinks.length === 0 ? (
+                {currentFiles.length === 0 ? (
                   <TableRow className="hover:bg-transparent">
                     <TableCell
-                      colSpan={4}
+                      colSpan={5}
                       className="py-10 text-center text-[12px] text-gray-500 dark:text-gray-400"
                     >
                       {emptyMessage}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  currentLinks.map((item) => {
-                    const originalIndex = knowledgeBaseLinks.findIndex(
-                      (linkItem) => linkItem.link === item.link,
+                  currentFiles.map((item) => {
+                    const originalIndex = knowledgeBaseFiles.findIndex(
+                      (fileItem) => fileItem.name === item.name,
                     );
                     return (
                       <TableRow
-                        key={item.link}
+                        key={item.name}
                         onClick={() => handleToggleCheckbox(originalIndex)}
                         className="cursor-pointer border-b border-gray-100 dark:border-deep-onyx hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 transition-all duration-200"
                       >
                         <TableCell className="py-4 px-[10px] whitespace-nowrap">
                           <Checkbox
-                            id={`link-${originalIndex}`}
-                            checked={item.checked}
+                            id={`file-${originalIndex}`}
+                            checked={item.checked ?? true}
                             onCheckedChange={() =>
                               handleToggleCheckbox(originalIndex)
                             }
@@ -397,44 +311,42 @@ export default function KnowledgeBaseLinksList() {
                           />
                         </TableCell>
                         <TableCell className="font-medium py-4 px-[10px] text-[14px] text-deep-onyx dark:text-pure-mist min-w-[260px]">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="font-mono text-[12px] truncate block max-w-[320px]">
-                                {highlightMatch(item.link, searchTerm)}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="max-w-xs break-all">{item.link}</p>
-                            </TooltipContent>
-                          </Tooltip>
+                          <div className="flex items-center gap-2">
+                            <FileText
+                              size={18}
+                              className="text-serene-purple shrink-0"
+                            />
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="font-mono text-[12px] truncate max-w-[280px]">
+                                  {highlightMatch(item.name, searchTerm)}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-xs break-all">{item.name}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
                         </TableCell>
                         <TableCell className="min-w-[120px] py-4 px-[10px] text-center">
                           <div className="flex items-center justify-center">
                             <Badge>New</Badge>
                           </div>
                         </TableCell>
-                        <TableCell className="w-[100px] text-right py-4 px-[10px] whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRemoveLink(item.link);
-                              }}
-                              className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer"
-                              aria-label="Remove link"
-                            >
-                              <X className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 hover:text-danger-red transition-colors" />
-                            </button>
-                            <Link
-                              href={item.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="p-1.5 rounded-md text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </Link>
-                          </div>
+                        <TableCell className="min-w-[120px] py-4 px-[10px] text-[14px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                          {item.size > 0 ? formatFileSize(item.size) : "—"}
+                        </TableCell>
+                        <TableCell className="w-[60px] text-right py-4 px-[10px] whitespace-nowrap">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveFile(item.name);
+                            }}
+                            className="p-2 rounded-[8px] text-danger-red hover:bg-danger-red hover:text-white transition-colors cursor-pointer"
+                            aria-label="Remove file"
+                          >
+                            <X size={14} />
+                          </button>
                         </TableCell>
                       </TableRow>
                     );
@@ -444,7 +356,7 @@ export default function KnowledgeBaseLinksList() {
             </Table>
           </div>
         </div>
-        {showRightGradient && currentLinks.length > 0 && (
+        {showRightGradient && currentFiles.length > 0 && (
           <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
         )}
       </div>

@@ -1,17 +1,25 @@
 "use client";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
 import {
   X,
-  ChevronLeft,
-  ChevronRight,
   Search,
   ExternalLink,
   Trash2,
   Trash,
   RotateCcw,
 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import TablePaginationControls from "./TablePaginationControls";
+import { type VisitorPageSize } from "@/lib/config";
 import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -49,16 +57,32 @@ import Cookies from "js-cookie";
 import NProgress from "nprogress";
 import { formatDateTime12hr } from "@/utils/formatDate";
 
-const LINKS_PER_PAGE = 6; // 3 rows × 2 columns
-
 interface AgentLinksListProps {
   isLoadingLinks: boolean;
   readOnly?: boolean;
+  currentPage: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+  total: number;
+  pageSize: number;
+  pageSizeOptions: readonly number[];
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: VisitorPageSize) => void;
 }
 
 export default function AgentLinksList({
   isLoadingLinks,
   readOnly = false,
+  currentPage,
+  totalPages,
+  hasNext,
+  hasPrev,
+  total,
+  pageSize,
+  pageSizeOptions,
+  onPageChange,
+  onPageSizeChange,
 }: AgentLinksListProps) {
   const dispatch = useDispatch();
   const knowledgeBaseLinks = useSelector(
@@ -68,8 +92,9 @@ export default function AgentLinksList({
   const triggerFetchAgentUrls = useAppSelector(
     (state) => state.agent.triggerFetchAgentUrls,
   );
-  const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [showRightGradient, setShowRightGradient] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [reindexDialogOpen, setReindexDialogOpen] = useState(false);
   const [singleReindexDialogOpen, setSingleReindexDialogOpen] = useState(false);
@@ -93,20 +118,25 @@ export default function AgentLinksList({
     );
   }, [knowledgeBaseLinks, searchTerm]);
 
-  // Reset to page 1 when search term changes
+  const currentLinks = filteredLinks;
+
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
-  const totalPages = Math.ceil(filteredLinks.length / LINKS_PER_PAGE);
-  const startIndex = (currentPage - 1) * LINKS_PER_PAGE;
-  const endIndex = startIndex + LINKS_PER_PAGE;
-  const currentLinks = filteredLinks.slice(startIndex, endIndex);
+    const handleScroll = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = container;
+      setShowRightGradient(scrollLeft + clientWidth < scrollWidth - 5);
+    };
 
-  // Reset to page 1 if current page is out of bounds
-  if (currentPage > totalPages && totalPages > 0) {
-    setCurrentPage(1);
-  }
+    handleScroll();
+    container.addEventListener("scroll", handleScroll);
+    window.addEventListener("resize", handleScroll);
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, [currentLinks]);
 
   // Calculate if all links are checked
   const allChecked = useMemo(() => {
@@ -380,22 +410,6 @@ export default function AgentLinksList({
     }
   };
 
-  const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  const handlePageClick = (page: number) => {
-    setCurrentPage(page);
-  };
-
   // Function to highlight matching text in search results
   const highlightMatch = (text: string, searchTerm: string) => {
     if (!searchTerm.trim()) {
@@ -425,29 +439,23 @@ export default function AgentLinksList({
     );
   };
 
-  if (knowledgeBaseLinks.length === 0 && !isLoadingLinks) {
-    return null;
-  }
+  const linkColumnCount = readOnly ? 4 : 5;
+  const emptyLinksMessage = searchTerm
+    ? `No links found matching "${searchTerm}"`
+    : "No links found";
 
   return (
     <div className="flex flex-col mt-6">
-      {isLoadingLinks && knowledgeBaseLinks.length === 0 ? (
-        <div className="flex justify-center items-center py-8">
-          <Spinner className="border-serene-purple dark:border-pure-mist" />
-        </div>
-      ) : (
-        <>
           <div className="flex items-center justify-between mb-4">
             <div className="lg:text-[14px] text-[12px] font-bold text-deep-onyx dark:text-pure-mist">
-              Links ({knowledgeBaseLinks.length})
+              Links ({total + knowledgeBaseLinks.filter((l) => l.status === "new").length})
               {searchTerm && (
                 <span className="text-gray-500 dark:text-gray-400 font-normal ml-1">
                   ({filteredLinks.length} found)
                 </span>
               )}
             </div>
-            {knowledgeBaseLinks.length > 0 && (
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
                 {!readOnly && (
                   <OutlineButton
                     className="text-[12px] font-bold px-3 py-1 h-8"
@@ -468,7 +476,6 @@ export default function AgentLinksList({
                   />
                 </div>
               </div>
-            )}
           </div>
 
           {/* Master Checkbox, Clear Selected, and Pagination */}
@@ -666,242 +673,248 @@ export default function AgentLinksList({
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-            {totalPages > 1 && (
-              <div className="w-full md:w-auto flex justify-end md:justify-start">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handlePreviousPage}
-                    disabled={currentPage === 1}
-                    className="p-1.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                    aria-label="Previous page"
-                  >
-                    <ChevronLeft className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                  </button>
-
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                      (page) => {
-                        // Show first page, last page, current page, and pages around current
-                        if (
-                          page === 1 ||
-                          page === totalPages ||
-                          (page >= currentPage - 1 && page <= currentPage + 1)
-                        ) {
-                          return (
-                            <button
-                              key={page}
-                              onClick={() => handlePageClick(page)}
-                              className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors cursor-pointer ${
-                                currentPage === page
-                                  ? "bg-serene-purple text-white border-serene-purple"
-                                  : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                              }`}
-                            >
-                              {page}
-                            </button>
-                          );
-                        } else if (
-                          page === currentPage - 2 ||
-                          page === currentPage + 2
-                        ) {
-                          return (
-                            <span
-                              key={page}
-                              className="px-1 text-[11px] text-gray-400 dark:text-gray-500"
-                            >
-                              ...
-                            </span>
-                          );
-                        }
-                        return null;
-                      },
-                    )}
-                  </div>
-
-                  <button
-                    onClick={handleNextPage}
-                    disabled={currentPage >= totalPages}
-                    className="p-1.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                    aria-label="Next page"
-                  >
-                    <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
 
-          {filteredLinks.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-[12px]">
-              {searchTerm
-                ? `No links found matching "${searchTerm}"`
-                : "No links found"}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-              {currentLinks.map((item, localIndex) => {
-                // Find the original index in the full knowledgeBaseLinks array
-                const originalIndex = knowledgeBaseLinks.findIndex(
-                  (linkItem) => linkItem.link === item.link,
-                );
-                return (
-                  <div
-                    key={item.link}
-                    onClick={() => {
-                      if (!readOnly) handleToggleCheckbox(originalIndex);
-                    }}
-                    className={`group flex items-center justify-between gap-2 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 w-full ${readOnly ? "" : "cursor-pointer"}`}
-                  >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      {!readOnly && (
-                      <Checkbox
-                        id={`link-${originalIndex}`}
-                        checked={item.checked}
-                        onCheckedChange={() =>
-                          handleToggleCheckbox(originalIndex)
-                        }
-                        onClick={(e) => e.stopPropagation()}
-                        className="shrink-0 border-2 border-gray-300 dark:border-gray-500 data-[state=checked]:border-serene-purple data-[state=checked]:bg-serene-purple data-[state=checked]:text-white dark:data-[state=checked]:text-black"
-                      />
-                      )}
-                      <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="font-mono text-[12px] text-gray-700 dark:text-gray-300 truncate cursor-default">
-                                {highlightMatch(item.link, searchTerm)}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="max-w-xs break-all">{item.link}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                          {item.status === "new" ? (
-                            <Badge>New</Badge>
-                          ) : item.api_status &&
-                            item.api_status !== "indexed" ? (
-                            <span
-                              className={`px-2 py-0.5 text-[10px] font-semibold rounded-full shrink-0 flex items-center gap-[1px] ${
-                                item.api_status === "indexed"
-                                  ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
-                                  : item.api_status === "indexing"
-                                    ? "bg-serene-purple/10 text-[#6c5f8d] dark:bg-serene-purple/20 dark:text-[#c4bcd6]"
-                                    : item.api_status === "failed" ||
-                                        item.api_status === "error"
-                                      ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
-                                      : item.api_status === "pending"
-                                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
-                                        : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                              }`}
-                            >
-                              {item.api_status === "indexing" ? (
-                                <span className="inline-flex items-center gap-[2px]">
-                                  <span>Indexing</span>
-                                  <span className="inline-flex items-end gap-[2px] ml-[2px]">
-                                    {[0, 0.2, 0.4].map((delay, i) => (
-                                      <span
-                                        key={i}
-                                        style={{
-                                          display: "inline-block",
-                                          width: "3px",
-                                          height: "3px",
-                                          borderRadius: "50%",
-                                          background: "currentColor",
-                                          animation: `bounce-dot 1.2s ${delay}s infinite ease-in-out`,
-                                        }}
-                                      />
-                                    ))}
+          <TablePaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            hasNext={hasNext}
+            hasPrev={hasPrev}
+            total={total}
+            pageSize={pageSize}
+            pageSizeOptions={pageSizeOptions}
+            isLoading={isLoadingLinks}
+            onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
+          />
+
+          <div className="relative">
+              <div
+                ref={scrollContainerRef}
+                className="overflow-x-auto md:overflow-visible"
+              >
+                <div className="inline-block min-w-full align-middle">
+                  <Table className="w-full table-fixed min-w-[600px] lg:min-w-full">
+                    <colgroup>
+                      {!readOnly && <col className="w-[40px]" />}
+                      <col className="w-[38%]" />
+                      <col className="w-[96px]" />
+                      <col className="w-[32%]" />
+                      <col className="w-[100px]" />
+                    </colgroup>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        {!readOnly && (
+                          <TableHead className="font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap" />
+                        )}
+                        <TableHead className="font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
+                          URL
+                        </TableHead>
+                        <TableHead className="font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap text-center">
+                          Status
+                        </TableHead>
+                        <TableHead className="font-[600] py-3 pl-8 md:pl-12 pr-[10px] text-[14px] whitespace-nowrap">
+                          Updated at
+                        </TableHead>
+                        <TableHead className="text-right font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {isLoadingLinks && currentLinks.length === 0 ? (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell
+                            colSpan={linkColumnCount}
+                            className="py-10 text-center"
+                          >
+                            <Spinner className="border-serene-purple dark:border-pure-mist mx-auto" />
+                          </TableCell>
+                        </TableRow>
+                      ) : currentLinks.length === 0 ? (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell
+                            colSpan={linkColumnCount}
+                            className="py-10 text-center text-[12px] text-gray-500 dark:text-gray-400"
+                          >
+                            {emptyLinksMessage}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                      currentLinks.map((item) => {
+                        const originalIndex = knowledgeBaseLinks.findIndex(
+                          (linkItem) => linkItem.link === item.link,
+                        );
+                        return (
+                          <TableRow
+                            key={item.link}
+                            onClick={() => {
+                              if (!readOnly) handleToggleCheckbox(originalIndex);
+                            }}
+                            className={`border-b border-gray-100 dark:border-deep-onyx transition-all duration-200 ${
+                              readOnly ? "" : "cursor-pointer hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20"
+                            }`}
+                          >
+                            {!readOnly && (
+                              <TableCell className="py-4 px-[10px] whitespace-nowrap">
+                                <Checkbox
+                                  id={`link-${originalIndex}`}
+                                  checked={item.checked}
+                                  onCheckedChange={() =>
+                                    handleToggleCheckbox(originalIndex)
+                                  }
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="border-2 border-gray-300 dark:border-gray-500 data-[state=checked]:border-serene-purple data-[state=checked]:bg-serene-purple data-[state=checked]:text-white dark:data-[state=checked]:text-black"
+                                />
+                              </TableCell>
+                            )}
+                            <TableCell className="font-medium py-4 px-[10px] text-[14px] text-deep-onyx dark:text-pure-mist overflow-hidden">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="font-mono text-[12px] truncate block min-w-0">
+                                    {highlightMatch(item.link, searchTerm)}
                                   </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="max-w-xs break-all">{item.link}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TableCell>
+                            <TableCell className="py-4 px-[10px] text-[14px] whitespace-nowrap text-center">
+                              <div className="flex items-center justify-center">
+                              {item.status === "new" ? (
+                                <Badge>New</Badge>
+                              ) : item.api_status && item.api_status !== "indexed" ? (
+                                <span
+                                  className={`px-2 py-0.5 text-[10px] font-semibold rounded-full shrink-0 inline-flex items-center gap-[1px] ${
+                                    item.api_status === "indexing"
+                                      ? "bg-serene-purple/10 text-[#6c5f8d] dark:bg-serene-purple/20 dark:text-[#c4bcd6]"
+                                      : item.api_status === "failed" ||
+                                          item.api_status === "error"
+                                        ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                                        : item.api_status === "pending"
+                                          ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                                          : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                  }`}
+                                >
+                                  {item.api_status === "indexing" ? (
+                                    <span className="inline-flex items-center gap-[2px]">
+                                      <span>Indexing</span>
+                                      <span className="inline-flex items-end gap-[2px] ml-[2px]">
+                                        {[0, 0.2, 0.4].map((delay, i) => (
+                                          <span
+                                            key={i}
+                                            style={{
+                                              display: "inline-block",
+                                              width: "3px",
+                                              height: "3px",
+                                              borderRadius: "50%",
+                                              background: "currentColor",
+                                              animation: `bounce-dot 1.2s ${delay}s infinite ease-in-out`,
+                                            }}
+                                          />
+                                        ))}
+                                      </span>
+                                    </span>
+                                  ) : (
+                                    item.api_status.charAt(0).toUpperCase() +
+                                    item.api_status.slice(1)
+                                  )}
                                 </span>
                               ) : (
-                                item.api_status.charAt(0).toUpperCase() +
-                                item.api_status.slice(1)
+                                <Badge className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 border-0">
+                                  Indexed
+                                </Badge>
                               )}
-                            </span>
-                          ) : null}
-                        </div>
-                        {item.updated_at && (
-                          <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                            updated at {formatDateTime12hr(item.updated_at)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {!readOnly && item.status === "existing" && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleReindexLink(item.link);
-                              }}
-                              disabled={reindexingLink === item.link}
-                              className="group/btn p-1.5 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                              aria-label="Reindex link"
-                            >
-                              {reindexingLink === item.link ? (
-                                <Spinner className="h-3.5 w-3.5 border-serene-purple dark:border-pure-mist" />
-                              ) : (
-                                <RotateCcw className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 group-hover/btn:text-serene-purple transition-colors" />
-                              )}
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Reindex this link</p>
-                          </TooltipContent>
-                        </Tooltip>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-4 pl-8 md:pl-12 pr-[10px] text-[14px] whitespace-nowrap text-gray-500 dark:text-gray-400">
+                              {item.updated_at
+                                ? formatDateTime12hr(item.updated_at)
+                                : "—"}
+                            </TableCell>
+                            <TableCell className="w-[100px] text-right py-4 px-[10px] whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1">
+                                {!readOnly && item.status === "existing" && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleReindexLink(item.link);
+                                        }}
+                                        disabled={reindexingLink === item.link}
+                                        className="p-1.5 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                        aria-label="Reindex link"
+                                      >
+                                        {reindexingLink === item.link ? (
+                                          <Spinner className="h-3.5 w-3.5 border-serene-purple dark:border-pure-mist" />
+                                        ) : (
+                                          <RotateCcw className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 hover:text-serene-purple transition-colors" />
+                                        )}
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Reindex this link</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                                {!readOnly && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRemoveLink(
+                                            item.link,
+                                            item.status === "existing",
+                                          );
+                                        }}
+                                        disabled={deletingLink === item.link}
+                                        className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                        aria-label="Remove link"
+                                      >
+                                        {deletingLink === item.link ? (
+                                          <Spinner className="h-3.5 w-3.5 border-danger-red dark:border-danger-red" />
+                                        ) : item.status === "existing" ? (
+                                          <Trash className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 hover:text-danger-red transition-colors" />
+                                        ) : (
+                                          <X className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 hover:text-danger-red transition-colors" />
+                                        )}
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>
+                                        {item.status === "existing"
+                                          ? "Delete this link"
+                                          : "Remove this link"}
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                                <Link
+                                  href={item.link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="p-1.5 rounded-md text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </Link>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                       )}
-                      {!readOnly && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveLink(
-                                item.link,
-                                item.status === "existing",
-                              );
-                            }}
-                            disabled={deletingLink === item.link}
-                            className="group/btn p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                            aria-label="Remove link"
-                          >
-                            {deletingLink === item.link ? (
-                              <Spinner className="h-3.5 w-3.5 border-danger-red dark:border-danger-red" />
-                            ) : item.status === "existing" ? (
-                              <Trash className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 group-hover/btn:text-danger-red transition-colors" />
-                            ) : (
-                              <X className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 group-hover/btn:text-danger-red transition-colors" />
-                            )}
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>
-                            {item.status === "existing"
-                              ? "Delete this link"
-                              : "Remove this link"}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                      )}
-                      <Link
-                        href={item.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1.5 rounded-md text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+              {showRightGradient && currentLinks.length > 0 && (
+                <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
+              )}
             </div>
-          )}
-        </>
-      )}
     </div>
   );
 }

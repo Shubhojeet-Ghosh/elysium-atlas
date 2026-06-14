@@ -15,8 +15,6 @@ import {
 } from "@/components/ui/table";
 
 import { formatDateTime12hr } from "@/utils/formatDate";
-import { AgentStatusPill } from "./AgentStatusPill";
-import { CircularProgress } from "./CircularProgress";
 import { MoreHorizontal, Search } from "lucide-react";
 import CustomInput from "@/components/inputs/CustomInput";
 import {
@@ -45,6 +43,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useCanManageAgents } from "@/hooks/useCanManageAgents";
+import { getAgentStatusTextClass, isSettledAgentStatus } from "@/utils/agentStatus";
 
 export default function MyAgentsTable() {
   const agents = useAppSelector((state) => state.userAgents.myAgents);
@@ -56,7 +55,13 @@ export default function MyAgentsTable() {
   const AGENTS_PER_PAGE = 5;
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [agentToDelete, setAgentToDelete] = useState<any>(null);
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [agentForStatusChange, setAgentForStatusChange] = useState<any>(null);
+  const [pendingAgentStatus, setPendingAgentStatus] = useState<
+    "active" | "disabled" | null
+  >(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showLeftGradient, setShowLeftGradient] = useState(false);
   const [showRightGradient, setShowRightGradient] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -131,6 +136,66 @@ export default function MyAgentsTable() {
   const handleDeleteAgent = (agent: any) => {
     setAgentToDelete(agent);
     setDeleteDialogOpen(true);
+  };
+
+  const handleAgentStatusChange = (
+    agent: any,
+    status: "active" | "disabled",
+  ) => {
+    setAgentForStatusChange(agent);
+    setPendingAgentStatus(status);
+    setStatusDialogOpen(true);
+  };
+
+  const handleConfirmStatusChange = async () => {
+    if (!agentForStatusChange || !pendingAgentStatus) return;
+
+    setIsUpdatingStatus(true);
+    const token = Cookies.get("elysium_atlas_session_token");
+    const isEnabling = pendingAgentStatus === "active";
+
+    try {
+      const response = await fastApiAxios.post(
+        "/elysium-agents/elysium-atlas/agent/v1/update-agent",
+        {
+          agent_id: agentForStatusChange.agent_id,
+          agent_status: pendingAgentStatus,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (response.data.success === true) {
+        toast.success(
+          response.data.message ||
+            (isEnabling
+              ? "Agent enabled successfully!"
+              : "Agent disabled successfully!"),
+        );
+        dispatch(triggerFetchAgents());
+        setStatusDialogOpen(false);
+        setAgentForStatusChange(null);
+        setPendingAgentStatus(null);
+      } else {
+        toast.error(
+          response.data.message ||
+            (isEnabling ? "Failed to enable agent" : "Failed to disable agent"),
+        );
+      }
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        (isEnabling
+          ? "Failed to enable agent. Please try again."
+          : "Failed to disable agent. Please try again.");
+      toast.error(errorMessage);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -249,63 +314,87 @@ export default function MyAgentsTable() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] py-2 px-[10px] text-[14px] whitespace-nowrap">
-                        <AgentStatusPill
-                          status={agent.agent_status}
-                          className="min-h-[20px] min-w-[50px] text-[11px] px-1.5 py-0.5"
-                        />
+                      <TableCell
+                        className={`font-medium min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] py-2 px-[10px] text-[14px] whitespace-nowrap ${getAgentStatusTextClass(agent.agent_status)}`}
+                      >
+                        {agent.agent_status}
                       </TableCell>
                       <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-2 px-[10px] text-[14px] whitespace-nowrap text-gray-500 dark:text-gray-400">
                         {formatDateTime12hr(agent.updated_at)}
                       </TableCell>
                       <TableCell className="w-[40px] md:w-[60px] py-2 px-[10px] text-right">
-                        {["active", "inactive", "failed"].includes(
-                          agent.agent_status.toLowerCase(),
-                        ) ? (
-                          canManageAgents ? (
+                        {canManageAgents ? (
                           <div className="mx-auto flex items-center justify-center h-[30px] w-[30px]">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <div
-                                  className="flex items-center justify-center rounded-full bg-transparent hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 transition-colors duration-150 cursor-pointer h-[30px] w-[30px] border-none focus:outline-none focus:ring-0"
-                                  tabIndex={0}
-                                  role="button"
-                                  aria-label="More options"
-                                  onClick={(e) => e.stopPropagation()}
+                            {isSettledAgentStatus(agent.agent_status) ? (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <div
+                                    className="flex items-center justify-center rounded-full bg-transparent hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 transition-colors duration-150 cursor-pointer h-[30px] w-[30px] border-none focus:outline-none focus:ring-0"
+                                    tabIndex={0}
+                                    role="button"
+                                    aria-label="More options"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <MoreHorizontal
+                                      className="text-gray-400 hover:text-serene-purple dark:text-gray-600 dark:hover:text-gray-300"
+                                      size={18}
+                                    />
+                                  </div>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                  align="end"
+                                  className="w-[160px]"
                                 >
-                                  <MoreHorizontal
-                                    className="text-gray-400 hover:text-serene-purple dark:text-gray-600 dark:hover:text-gray-300"
-                                    size={18}
-                                  />
-                                </div>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent
-                                align="end"
-                                className="w-[160px]"
+                                  {agent.agent_status.toLowerCase() ===
+                                  "disabled" ? (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleAgentStatusChange(agent, "active");
+                                      }}
+                                      className="cursor-pointer"
+                                    >
+                                      Enable Agent
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleAgentStatusChange(
+                                          agent,
+                                          "disabled",
+                                        );
+                                      }}
+                                      className="cursor-pointer"
+                                    >
+                                      Disable Agent
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteAgent(agent);
+                                    }}
+                                    className="cursor-pointer text-danger-red focus:text-danger-red"
+                                    variant="destructive"
+                                  >
+                                    Delete Agent
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            ) : (
+                              <div
+                                className="flex items-center justify-center rounded-full h-[30px] w-[30px] opacity-40 cursor-not-allowed"
+                                aria-label="Actions unavailable while agent is updating"
                               >
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteAgent(agent);
-                                  }}
-                                  className="cursor-pointer text-danger-red focus:text-danger-red"
-                                  variant="destructive"
-                                >
-                                  Delete Agent
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                                <MoreHorizontal
+                                  className="text-gray-400 dark:text-gray-600"
+                                  size={18}
+                                />
+                              </div>
+                            )}
                           </div>
-                          ) : null
-                        ) : (
-                          <div className="mx-auto flex items-center justify-center h-[30px] w-[30px]">
-                            <CircularProgress
-                              percentage={agent.progress || null}
-                              size={24}
-                              strokeWidth={2}
-                            />
-                          </div>
-                        )}
+                        ) : null}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -432,6 +521,52 @@ export default function MyAgentsTable() {
               disabled={isLoading}
             >
               {isLoading ? "Deleting..." : "Confirm"}
+            </PrimaryButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={statusDialogOpen}
+        onOpenChange={(open) => {
+          setStatusDialogOpen(open);
+          if (!open) {
+            setAgentForStatusChange(null);
+            setPendingAgentStatus(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {pendingAgentStatus === "active"
+                ? "Enable Agent"
+                : "Disable Agent"}
+            </DialogTitle>
+            <DialogDescription>
+              {pendingAgentStatus === "active"
+                ? `This will enable the agent "${agentForStatusChange?.agent_name}" and make it available for use again.`
+                : `This will disable the agent "${agentForStatusChange?.agent_name}". Disabled agents will no longer be available for use.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <PrimaryButton
+                className="bg-transparent border border-gray-300 dark:border-white text-gray-700 dark:text-white text-[12px] hover:bg-white dark:hover:bg-pure-mist dark:hover:text-deep-onyx"
+                disabled={isUpdatingStatus}
+              >
+                Cancel
+              </PrimaryButton>
+            </DialogClose>
+            <PrimaryButton
+              className="min-w-[95px] text-[12px] font-semibold flex items-center gap-2"
+              onClick={handleConfirmStatusChange}
+              disabled={isUpdatingStatus}
+            >
+              {isUpdatingStatus
+                ? pendingAgentStatus === "active"
+                  ? "Enabling..."
+                  : "Disabling..."
+                : "Confirm"}
             </PrimaryButton>
           </DialogFooter>
         </DialogContent>

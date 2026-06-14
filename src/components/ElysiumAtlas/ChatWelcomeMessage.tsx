@@ -2,6 +2,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { useAppSelector } from "@/store";
+import { isAgentDisabled, AGENT_OFFLINE_MESSAGE } from "@/utils/agentStatus";
 import Image from "next/image";
 
 interface ChatWelcomeMessageProps {
@@ -18,9 +19,12 @@ const ChatWelcomeMessage: React.FC<ChatWelcomeMessageProps> = ({
     welcome_message,
     quick_prompts,
     agent_name,
+    agent_status,
     primary_color,
     text_color,
   } = useAppSelector((state) => state.agentChat);
+
+  const isOffline = isAgentDisabled(agent_status);
 
   return (
     <div className="flex pl-[18px] pr-[16px] h-full min-h-[200px] py-[10px]">
@@ -44,15 +48,21 @@ const ChatWelcomeMessage: React.FC<ChatWelcomeMessageProps> = ({
             {agent_name?.charAt(0)?.toUpperCase() || "A"}
           </div>
         )}
-        <div className="text-[14px] text-gray-800 leading-relaxed font-[600]">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight]}
-          >
-            {welcome_message}
-          </ReactMarkdown>
-        </div>
-        {quick_prompts && quick_prompts.length > 0 && (
+        {isOffline ? (
+          <p className="text-[14px] text-gray-700 leading-relaxed font-[500]">
+            {AGENT_OFFLINE_MESSAGE}
+          </p>
+        ) : (
+          <div className="text-[14px] text-gray-800 leading-relaxed font-[600]">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+            >
+              {welcome_message}
+            </ReactMarkdown>
+          </div>
+        )}
+        {!isOffline && quick_prompts && quick_prompts.length > 0 && (
           <div className="space-y-2">
             {quick_prompts.map((prompt: any) => (
               <button

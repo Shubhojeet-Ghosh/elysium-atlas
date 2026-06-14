@@ -47,6 +47,7 @@ import { mapInitialAgentDetails } from "@/utils/mapInitialAgentDetails";
 import fastApiAxios from "@/utils/fastapi_axios";
 import { isEquivalent, normalizeValue } from "@/utils/comparisonUtils";
 import { toast } from "sonner";
+import { triggerFetchAgents } from "@/store/reducers/userAgentsSlice";
 import { SquareArrowOutUpRight } from "lucide-react";
 import axios from "axios";
 import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
@@ -307,6 +308,10 @@ export default function MyAgent({
 
     if (!isEquivalent(mappedInitial.baseURL, current.baseURL)) {
       payload.base_url = current.baseURL;
+    }
+
+    if (!isEquivalent(mappedInitial.agent_status, current.agent_status)) {
+      payload.agent_status = current.agent_status;
     }
 
     if (!isEquivalent(mappedInitial.systemPrompt, current.systemPrompt)) {
@@ -666,6 +671,10 @@ export default function MyAgent({
         }
 
         dispatch(setTriggerGetAgentDetails(triggerGetAgentDetails + 1));
+
+        if (payload.agent_status !== undefined) {
+          dispatch(triggerFetchAgents());
+        }
       } else {
         toast.error(
           "Failed to update agent: " +

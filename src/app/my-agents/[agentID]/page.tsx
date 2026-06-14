@@ -34,6 +34,7 @@ import {
   setSecondaryColor,
   setTextColor,
 } from "@/store/reducers/agentSlice";
+import { isSettledAgentStatus } from "@/utils/agentStatus";
 
 export default function AgentPage() {
   const params = useParams();
@@ -45,8 +46,6 @@ export default function AgentPage() {
   const [initialAgentDetails, setInitialAgentDetails] = useState<any>(null);
 
   useEffect(() => {
-    const allowedStatuses = ["active", "failed", "inactive"];
-
     const fetchAgentDetails = async () => {
       const token = Cookies.get("elysium_atlas_session_token");
       try {
@@ -89,8 +88,7 @@ export default function AgentPage() {
           dispatch(setSecondaryColor(agentDetails.secondary_color || "#fff"));
           dispatch(setTextColor(agentDetails.text_color || "#111"));
 
-          // If status is not in allowedStatuses, poll again after 5 seconds
-          if (!allowedStatuses.includes(agentDetails.agent_status)) {
+          if (!isSettledAgentStatus(agentDetails.agent_status)) {
             setTimeout(fetchAgentDetails, 5000);
           }
         }

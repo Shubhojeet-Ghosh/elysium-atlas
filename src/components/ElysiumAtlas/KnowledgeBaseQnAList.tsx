@@ -28,20 +28,24 @@ import {
   updateKnowledgeBaseQnA,
   removeKnowledgeBaseQnA,
 } from "@/store/reducers/agentBuilderSlice";
-import { Trash2, ChevronLeft, ChevronRight, Search } from "lucide-react";
-
-const QNA_PER_PAGE = 10;
+import OutlineButton from "@/components/ui/OutlineButton";
+import { Trash2, Search } from "lucide-react";
+import TablePaginationControls from "./TablePaginationControls";
+import { useClientSideTablePagination } from "@/hooks/useClientSideTablePagination";
+import { formatDateTime12hr } from "@/utils/formatDate";
 
 interface KnowledgeBaseQnAListProps {
   items?: never[];
   onEdit?: (index: number) => void;
   onRemove?: (index: number) => void;
+  onAddMore?: () => void;
 }
 
 export default function KnowledgeBaseQnAList({
   items: _items,
   onEdit: _onEdit,
   onRemove: _onRemove,
+  onAddMore,
 }: KnowledgeBaseQnAListProps = {}) {
   const dispatch = useDispatch();
   const knowledgeBaseQnA = useSelector(
@@ -52,7 +56,6 @@ export default function KnowledgeBaseQnAList({
   const [alias, setAlias] = useState("");
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [showRightGradient, setShowRightGradient] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -71,35 +74,39 @@ export default function KnowledgeBaseQnAList({
     );
   }, [knowledgeBaseQnA, searchTerm]);
 
-  // Reset to page 1 when search term changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
-
-  // Sort by lastUpdated (newest first)
   const sortedQnA = useMemo(() => {
     return [...filteredQnA]
-      .map((item, originalIndex) => ({ item, originalIndex }))
+      .map((item) => ({
+        item,
+        originalIndex: knowledgeBaseQnA.findIndex(
+          (q) => q.qna_alias === item.qna_alias,
+        ),
+      }))
       .sort(
         (a, b) =>
           new Date(b.item.lastUpdated).getTime() -
-          new Date(a.item.lastUpdated).getTime()
+          new Date(a.item.lastUpdated).getTime(),
       );
-  }, [filteredQnA]);
+  }, [filteredQnA, knowledgeBaseQnA]);
 
-  const totalPages = Math.ceil(sortedQnA.length / QNA_PER_PAGE);
-  const startIndex = (currentPage - 1) * QNA_PER_PAGE;
-  const endIndex = startIndex + QNA_PER_PAGE;
-  const currentQnA = sortedQnA.slice(startIndex, endIndex);
+  const {
+    currentPage,
+    totalPages,
+    hasNext,
+    hasPrev,
+    total,
+    pageSize,
+    pageSizeOptions,
+    paginatedItems: currentQnA,
+    handlePageChange,
+    handlePageSizeChange,
+    resetPage,
+  } = useClientSideTablePagination(sortedQnA);
 
-  // Reset to page 1 if current page is out of bounds
   useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(1);
-    }
-  }, [currentPage, totalPages]);
+    resetPage();
+  }, [searchTerm, resetPage]);
 
-  // Handle scroll to detect if we're at the end
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
@@ -153,36 +160,9 @@ export default function KnowledgeBaseQnAList({
     );
   };
 
-  const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  const handlePageClick = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  if (knowledgeBaseQnA.length === 0) {
-    return null;
-  }
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
+  const emptyMessage = searchTerm
+    ? `No entries found matching "${searchTerm}"`
+    : "No QnA entries added yet";
 
   const handleRowClick = (aliasName: string) => {
     // Find the item by alias name in the Redux store
@@ -243,7 +223,16 @@ export default function KnowledgeBaseQnAList({
               </span>
             )}
           </div>
-          {knowledgeBaseQnA.length > 0 && (
+          <div className="flex items-center gap-2">
+            {onAddMore && (
+              <OutlineButton
+                className="text-[12px] font-bold px-3 py-1 h-8"
+                onClick={onAddMore}
+              >
+                <span className="text-[18px]">+</span>{" "}
+                <span className="hidden md:inline">Add More</span>
+              </OutlineButton>
+            )}
             <div className="relative w-[200px]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
               <CustomInput
@@ -254,80 +243,22 @@ export default function KnowledgeBaseQnAList({
                 className="w-full pl-9 pr-3 py-2 text-[11px] h-8"
               />
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="flex justify-end mb-3 ">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handlePreviousPage}
-                disabled={currentPage === 1}
-                className="p-1.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-              </button>
+        <TablePaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          total={total}
+          pageSize={pageSize}
+          pageSizeOptions={pageSizeOptions}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
 
-              <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                  (page) => {
-                    // Show first page, last page, current page, and pages around current
-                    if (
-                      page === 1 ||
-                      page === totalPages ||
-                      (page >= currentPage - 1 && page <= currentPage + 1)
-                    ) {
-                      return (
-                        <button
-                          key={page}
-                          onClick={() => handlePageClick(page)}
-                          className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors cursor-pointer ${
-                            currentPage === page
-                              ? "bg-serene-purple text-white border-serene-purple"
-                              : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      );
-                    } else if (
-                      page === currentPage - 2 ||
-                      page === currentPage + 2
-                    ) {
-                      return (
-                        <span
-                          key={page}
-                          className="px-1 text-[11px] text-gray-400 dark:text-gray-500"
-                        >
-                          ...
-                        </span>
-                      );
-                    }
-                    return null;
-                  }
-                )}
-              </div>
-
-              <button
-                onClick={handleNextPage}
-                disabled={currentPage === totalPages}
-                className="p-1.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                aria-label="Next page"
-              >
-                <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {filteredQnA.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-[12px] px-4 md:px-0">
-            No entries found matching "{searchTerm}"
-          </div>
-        ) : (
-          <div className="relative">
+        <div className="relative">
             <div
               ref={scrollContainerRef}
               className="overflow-x-auto md:overflow-visible"
@@ -346,7 +277,17 @@ export default function KnowledgeBaseQnAList({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {currentQnA.map(({ item, originalIndex }, displayIndex) => {
+                    {currentQnA.length === 0 ? (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell
+                          colSpan={3}
+                          className="py-10 text-center text-[12px] text-gray-500 dark:text-gray-400"
+                        >
+                          {emptyMessage}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                    currentQnA.map(({ item, originalIndex }, displayIndex) => {
                       const alias = item.qna_alias || `QnA ${displayIndex + 1}`;
                       const matchesAlias =
                         searchTerm.trim() &&
@@ -368,7 +309,7 @@ export default function KnowledgeBaseQnAList({
                             </div>
                           </TableCell>
                           <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-2 lg:px-4 px-0 text-[12px] whitespace-nowrap">
-                            {formatDate(item.lastUpdated)}
+                            {formatDateTime12hr(item.lastUpdated)}
                           </TableCell>
                           <TableCell className="w-[60px] md:w-[80px] text-right py-2 lg:px-4 px-0 whitespace-nowrap">
                             <button
@@ -383,17 +324,16 @@ export default function KnowledgeBaseQnAList({
                           </TableCell>
                         </TableRow>
                       );
-                    })}
+                    })
+                    )}
                   </TableBody>
                 </Table>
               </div>
             </div>
-            {/* Right gradient overlay - fixed to viewport */}
-            {showRightGradient && (
+            {showRightGradient && currentQnA.length > 0 && (
               <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
             )}
           </div>
-        )}
       </div>
 
       <Sheet

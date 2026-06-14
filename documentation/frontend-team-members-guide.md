@@ -15,6 +15,7 @@ For backend/MongoDB internals, see [`team-members-api.md`](./team-members-api.md
 | 3   | `POST` | `/elysium-atlas/v1/team/members/invitation/respond` | No — invite token in body |
 | 4   | `GET`  | `/elysium-atlas/v1/team/members`                    | Yes — any team member     |
 | 5   | `POST` | `/elysium-atlas/v1/team/members/remove`             | Yes — owner or admin      |
+| 6   | `POST` | `/elysium-atlas/v1/team/members/update-role`        | Yes — owner or admin      |
 
 **Base URL example:** `https://your-api.com/elysium-atlas`
 
@@ -26,7 +27,7 @@ Team size is **not** stored as counters on the team document. The backend counts
 
 | What                  | Where it comes from                                                                                           |
 | --------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **Max team size**     | Owner's `atlas_teams.max_members` (source of truth — not overwritten by plan assign)                          |
+| **Max team size**     | Owner's `atlas_teams.max_members` — updated on **`POST /plan/assign`** from plan's `max_team_members`         |
 | **Current team size** | Owner's `atlas_teams.member_count` (refreshed live: 1 + active members)                                       |
 | **Plan info API**     | `max_team_members` + `member_count` in **`original_limits`** (from `atlas_teams`) — not in `available_limits` |
 
@@ -78,23 +79,24 @@ The session token must include `team_id` and `role` — the **active team the us
 
 All team member APIs scope authorization to **`req.user.team_id`** plus the caller's role for that team (resolved from DB on each request).
 
-| API            | Required role                 |
-| -------------- | ----------------------------- |
-| List members   | `owner`, `admin`, or `member` |
-| Invite members | `owner` or `admin`            |
-| Remove members | `owner` or `admin`            |
+| API                | Required role                 |
+| ------------------ | ----------------------------- |
+| List members       | `owner`, `admin`, or `member` |
+| Invite members     | `owner` or `admin`            |
+| Remove members     | `owner` or `admin`            |
+| Update member role | `owner` or `admin`            |
 
-Members who call invite/remove receive **403** with a permission message. Gate these actions in the UI using `user.role` from login (but trust the API as source of truth).
+Members who call invite/remove/update-role receive **403** with a permission message. Gate these actions in the UI using `user.role` from login (but trust the API as source of truth).
 
 ---
 
 ## Roles
 
-| Role       | Set via                                | Notes                                                |
-| ---------- | -------------------------------------- | ---------------------------------------------------- |
-| `"owner"`  | Team creation / login                  | Full team management (list, invite, remove)          |
-| `"admin"`  | Invite API (`role: "admin"`)           | Same as owner for member APIs (list, invite, remove) |
-| `"member"` | Invite API (`role: "member"`, default) | List members only — invite/remove return 403         |
+| Role       | Set via                                         | Notes                                                             |
+| ---------- | ----------------------------------------------- | ----------------------------------------------------------------- |
+| `"owner"`  | Team creation / login                           | Full team management (list, invite, remove, update role)          |
+| `"admin"`  | Invite API (`role: "admin"`) or update-role API | Same as owner for member APIs (list, invite, remove, update role) |
+| `"member"` | Invite API (`role: "member"`, default)          | List members only — invite/remove/update-role return 403          |
 
 When inviting, pass `"admin"` or `"member"` in the request body. Invalid values return `400`:
 
@@ -963,6 +965,147 @@ POST /elysium-atlas/v1/team/members/remove
 
 ---
 
+# API 6 — Update team member role
+
+**Who calls this:** Team **owner** or **admin**  
+**When:** Promote a member to admin, or demote an admin to member
+
+Updates `role` on an active `atlas_team_members` row. The team owner is not in that collection — their role cannot be changed via this API.
+
+### Request
+
+```
+POST /elysium-atlas/v1/team/members/update-role
+```
+
+**Headers:**
+
+```json
+{
+  "Authorization": "Bearer eyJhbGciOiJIUzI1NiIs...",
+  "Content-Type": "application/json"
+}
+```
+
+**Body:**
+
+```json
+{
+  "user_id": "665a1b2c3d4e5f6789012347",
+  "role": "admin"
+}
+```
+
+| Field     | Required | Type     | Notes                         |
+| --------- | -------- | -------- | ----------------------------- |
+| `user_id` | Yes      | `string` | MongoDB user id of the member |
+| `role`    | Yes      | `string` | `"admin"` or `"member"`       |
+
+---
+
+### Response — success (HTTP 200)
+
+```json
+{
+  "success": true,
+  "message": "Team member role updated.",
+  "member": {
+    "user_id": "665a1b2c3d4e5f6789012347",
+    "email": "alice@example.com",
+    "role": "admin",
+    "status": "active"
+  }
+}
+```
+
+**Suggested UI:** Update the member row in the list with the returned `role`, or refresh `GET /team/members`.
+
+> **Note:** The affected user's session JWT still holds their old `role` until they log in again or re-select the team. Your UI should rely on list API data for other members, not stale JWT claims.
+
+---
+
+### Response — every failure case
+
+**Case: missing user_id (HTTP 400)**
+
+```json
+{
+  "success": false,
+  "message": "user_id is required."
+}
+```
+
+**Case: missing role (HTTP 400)**
+
+```json
+{
+  "success": false,
+  "message": "role is required."
+}
+```
+
+**Case: invalid role (HTTP 400)**
+
+```json
+{
+  "success": false,
+  "message": "Invalid role. Must be \"admin\" or \"member\"."
+}
+```
+
+**Case: caller lacks permission (HTTP 403)**
+
+```json
+{
+  "success": false,
+  "message": "You do not have permission to update member roles on this team."
+}
+```
+
+**Case: trying to change the owner's role (HTTP 400)**
+
+```json
+{
+  "success": false,
+  "message": "The team owner's role cannot be changed."
+}
+```
+
+**Case: user was never on the team (HTTP 404)**
+
+```json
+{
+  "success": false,
+  "message": "This user is not a member of your team."
+}
+```
+
+**Case: member was removed (HTTP 200)**
+
+```json
+{
+  "success": false,
+  "message": "This member has been removed.",
+  "member": {
+    "user_id": "665a1b2c3d4e5f6789012347",
+    "email": "alice@example.com",
+    "role": "member",
+    "status": "removed"
+  }
+}
+```
+
+**Case: server error (HTTP 500)**
+
+```json
+{
+  "success": false,
+  "message": "Server error."
+}
+```
+
+---
+
 ## Frontend pages to build
 
 ### 1. Team settings — Invite members (owner)
@@ -978,6 +1121,7 @@ POST /elysium-atlas/v1/team/members/remove
 - Paginate if `total > limit`
 - Refresh after successful invites (pending invites won't appear here until accepted)
 - **Remove button** per member → `POST /team/members/remove` with `{ user_id }` → refresh list
+- **Role dropdown** per member (not owner) → `POST /team/members/update-role` with `{ user_id, role }` → update row or refresh list
 
 ### 3. Invite landing page (invitee)
 
@@ -1100,6 +1244,19 @@ interface RemoveMemberResponse {
   };
 }
 
+// --- Update member role API ---
+
+interface UpdateMemberRoleResponse {
+  success: boolean;
+  message: string;
+  member?: {
+    user_id: string;
+    email: string;
+    role: TeamMemberRole;
+    status: "active" | "removed";
+  };
+}
+
 // --- List members API ---
 
 interface TeamMember {
@@ -1198,7 +1355,7 @@ When a user switches teams at login, call `/plan/info` again — they see that t
 
 8. **No manual counter increments on join/leave** — `atlas_teams.member_count` is recomputed from active members when plan info, list, invite, accept, or remove runs.
 
-9. **`max_team_members` and `member_count` come from `atlas_teams`** (in `original_limits` and `plan_data.team`), not from `available_limits`. Plan assign does **not** change `atlas_teams.max_members`.
+9. **`max_team_members` and `member_count` come from `atlas_teams`** (in `original_limits` and `plan_data.team`), not from `available_limits`. **`POST /plan/assign`** sets `atlas_teams.max_members` from the plan's `max_team_members`.
 
 10. **Only the team owner** can invite, list, or remove members. Invited members cannot perform these actions.
 
@@ -1253,6 +1410,19 @@ await fetch(`${BASE}/v1/team/members/remove`, {
     "Content-Type": "application/json",
   },
   body: JSON.stringify({ user_id: "665a1b2c3d4e5f6789012347" }),
+});
+
+// 6. Update member role
+await fetch(`${BASE}/v1/team/members/update-role`, {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${sessionToken}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    user_id: "665a1b2c3d4e5f6789012347",
+    role: "admin",
+  }),
 });
 ```
 

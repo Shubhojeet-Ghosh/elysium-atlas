@@ -132,7 +132,7 @@ export default function ConversationChatBody({
       messagingUnreadCount,
     ) !== -1;
 
-  useChatScrollToUnreadOrBottom({
+  const { scrollToBottomOnSend } = useChatScrollToUnreadOrBottom({
     active: isVisible,
     ready: conversation_chain.length > 0,
     conversationLength: conversation_chain.length,
@@ -237,6 +237,8 @@ export default function ConversationChatBody({
         }),
       );
 
+      scrollToBottomOnSend();
+
       // Emit socket — payload matches spec: { agent_id, chat_session_id, message }
       aiSocket.emit("atlas-team-member-message", {
         agent_id,
@@ -258,7 +260,7 @@ export default function ConversationChatBody({
         textareaRef.current.style.height = "auto";
       }
     },
-    [inputValue, agent_id, chat_session_id, dispatch],
+    [inputValue, agent_id, chat_session_id, dispatch, scrollToBottomOnSend],
   );
 
   const handleInputChange = useCallback(

@@ -28,7 +28,7 @@ const MessageActions = memo(
           } catch (clipboardError) {
             // Clipboard API failed (likely due to iframe permissions), fall back to legacy method
             console.warn(
-              "Clipboard API blocked, falling back to document.execCommand"
+              "Clipboard API blocked, falling back to document.execCommand",
             );
           }
         }
@@ -127,7 +127,7 @@ const MessageActions = memo(
         </Tooltip>
       </div>
     );
-  }
+  },
 );
 
 MessageActions.displayName = "MessageActions";

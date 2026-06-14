@@ -5,10 +5,7 @@ import { RootState } from "@/store";
 import { useAppSelector } from "@/store";
 import {
   setKnowledgeBaseFiles,
-  addKnowledgeBaseFiles,
-  setFileChecked,
   removeKnowledgeBaseFile,
-  setTriggerFetchAgentFiles,
 } from "@/store/reducers/agentSlice";
 import { FileMetadata } from "@/store/types/AgentBuilderTypes";
 import { toast } from "sonner";
@@ -20,6 +17,12 @@ import { cn } from "@/lib/utils";
 import Pill from "@/components/ui/Pill";
 import AgentFilesList from "./AgentFilesList";
 import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
+import {
+  readDatasourcePageSize,
+  writeDatasourcePageSize,
+  VISITOR_PAGE_SIZE_OPTIONS,
+  type VisitorPageSize,
+} from "@/lib/config";
 
 interface AgentFilesProps {
   documentFiles: File[];
@@ -37,7 +40,21 @@ export default function AgentFiles({
     (state: RootState) => state.agent.knowledgeBaseFiles,
   );
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrev, setHasPrev] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [pageSize, setPageSize] = useState<VisitorPageSize>(() =>
+    readDatasourcePageSize(),
+  );
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pageSizeRef = useRef(pageSize);
+  const currentPageRef = useRef(currentPage);
+  const knowledgeBaseFilesRef = useRef(knowledgeBaseFiles);
+  pageSizeRef.current = pageSize;
+  currentPageRef.current = currentPage;
+  knowledgeBaseFilesRef.current = knowledgeBaseFiles;
   const triggerFetchAgentFiles = useAppSelector(
     (state) => state.agent.triggerFetchAgentFiles,
   );
@@ -49,82 +66,154 @@ export default function AgentFiles({
     }
   };
 
-  const fetchAgentFiles = async (isPolling = false): Promise<boolean> => {
-    if (!agentID) return false;
+  const mergeWithNewFiles = useCallback((mappedFiles: FileMetadata[]) => {
+    const fetchedNames = new Set(mappedFiles.map((f) => f.name));
+    const newItems = knowledgeBaseFilesRef.current.filter(
+      (item) => item.status === "new" && !fetchedNames.has(item.name),
+    );
+    return [...newItems, ...mappedFiles];
+  }, []);
 
-    if (!isPolling) setIsLoadingFiles(true);
-    const token = Cookies.get("elysium_atlas_session_token");
-
-    try {
-      const response = await fastApiAxios.post(
-        "/elysium-agents/elysium-atlas/agent/v1/get-agent-files",
-        {
-          agent_id: agentID,
-          limit: 1000,
-          cursor: null,
-          include_count: false,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
+  const applyPagination = useCallback(
+    (payload: {
+      total: number;
+      page: number;
+      total_pages: number;
+      has_next: boolean;
+      has_prev: boolean;
+    }) => {
+      setCurrentPage(payload.page);
+      setTotal(payload.total);
+      setHasNext(payload.has_next);
+      setHasPrev(payload.has_prev);
+      setTotalPages(
+        payload.total_pages > 0
+          ? payload.total_pages
+          : payload.total > 0
+            ? Math.max(1, Math.ceil(payload.total / pageSizeRef.current))
+            : 0,
       );
+    },
+    [],
+  );
 
-      if (response.data.success === true) {
-        const files = response.data.files?.data || [];
+  const fetchAgentFiles = useCallback(
+    async (
+      page = currentPageRef.current,
+      limit = pageSizeRef.current,
+      isPolling = false,
+    ): Promise<boolean> => {
+      if (!agentID) return false;
 
-        const mappedFiles = files.map((fileItem: any) => ({
-          name: fileItem.file_name,
-          size: fileItem.file_size || 0,
-          type: fileItem.file_type || "",
-          checked: false,
-          s3_key: fileItem.file_key,
-          cdn_url: fileItem.cdn_url,
-          status: fileItem.status ?? "indexed",
-          updated_at: fileItem.updated_at ?? null,
-        }));
+      if (!isPolling) setIsLoadingFiles(true);
+      const token = Cookies.get("elysium_atlas_session_token");
 
-        dispatch(setKnowledgeBaseFiles(mappedFiles));
-
-        const hasIndexing = mappedFiles.some(
-          (f: any) => f.status !== "indexed",
+      try {
+        const response = await fastApiAxios.post(
+          "/elysium-agents/elysium-atlas/agent/v1/get-agent-files",
+          {
+            agent_id: agentID,
+            page,
+            limit,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
         );
-        if (!hasIndexing) stopPolling();
-        return hasIndexing;
-      }
-    } catch (error: any) {
-      const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to fetch agent files";
-      if (!isPolling) toast.error(errorMessage);
-      stopPolling();
-    } finally {
-      if (!isPolling) setIsLoadingFiles(false);
-    }
-    return false;
-  };
 
-  const startPollingIfNeeded = (hasIndexing: boolean) => {
-    if (hasIndexing && !pollingRef.current) {
-      pollingRef.current = setInterval(() => {
-        fetchAgentFiles(true);
-      }, 5000);
-    }
-  };
+        if (response.data.success === true) {
+          const files = response.data.files || [];
+
+          const mappedFiles = files.map((fileItem: any) => ({
+            name: fileItem.file_name,
+            size: fileItem.file_size || 0,
+            type: fileItem.file_type || "",
+            checked: false,
+            s3_key: fileItem.file_key,
+            cdn_url: fileItem.cdn_url,
+            status: fileItem.status ?? "indexed",
+            updated_at: fileItem.updated_at ?? null,
+          }));
+
+          dispatch(setKnowledgeBaseFiles(mergeWithNewFiles(mappedFiles)));
+          applyPagination({
+            total: response.data.total ?? 0,
+            page: response.data.page ?? page,
+            total_pages: response.data.total_pages ?? 0,
+            has_next: response.data.has_next ?? false,
+            has_prev: response.data.has_prev ?? false,
+          });
+
+          const hasIndexing = mappedFiles.some(
+            (f: FileMetadata) => f.status !== "indexed",
+          );
+          if (!hasIndexing) stopPolling();
+          return hasIndexing;
+        }
+      } catch (error: any) {
+        const errorMessage =
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to fetch agent files";
+        if (!isPolling) toast.error(errorMessage);
+        stopPolling();
+      } finally {
+        if (!isPolling) setIsLoadingFiles(false);
+      }
+      return false;
+    },
+    [agentID, dispatch, mergeWithNewFiles, applyPagination],
+  );
+
+  const startPollingIfNeeded = useCallback(
+    (hasIndexing: boolean) => {
+      if (hasIndexing && !pollingRef.current) {
+        pollingRef.current = setInterval(() => {
+          fetchAgentFiles(
+            currentPageRef.current,
+            pageSizeRef.current,
+            true,
+          );
+        }, 5000);
+      }
+    },
+    [fetchAgentFiles],
+  );
 
   useEffect(() => {
     if (!agentID) return;
-    fetchAgentFiles().then(startPollingIfNeeded);
+    setCurrentPage(1);
+    fetchAgentFiles(1, pageSizeRef.current).then(startPollingIfNeeded);
     return () => stopPolling();
-  }, [agentID]);
+  }, [agentID, fetchAgentFiles, startPollingIfNeeded]);
 
   useEffect(() => {
     if (!agentID || triggerFetchAgentFiles === 0) return;
     stopPolling();
-    fetchAgentFiles().then(startPollingIfNeeded);
-  }, [triggerFetchAgentFiles]);
+    setCurrentPage(1);
+    fetchAgentFiles(1, pageSizeRef.current).then(startPollingIfNeeded);
+  }, [triggerFetchAgentFiles, agentID, fetchAgentFiles, startPollingIfNeeded]);
+
+  const handlePageChange = useCallback(
+    (page: number) => {
+      stopPolling();
+      fetchAgentFiles(page, pageSizeRef.current).then(startPollingIfNeeded);
+    },
+    [fetchAgentFiles, startPollingIfNeeded],
+  );
+
+  const handlePageSizeChange = useCallback(
+    (size: VisitorPageSize) => {
+      setPageSize(size);
+      writeDatasourcePageSize(size);
+      stopPolling();
+      setCurrentPage(1);
+      fetchAgentFiles(1, size).then(startPollingIfNeeded);
+    },
+    [fetchAgentFiles, startPollingIfNeeded],
+  );
 
   // Sync local files state with Redux store (convert File[] to FileMetadata[])
   useEffect(() => {
@@ -139,15 +228,12 @@ export default function AgentFiles({
         cdn_url: null,
       }));
 
-      // Get existing file names to avoid duplicates
       const existingFileNames = new Set(knowledgeBaseFiles.map((f) => f.name));
 
-      // Filter out files that are already in Redux
       const newUniqueFiles = fileMetadata.filter(
         (f) => !existingFileNames.has(f.name),
       );
 
-      // Add only truly new files to Redux (prepend to show them first)
       if (newUniqueFiles.length > 0) {
         dispatch(
           setKnowledgeBaseFiles([...newUniqueFiles, ...knowledgeBaseFiles]),
@@ -156,8 +242,6 @@ export default function AgentFiles({
     }
   }, [documentFiles, dispatch]);
 
-  // Reverse Sync: Ensure local documentFiles only contains files present in Redux
-  // This handles external removals (like Unsaved Changes Bar clearing Redux state)
   useEffect(() => {
     setDocumentFiles((prevFiles) => {
       if (prevFiles.length === 0) return prevFiles;
@@ -186,11 +270,17 @@ export default function AgentFiles({
         <AgentFilesList
           isLoadingFiles={isLoadingFiles}
           readOnly={readOnly}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          total={total}
+          pageSize={pageSize}
+          pageSizeOptions={VISITOR_PAGE_SIZE_OPTIONS}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
           onRemoveFile={(fileName) => {
-            // Remove from Redux
             dispatch(removeKnowledgeBaseFile(fileName));
-
-            // Remove from local state
             setDocumentFiles((prev) =>
               prev.filter((file) => file.name !== fileName),
             );
@@ -201,7 +291,6 @@ export default function AgentFiles({
   );
 }
 
-// Simple upload component without file display
 function SimpleFileUpload({
   documentFiles,
   setDocumentFiles,
@@ -215,7 +304,6 @@ function SimpleFileUpload({
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
-      // Create a set of all current file names (both in local state and Redux)
       const currentFileNames = new Set([
         ...documentFiles.map((f) => f.name),
         ...knowledgeBaseFiles.map((f) => f.name),
@@ -262,7 +350,7 @@ function SimpleFileUpload({
         [".docx"],
     },
     multiple: true,
-    maxSize: 10 * 1024 * 1024, // 10 MB
+    maxSize: 10 * 1024 * 1024,
   });
 
   return (

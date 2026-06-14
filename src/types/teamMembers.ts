@@ -105,3 +105,14 @@ export interface RemoveMemberResponse {
   message: string;
   member?: RemovedMember;
 }
+
+export interface UpdateMemberRoleResponse {
+  success: boolean;
+  message: string;
+  member?: {
+    user_id: string;
+    email: string;
+    role: TeamMemberRole;
+    status: "active" | "removed";
+  };
+}

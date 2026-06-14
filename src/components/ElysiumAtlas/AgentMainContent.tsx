@@ -10,7 +10,9 @@ import AgentReadyCard from "./AgentReadyCard";
 import AgentEmbedCard from "./AgentEmbedCard";
 import AgentProgressCard from "./AgentProgressCard";
 import DeleteAgentCard from "./DeleteAgentCard";
+import AgentStatusToggle from "./AgentStatusToggle";
 import { useAppSelector } from "../../store";
+import { isSettledAgentStatus } from "@/utils/agentStatus";
 
 interface AgentMainContentProps {
   initialAgentDetails: any;
@@ -29,14 +31,14 @@ export default function AgentMainContent({
   );
   const progress = useAppSelector((state) => state.agent.progress);
 
-  const allowedStatuses = ["active", "failed", "inactive"];
-  const isAgentInProgress = !allowedStatuses.includes(agentStatus);
+  const isAgentInProgress = !isSettledAgentStatus(agentStatus);
 
   return (
     <>
       <div className="flex flex-col lg:px-[40px] px-0">
-        <div className="lg:mt-[40px] mt-[20px] flex items-center justify-between">
+        <div className="lg:mt-[40px] mt-[20px] flex items-center gap-4">
           <p className="text-[24px] font-[700]">{agentName || "Agent"}</p>
+          <AgentStatusToggle />
         </div>
         {isAgentInProgress && (
           <div className="w-full flex items-center lg:mt-0 mt-[20px] justify-end">

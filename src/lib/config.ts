@@ -23,6 +23,23 @@ export function writeVisitorsPageSize(size: VisitorPageSize) {
   localStorage.setItem(VISITORS_PAGE_SIZE_STORAGE_KEY, String(size));
 }
 
+export const DEFAULT_DATASOURCE_PAGE_SIZE: VisitorPageSize = 10;
+const DATASOURCE_PAGE_SIZE_STORAGE_KEY = "elysium_atlas_datasource_page_size";
+
+export function readDatasourcePageSize(): VisitorPageSize {
+  if (typeof window === "undefined") return DEFAULT_DATASOURCE_PAGE_SIZE;
+  const stored = Number(localStorage.getItem(DATASOURCE_PAGE_SIZE_STORAGE_KEY));
+  if (VISITOR_PAGE_SIZE_OPTIONS.includes(stored as VisitorPageSize)) {
+    return stored as VisitorPageSize;
+  }
+  return DEFAULT_DATASOURCE_PAGE_SIZE;
+}
+
+export function writeDatasourcePageSize(size: VisitorPageSize) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(DATASOURCE_PAGE_SIZE_STORAGE_KEY, String(size));
+}
+
 /** @deprecated Use readVisitorsPageSize() — kept for any legacy imports */
 export const VISITORS_PER_PAGE = DEFAULT_VISITORS_PER_PAGE;
 // ─────────────────────────────────────────────────────────────────────────────

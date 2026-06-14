@@ -61,11 +61,12 @@ The session JWT payload includes:
 
 ### Role permissions
 
-| Action                                       | `owner` | `admin` | `member`   |
-| -------------------------------------------- | ------- | ------- | ---------- |
-| List members (`GET /team/members`)           | Yes     | Yes     | Yes        |
-| Invite members (`POST /team/members/invite`) | Yes     | Yes     | No → `403` |
-| Remove members (`POST /team/members/remove`) | Yes     | Yes     | No → `403` |
+| Action                                                | `owner` | `admin` | `member`   |
+| ----------------------------------------------------- | ------- | ------- | ---------- |
+| List members (`GET /team/members`)                    | Yes     | Yes     | Yes        |
+| Invite members (`POST /team/members/invite`)          | Yes     | Yes     | No → `403` |
+| Remove members (`POST /team/members/remove`)          | Yes     | Yes     | No → `403` |
+| Update member role (`POST /team/members/update-role`) | Yes     | Yes     | No → `403` |
 
 The backend re-resolves role from the database on each request (via `team_id` + `user_id`), not only from the JWT claim.
 
@@ -420,8 +421,18 @@ Paginated list of accepted team members. Owner-only. Profile names are joined fr
   "max_team_members": 55,
   "page": 1,
   "limit": 50,
-  "total": 4,
+  "total": 5,
   "members": [
+    {
+      "user_id": "665a1b2c3d4e5f6789012300",
+      "email": "owner@example.com",
+      "first_name": "Jane",
+      "last_name": "Doe",
+      "profile_image_url": null,
+      "role": "owner",
+      "status": "active",
+      "joined_at": "2026-02-25T06:51:29.737Z"
+    },
     {
       "user_id": "665a1b2c3d4e5f6789012347",
       "email": "alice@example.com",
@@ -436,7 +447,7 @@ Paginated list of accepted team members. Owner-only. Profile names are joined fr
 }
 ```
 
-> **Note:** `current_team_size` and `max_team_members` come from `atlas_teams` (`member_count` / `max_members`), refreshed before each response. `total` is the paginated count of `atlas_team_members` rows (not including the owner).
+> **Note:** `current_team_size` and `max_team_members` come from `atlas_teams` (`member_count` / `max_members`), refreshed before each response. When `status=active`, `members[]` includes the **owner** first (`role: "owner"`), then invited members. `total` = owner + matching `atlas_team_members` rows.
 
 #### Error — `403`
 
@@ -500,19 +511,100 @@ Owner-only. Soft-removes an active member (`status: "removed"`). No counter upda
 
 ---
 
+### 6. Update team member role
+
+**`POST /elysium-atlas/v1/team/members/update-role`**
+
+Owner or admin. Updates the role of an active team member (`admin` or `member`). The team owner's role cannot be changed.
+
+#### Headers
+
+```json
+{
+  "Authorization": "Bearer <sessionToken>",
+  "Content-Type": "application/json"
+}
+```
+
+#### Request body
+
+```json
+{
+  "user_id": "665a1b2c3d4e5f6789012347",
+  "role": "admin"
+}
+```
+
+| Field     | Required | Type     | Notes                         |
+| --------- | -------- | -------- | ----------------------------- |
+| `user_id` | Yes      | `string` | MongoDB user id of the member |
+| `role`    | Yes      | `string` | `"admin"` or `"member"`       |
+
+#### Success response — `200`
+
+```json
+{
+  "success": true,
+  "message": "Team member role updated.",
+  "member": {
+    "user_id": "665a1b2c3d4e5f6789012347",
+    "email": "alice@example.com",
+    "role": "admin",
+    "status": "active"
+  }
+}
+```
+
+#### Error responses
+
+| HTTP  | Body                                                                                                 |
+| ----- | ---------------------------------------------------------------------------------------------------- |
+| `400` | `{ "success": false, "message": "user_id is required." }`                                            |
+| `400` | `{ "success": false, "message": "role is required." }`                                               |
+| `400` | `{ "success": false, "message": "Invalid role. Must be \"admin\" or \"member\"." }`                  |
+| `400` | `{ "success": false, "message": "The team owner's role cannot be changed." }`                        |
+| `401` | Missing or invalid session token                                                                     |
+| `403` | `{ "success": false, "message": "You do not have permission to update member roles on this team." }` |
+| `404` | `{ "success": false, "message": "This user is not a member of your team." }`                         |
+| `200` | `{ "success": false, "message": "This member has been removed.", "member": { ... } }`                |
+
+---
+
 ## MongoDB collections
 
 ### `atlas_teams` (existing)
 
 Team metadata. One personal team per owner.
 
-| Field           | Purpose                                                                         |
-| --------------- | ------------------------------------------------------------------------------- |
-| `owner_user_id` | Team owner                                                                      |
-| `member_count`  | Owner (1) + active members — **source of truth**, recomputed on team operations |
-| `max_members`   | Max team size — **source of truth**, synced from plan on assign                 |
+| Field           | Purpose                                                                                                              |
+| --------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `owner_user_id` | Team owner                                                                                                           |
+| `member_count`  | Owner (1) + active members — **source of truth**, recomputed on team operations                                      |
+| `max_members`   | Max team size — **source of truth**; set via **`POST /plan/assign`** from `atlas_plans.plan_limits.max_team_members` |
 
-Team capacity in `/plan/info` and invite/list APIs reads from this document. `max_team_members` is **not** stored in `atlas_user_available_plan_limits`.
+Team capacity in `/plan/info` and invite/list APIs reads from **`atlas_teams`**, not from this collection.
+
+### `atlas_user_available_plan_limits`
+
+Per-user **consumable** limits remaining for the active plan period (e.g. `ai_queries`, `max_visitor_message_chars`).
+
+```json
+{
+  "_id": "ObjectId",
+  "user_id": "665a1b2c3d4e5f6789012300",
+  "ai_queries": 4655,
+  "max_visitor_message_chars": 4000,
+  "createdAt": "2026-06-05T10:00:00.000Z",
+  "updatedAt": "2026-06-13T22:48:53.037Z"
+}
+```
+
+| Rule                | Detail                                                                                                                                        |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Stored here**     | Consumable limits only                                                                                                                        |
+| **Not stored here** | `max_team_members` — use `atlas_teams.max_members`                                                                                            |
+| **Legacy docs**     | Old documents may still have `max_team_members`; removed on next plan sync (`$unset`) and never returned in `/plan/info` → `available_limits` |
+| **Written by**      | `syncUserAvailableLimits` (trial provisioning, `/plan/assign`) — strips capacity keys before `$set`                                           |
 
 ### `atlas_team_invitations` (new)
 
@@ -671,7 +763,7 @@ remaining invite slots = max_members - member_count - pending_invites
 ```
 
 - `member_count` includes the owner (minimum 1); recomputed from `atlas_team_members` before reads.
-- `max_members` is synced from `atlas_plans.plan_limits.max_team_members` when a plan is assigned.
+- `max_members` is updated on **`POST /plan/assign`** from `atlas_plans.plan_limits.max_team_members` (owner's active team(s)). Login/trial/`syncUserAvailableLimits` do **not** change it.
 - Each **new** pending invitation consumes one slot until it expires, is declined, or is accepted.
 - Re-inviting an email with an existing pending invite (`already_invited`) does **not** consume an additional slot.
 
@@ -737,6 +829,15 @@ curl -X POST http://localhost:3000/elysium-atlas/v1/team/members/remove \
   -H "Authorization: Bearer YOUR_SESSION_TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"user_id\":\"MEMBER_USER_ID\"}"
+```
+
+**Update member role:**
+
+```bash
+curl -X POST http://localhost:3000/elysium-atlas/v1/team/members/update-role \
+  -H "Authorization: Bearer YOUR_SESSION_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"user_id\":\"MEMBER_USER_ID\",\"role\":\"admin\"}"
 ```
 
 ---

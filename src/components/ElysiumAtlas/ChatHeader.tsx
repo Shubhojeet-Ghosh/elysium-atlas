@@ -4,18 +4,21 @@ import { useAppSelector, useAppDispatch } from "@/store";
 import Image from "next/image";
 import { X } from "lucide-react";
 import { setIsAgentOpen } from "@/store/reducers/agentChatSlice";
+import { isAgentDisabled } from "@/utils/agentStatus";
 import ChatMoreOptions from "@/components/ElysiumAtlas/ChatMoreOptions";
 
 export default function ChatHeader() {
   const {
     agent_icon,
     agent_name,
+    agent_status,
     isFetching,
     primary_color,
     secondary_color,
     text_color,
   } = useAppSelector((state) => state.agentChat);
   const dispatch = useAppDispatch();
+  const isOffline = isAgentDisabled(agent_status);
 
   const handleClose = () => {
     dispatch(setIsAgentOpen(false));
@@ -49,16 +52,26 @@ export default function ChatHeader() {
         {isFetching ? (
           <div className="h-4 w-24 bg-gray-200 animate-pulse rounded"></div>
         ) : (
-          <span
-            className="font-semibold text-gray-700 text-sm truncate"
-            style={{ color: text_color }}
-          >
-            {agent_name || "Agent"}
-          </span>
+          <div className="flex min-w-0 flex-col">
+            <span
+              className="font-semibold text-gray-700 text-sm truncate"
+              style={{ color: text_color }}
+            >
+              {agent_name || "Agent"}
+            </span>
+            {isOffline && (
+              <span
+                className="text-[10px] font-medium opacity-80"
+                style={{ color: text_color }}
+              >
+                Offline
+              </span>
+            )}
+          </div>
         )}
       </div>
       <div className="flex gap-1 flex-shrink-0">
-        <ChatMoreOptions textColor={text_color} />
+        <ChatMoreOptions textColor={text_color} disabled={isOffline} />
         <button
           className="p-1.5 text-gray-400 hover:outline-[2px] outline-gray-100 rounded-full transition-colors cursor-pointer"
           onClick={handleClose}

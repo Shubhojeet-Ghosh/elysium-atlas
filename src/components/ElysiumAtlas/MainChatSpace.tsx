@@ -30,6 +30,7 @@ import MessageActions from "./MessageActions";
 import { formatChatTimestamp } from "@/utils/formatDate";
 import { markdownComponents } from "@/utils/markdownComponents";
 import { getUserGeoLocationDetails } from "@/utils/geoLocationUtils";
+import { isAgentDisabled, AGENT_OFFLINE_MESSAGE } from "@/utils/agentStatus";
 
 export default function MainChatSpace() {
   const {
@@ -39,6 +40,7 @@ export default function MainChatSpace() {
     secondary_color,
     text_color,
     placeholder_text,
+    agent_status,
     conversation_chain,
     isFetching,
     chatMode,
@@ -48,10 +50,21 @@ export default function MainChatSpace() {
     isAgentOpen,
   } = useAppSelector((state) => state.agentChat);
 
+  const isOffline = isAgentDisabled(agent_status);
+  const inputDisabled = isOffline;
+  const inputPlaceholder = isOffline
+    ? "This agent is currently offline"
+    : placeholder_text;
+
   const dispatch = useAppDispatch();
   const [inputValue, setInputValue] = useState("");
   const [newMessageAnimating, setNewMessageAnimating] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState("");
+  const showOfflineAgentMessage =
+    isOffline &&
+    conversation_chain.length > 0 &&
+    !isTyping &&
+    !streamingMessage;
   const [showScrollButton, setShowScrollButton] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -279,7 +292,7 @@ export default function MainChatSpace() {
     separatorIndex >= 0 ||
     findFirstIncomingUnreadSeparatorIndex(conversation_chain) !== -1;
 
-  useChatScrollToUnreadOrBottom({
+  const { scrollToBottomOnSend } = useChatScrollToUnreadOrBottom({
     active: isAgentOpen,
     ready: !isFetching && conversation_chain.length > 0,
     conversationLength: conversation_chain.length,
@@ -339,6 +352,8 @@ export default function MainChatSpace() {
 
   const handleSendMessage = useCallback(
     (message?: string) => {
+      if (isOffline) return;
+
       const msg = (message ?? inputValue).trim();
       if (msg === "") return;
 
@@ -352,6 +367,8 @@ export default function MainChatSpace() {
           created_at: user_message_created_at,
         }),
       );
+
+      scrollToBottomOnSend();
 
       // `emit` is connection-safe: if the socket isn't connected yet, it
       // queues the payload until the next connect. No reconnect dance needed.
@@ -376,12 +393,14 @@ export default function MainChatSpace() {
     },
     [
       inputValue,
+      isOffline,
       emit,
       agent_id,
       chat_session_id,
       chatMode,
       dispatch,
       in_conversation_with,
+      scrollToBottomOnSend,
     ],
   );
 
@@ -457,7 +476,10 @@ export default function MainChatSpace() {
                         agent_id={agent_id}
                         primary_color={primary_color}
                         text_color={text_color}
-                        isLast={index === conversation_chain.length - 1}
+                        isLast={
+                          index === conversation_chain.length - 1 &&
+                          !showOfflineAgentMessage
+                        }
                         isAnimating={newMessageAnimating}
                       />
                     </ReadReceiptMarker>
@@ -467,12 +489,31 @@ export default function MainChatSpace() {
                       agent_id={agent_id}
                       primary_color={primary_color}
                       text_color={text_color}
-                      isLast={index === conversation_chain.length - 1}
+                      isLast={
+                        index === conversation_chain.length - 1 &&
+                        !showOfflineAgentMessage
+                      }
                       isAnimating={newMessageAnimating}
                     />
                   )}
                 </Fragment>
               ))}
+
+              {showOfflineAgentMessage && (
+                <ChatMessage
+                  message={{
+                    message_id: "agent-offline-notice",
+                    role: "agent",
+                    content: AGENT_OFFLINE_MESSAGE,
+                    created_at: new Date().toISOString(),
+                  }}
+                  agent_id={agent_id}
+                  primary_color={primary_color}
+                  text_color={text_color}
+                  isLast
+                  isAnimating={false}
+                />
+              )}
 
               {isTyping && !in_conversation_with && (
                 <div className="mt-[4px]">
@@ -527,26 +568,31 @@ export default function MainChatSpace() {
       </button>
 
       <div className="flex-shrink-0 pt-[6px] pb-[6px] px-[12px]">
-        <div className="pr-[10px] relative flex items-end gap-2 bg-white border border-gray-200 rounded-xl shadow-sm transition-all py-2">
+        <div
+          className={`pr-[10px] relative flex items-end gap-2 bg-white border border-gray-200 rounded-xl shadow-sm transition-all py-2 ${
+            inputDisabled ? "opacity-60" : ""
+          }`}
+        >
           <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors mb-0.5"></button>
           <textarea
             ref={textareaRef}
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder={placeholder_text}
-            className="font-[500] w-full py-1.5 bg-transparent text-[13px] text-gray-800 placeholder-gray-400 focus:outline-none resize-none overflow-y-auto"
+            placeholder={inputPlaceholder}
+            disabled={inputDisabled}
+            className="font-[500] w-full py-1.5 bg-transparent text-[13px] text-gray-800 placeholder-gray-400 focus:outline-none resize-none overflow-y-auto disabled:cursor-not-allowed disabled:text-gray-500"
             rows={1}
             style={{ minHeight: "40px", maxHeight: "100px" }}
           />
           <button
             className={`p-1.5 text-white bg-black rounded-lg transition-all duration-300 shadow-sm mb-[-2px] mr-[-2px] ${
-              inputValue.trim() === ""
+              inputDisabled || inputValue.trim() === ""
                 ? "cursor-not-allowed opacity-10 "
                 : "cursor-pointer"
             }`}
             onClick={() => handleSendMessage()}
-            disabled={inputValue.trim() === ""}
+            disabled={inputDisabled || inputValue.trim() === ""}
             style={{ background: primary_color }}
           >
             <ArrowUp size={16} style={{ color: text_color }} />

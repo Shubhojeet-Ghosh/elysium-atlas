@@ -129,6 +129,7 @@ export default function TeamMembers() {
           onPageChange={handlePageChange}
           onPageSizeChange={handlePageSizeChange}
           onMemberRemoved={() => loadMembers(currentPage, pageSize)}
+          onMemberRoleUpdated={() => loadMembers(currentPage, pageSize)}
         />
       </div>
     </div>

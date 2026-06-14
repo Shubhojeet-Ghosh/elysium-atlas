@@ -19,6 +19,7 @@ import { useCanManageAgents } from "@/hooks/useCanManageAgents";
 import { useRouter } from "next/navigation";
 import { resetAgentBuilder } from "@/store/reducers/agentBuilderSlice";
 import NProgress from "nprogress";
+import { isSettledAgentStatus } from "@/utils/agentStatus";
 
 export default function MyAgents() {
   const router = useRouter();
@@ -46,8 +47,6 @@ export default function MyAgents() {
 
   useEffect(() => {
     let isMounted = true;
-    const allowedStatuses = ["active", "failed", "inactive"];
-
     async function fetchAgentsAndMaybePoll() {
       try {
         const token = Cookies.get("elysium_atlas_session_token");
@@ -73,7 +72,7 @@ export default function MyAgents() {
           if (agentsList.length > 0) {
             // Check if any agent_status is not in allowedStatuses
             const hasPending = agentsList.some(
-              (agent: any) => !allowedStatuses.includes(agent.agent_status),
+              (agent: any) => !isSettledAgentStatus(agent.agent_status),
             );
             if (hasPending && isMounted) {
               pollingRef.current = setTimeout(fetchAgentsAndMaybePoll, 5000);

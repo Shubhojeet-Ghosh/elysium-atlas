@@ -7,6 +7,7 @@ import type {
   PreviewResponse,
   RemoveMemberResponse,
   RespondResponse,
+  UpdateMemberRoleResponse,
 } from "@/types/teamMembers";
 
 function getAuthHeaders() {
@@ -64,6 +65,18 @@ export async function removeTeamMember(
   const response = await nodeExpressAxios.post(
     "/elysium-atlas/v1/team/members/remove",
     { user_id: userId },
+    { headers: getAuthHeaders() },
+  );
+  return response.data;
+}
+
+export async function updateTeamMemberRole(
+  userId: string,
+  role: InvitableRole,
+): Promise<UpdateMemberRoleResponse> {
+  const response = await nodeExpressAxios.post(
+    "/elysium-atlas/v1/team/members/update-role",
+    { user_id: userId, role },
     { headers: getAuthHeaders() },
   );
   return response.data;

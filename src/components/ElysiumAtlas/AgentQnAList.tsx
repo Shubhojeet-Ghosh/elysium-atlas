@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { RootState } from "@/store";
 import {
@@ -10,6 +10,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import TablePaginationControls from "./TablePaginationControls";
+import {
+  readDatasourcePageSize,
+  writeDatasourcePageSize,
+  VISITOR_PAGE_SIZE_OPTIONS,
+  type VisitorPageSize,
+} from "@/lib/config";
 import {
   Sheet,
   SheetClose,
@@ -33,11 +40,14 @@ import CustomTextareaPrimary from "@/components/inputs/CustomTextareaPrimary";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import CancelButton from "@/components/ui/CancelButton";
 import Badge from "@/components/ui/Badge";
+import Spinner from "@/components/ui/Spinner";
 import {
   updateKnowledgeBaseQnA,
   removeKnowledgeBaseQnA,
+  setKnowledgeBaseQnA,
 } from "@/store/reducers/agentSlice";
-import { Trash2, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import OutlineButton from "@/components/ui/OutlineButton";
+import { Trash2, Search } from "lucide-react";
 import fastApiAxios from "@/utils/fastapi_axios";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
@@ -45,18 +55,18 @@ import NProgress from "nprogress";
 import { formatDateTime12hr } from "@/utils/formatDate";
 import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
-const QNA_PER_PAGE = 10;
-
 interface KnowledgeBaseQnAListProps {
   items?: never[];
   onEdit?: (index: number) => void;
   onRemove?: (index: number) => void;
+  onAddMore?: () => void;
 }
 
 export default function KnowledgeBaseQnAList({
   items: _items,
   onEdit: _onEdit,
   onRemove: _onRemove,
+  onAddMore,
 }: KnowledgeBaseQnAListProps = {}) {
   const dispatch = useAppDispatch();
   const readOnly = useAgentReadOnly();
@@ -64,61 +74,221 @@ export default function KnowledgeBaseQnAList({
     (state) => state.agent.knowledgeBaseQnA,
   );
   const agentID = useAppSelector((state) => state.agent.agentID);
+  const triggerFetchAgentQnA = useAppSelector(
+    (state) => state.agent.triggerFetchAgentQnA,
+  );
   const [open, setOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [alias, setAlias] = useState("");
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrev, setHasPrev] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [pageSize, setPageSize] = useState<VisitorPageSize>(() =>
+    readDatasourcePageSize(),
+  );
+  const [isLoadingQnA, setIsLoadingQnA] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [showRightGradient, setShowRightGradient] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pageSizeRef = useRef(pageSize);
+  const currentPageRef = useRef(currentPage);
+  const knowledgeBaseQnARef = useRef(knowledgeBaseQnA);
+  pageSizeRef.current = pageSize;
+  currentPageRef.current = currentPage;
+  knowledgeBaseQnARef.current = knowledgeBaseQnA;
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [qnaToDelete, setQnaToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  // Filter QnA based on search term (alias, question, or answer)
+
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
+
+  const mergeWithNewQnA = useCallback(
+    (
+      mappedQnA: {
+        qna_alias: string;
+        question: string;
+        answer: string;
+        lastUpdated: string;
+        status: string;
+      }[],
+    ) => {
+      const fetchedAliases = new Set(
+        mappedQnA.map((q) => q.qna_alias.toLowerCase()),
+      );
+      const newItems = knowledgeBaseQnARef.current.filter(
+        (item) =>
+          item.status === "new" &&
+          !fetchedAliases.has(item.qna_alias.toLowerCase()),
+      );
+      return [...newItems, ...mappedQnA];
+    },
+    [],
+  );
+
+  const applyPagination = useCallback(
+    (payload: {
+      total: number;
+      page: number;
+      total_pages: number;
+      has_next: boolean;
+      has_prev: boolean;
+    }) => {
+      setCurrentPage(payload.page);
+      setTotal(payload.total);
+      setHasNext(payload.has_next);
+      setHasPrev(payload.has_prev);
+      setTotalPages(
+        payload.total_pages > 0
+          ? payload.total_pages
+          : payload.total > 0
+            ? Math.max(1, Math.ceil(payload.total / pageSizeRef.current))
+            : 0,
+      );
+    },
+    [],
+  );
+
+  const fetchQAPairs = useCallback(
+    async (
+      page = currentPageRef.current,
+      limit = pageSizeRef.current,
+      isPolling = false,
+    ): Promise<boolean> => {
+      if (!agentID) return false;
+
+      if (!isPolling) setIsLoadingQnA(true);
+      const token = Cookies.get("elysium_atlas_session_token");
+
+      try {
+        const response = await fastApiAxios.post(
+          "/elysium-agents/elysium-atlas/agent/v1/get-agent-qa-pairs",
+          {
+            agent_id: agentID,
+            page,
+            limit,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
+        if (response.data.success === true) {
+          const qaPairs = response.data.qa_pairs || [];
+          const mappedQnA = qaPairs.map((item: any) => ({
+            qna_alias: item.qna_alias,
+            question: "",
+            answer: "",
+            lastUpdated: item.updated_at || item.created_at,
+            status: item.status ?? "indexed",
+          }));
+
+          dispatch(setKnowledgeBaseQnA(mergeWithNewQnA(mappedQnA)));
+          applyPagination({
+            total: response.data.total ?? 0,
+            page: response.data.page ?? page,
+            total_pages: response.data.total_pages ?? 0,
+            has_next: response.data.has_next ?? false,
+            has_prev: response.data.has_prev ?? false,
+          });
+
+          const hasIndexing = mappedQnA.some(
+            (q: { status: string }) =>
+              q.status !== "active" && q.status !== "indexed",
+          );
+          if (!hasIndexing) stopPolling();
+          return hasIndexing;
+        }
+      } catch (error: any) {
+        const errorMessage =
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to fetch QA pairs";
+        if (!isPolling) toast.error(errorMessage);
+        stopPolling();
+      } finally {
+        if (!isPolling) setIsLoadingQnA(false);
+      }
+      return false;
+    },
+    [agentID, dispatch, mergeWithNewQnA, applyPagination],
+  );
+
+  const startPollingIfNeeded = useCallback(
+    (hasIndexing: boolean) => {
+      if (hasIndexing && !pollingRef.current) {
+        pollingRef.current = setInterval(() => {
+          fetchQAPairs(currentPageRef.current, pageSizeRef.current, true);
+        }, 5000);
+      }
+    },
+    [fetchQAPairs],
+  );
+
+  useEffect(() => {
+    if (!agentID) return;
+    setCurrentPage(1);
+    fetchQAPairs(1, pageSizeRef.current).then(startPollingIfNeeded);
+    return () => stopPolling();
+  }, [agentID, fetchQAPairs, startPollingIfNeeded]);
+
+  useEffect(() => {
+    if (!agentID || triggerFetchAgentQnA === 0) return;
+    stopPolling();
+    setCurrentPage(1);
+    fetchQAPairs(1, pageSizeRef.current).then(startPollingIfNeeded);
+  }, [triggerFetchAgentQnA, agentID, fetchQAPairs, startPollingIfNeeded]);
+
+  const handlePageChange = useCallback(
+    (page: number) => {
+      stopPolling();
+      fetchQAPairs(page, pageSizeRef.current).then(startPollingIfNeeded);
+    },
+    [fetchQAPairs, startPollingIfNeeded],
+  );
+
+  const handlePageSizeChange = useCallback(
+    (size: VisitorPageSize) => {
+      setPageSize(size);
+      writeDatasourcePageSize(size);
+      stopPolling();
+      setCurrentPage(1);
+      fetchQAPairs(1, size).then(startPollingIfNeeded);
+    },
+    [fetchQAPairs, startPollingIfNeeded],
+  );
+
+  // Filter QnA based on search term (alias only — content loaded on demand)
   const filteredQnA = useMemo(() => {
     if (!searchTerm.trim()) {
       return knowledgeBaseQnA;
     }
     const lowerSearchTerm = searchTerm.toLowerCase();
-    return knowledgeBaseQnA.filter(
-      (item) =>
-        item.qna_alias.toLowerCase().includes(lowerSearchTerm) ||
-        item.question.toLowerCase().includes(lowerSearchTerm) ||
-        item.answer.toLowerCase().includes(lowerSearchTerm),
+    return knowledgeBaseQnA.filter((item) =>
+      item.qna_alias.toLowerCase().includes(lowerSearchTerm),
     );
   }, [knowledgeBaseQnA, searchTerm]);
 
-  // Reset to page 1 when search term changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
+  const currentQnA = useMemo(() => {
+    return filteredQnA.map((item) => ({
+      item,
+      originalIndex: knowledgeBaseQnA.findIndex(
+        (q) => q.qna_alias === item.qna_alias,
+      ),
+    }));
+  }, [filteredQnA, knowledgeBaseQnA]);
 
-  // Sort by lastUpdated (newest first)
-  const sortedQnA = useMemo(() => {
-    return [...filteredQnA]
-      .map((item, originalIndex) => ({ item, originalIndex }))
-      .sort(
-        (a, b) =>
-          new Date(b.item.lastUpdated).getTime() -
-          new Date(a.item.lastUpdated).getTime(),
-      );
-  }, [filteredQnA]);
-
-  const totalPages = Math.ceil(sortedQnA.length / QNA_PER_PAGE);
-  const startIndex = (currentPage - 1) * QNA_PER_PAGE;
-  const endIndex = startIndex + QNA_PER_PAGE;
-  const currentQnA = sortedQnA.slice(startIndex, endIndex);
-
-  // Reset to page 1 if current page is out of bounds
-  useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(1);
-    }
-  }, [currentPage, totalPages]);
-
-  // Handle scroll to detect if we're at the end
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
@@ -172,25 +342,14 @@ export default function KnowledgeBaseQnAList({
     );
   };
 
-  const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  const handlePageClick = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  if (knowledgeBaseQnA.length === 0) {
-    return null;
-  }
+  const unsavedNewCount = knowledgeBaseQnA.filter(
+    (q) => q.status === "new",
+  ).length;
+  const displayTotal = total + unsavedNewCount;
+  const qnaColumnCount = readOnly ? 2 : 3;
+  const emptyQnaMessage = searchTerm
+    ? `No entries found matching "${searchTerm}"`
+    : "No QnA entries found";
 
   const handleRowClick = async (aliasName: string) => {
     // Find the item by alias name in the Redux store
@@ -359,14 +518,23 @@ export default function KnowledgeBaseQnAList({
         {/* Search Bar */}
         <div className="flex items-center justify-between mb-4 px-0">
           <div className="lg:text-[14px] text-[12px] font-bold text-deep-onyx dark:text-pure-mist">
-            QnA Entries ({knowledgeBaseQnA.length})
+            QnA Entries ({displayTotal})
             {searchTerm && (
               <span className="text-gray-500 dark:text-gray-400 font-normal ml-1">
                 ({filteredQnA.length} found)
               </span>
             )}
           </div>
-          {knowledgeBaseQnA.length > 0 && (
+          <div className="flex items-center gap-2">
+            {!readOnly && onAddMore && (
+              <OutlineButton
+                className="text-[12px] font-bold px-3 py-1 h-8"
+                onClick={onAddMore}
+              >
+                <span className="text-[18px]">+</span>{" "}
+                <span className="hidden md:inline">Add More</span>
+              </OutlineButton>
+            )}
             <div className="relative w-[200px]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
               <CustomInput
@@ -377,101 +545,64 @@ export default function KnowledgeBaseQnAList({
                 className="w-full pl-9 pr-3 py-2 text-[11px] h-8"
               />
             </div>
-          )}
+          </div>
         </div>
 
         {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="flex justify-end mb-3 ">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handlePreviousPage}
-                disabled={currentPage === 1}
-                className="p-1.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-              </button>
+        <TablePaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          total={total}
+          pageSize={pageSize}
+          pageSizeOptions={VISITOR_PAGE_SIZE_OPTIONS}
+          isLoading={isLoadingQnA}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
 
-              <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                  (page) => {
-                    // Show first page, last page, current page, and pages around current
-                    if (
-                      page === 1 ||
-                      page === totalPages ||
-                      (page >= currentPage - 1 && page <= currentPage + 1)
-                    ) {
-                      return (
-                        <button
-                          key={page}
-                          onClick={() => handlePageClick(page)}
-                          className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors cursor-pointer ${
-                            currentPage === page
-                              ? "bg-serene-purple text-white border-serene-purple"
-                              : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      );
-                    } else if (
-                      page === currentPage - 2 ||
-                      page === currentPage + 2
-                    ) {
-                      return (
-                        <span
-                          key={page}
-                          className="px-1 text-[11px] text-gray-400 dark:text-gray-500"
-                        >
-                          ...
-                        </span>
-                      );
-                    }
-                    return null;
-                  },
-                )}
-              </div>
-
-              <button
-                onClick={handleNextPage}
-                disabled={currentPage === totalPages}
-                className="p-1.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                aria-label="Next page"
-              >
-                <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {filteredQnA.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-[12px] px-4 md:px-0">
-            No entries found matching "{searchTerm}"
-          </div>
-        ) : (
-          <div className="relative">
-            <div
-              ref={scrollContainerRef}
-              className="overflow-x-auto md:overflow-visible"
-            >
-              <div className="inline-block min-w-full align-middle">
-                <Table className="min-w-[600px] lg:min-w-full">
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] font-[600] py-2 lg:px-4 px-0 whitespace-nowrap">
-                        QnA alias
-                      </TableHead>
-                      <TableHead className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 font-[600] py-2 lg:px-4 px-0 whitespace-nowrap">
-                        Last updated
-                      </TableHead>
-                      {!readOnly && (
+        <div className="relative">
+          <div
+            ref={scrollContainerRef}
+            className="overflow-x-auto md:overflow-visible"
+          >
+            <div className="inline-block min-w-full align-middle">
+              <Table className="min-w-[600px] lg:min-w-full">
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] font-[600] py-2 lg:px-4 px-0 whitespace-nowrap">
+                      QnA alias
+                    </TableHead>
+                    <TableHead className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 font-[600] py-2 lg:px-4 px-0 whitespace-nowrap">
+                      Last updated
+                    </TableHead>
+                    {!readOnly && (
                       <TableHead className="w-[60px] md:w-[80px] text-right font-[600] py-2 lg:px-4 px-0 whitespace-nowrap"></TableHead>
-                      )}
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoadingQnA && currentQnA.length === 0 ? (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell
+                        colSpan={qnaColumnCount}
+                        className="py-10 text-center"
+                      >
+                        <Spinner className="border-serene-purple dark:border-pure-mist mx-auto" />
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {currentQnA.map(({ item, originalIndex }, displayIndex) => {
+                  ) : currentQnA.length === 0 ? (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell
+                        colSpan={qnaColumnCount}
+                        className="py-10 text-center text-[12px] text-gray-500 dark:text-gray-400"
+                      >
+                        {emptyQnaMessage}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    currentQnA.map(({ item, originalIndex }, displayIndex) => {
                       const alias = item.qna_alias || `QnA ${displayIndex + 1}`;
                       const matchesAlias =
                         searchTerm.trim() &&
@@ -530,31 +661,30 @@ export default function KnowledgeBaseQnAList({
                             {formatDateTime12hr(item.lastUpdated)}
                           </TableCell>
                           {!readOnly && (
-                          <TableCell className="w-[60px] md:w-[80px] text-right py-2 lg:px-4 px-0 whitespace-nowrap">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRemove(item.qna_alias);
-                              }}
-                              className="p-2 rounded-[8px] text-danger-red hover:bg-danger-red hover:text-white transition-colors cursor-pointer"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </TableCell>
+                            <TableCell className="w-[60px] md:w-[80px] text-right py-2 lg:px-4 px-0 whitespace-nowrap">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemove(item.qna_alias);
+                                }}
+                                className="p-2 rounded-[8px] text-danger-red hover:bg-danger-red hover:text-white transition-colors cursor-pointer"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </TableCell>
                           )}
                         </TableRow>
                       );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                    })
+                  )}
+                </TableBody>
+              </Table>
             </div>
-            {/* Right gradient overlay - fixed to viewport */}
-            {showRightGradient && (
-              <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
-            )}
           </div>
-        )}
+          {showRightGradient && currentQnA.length > 0 && (
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
+          )}
+        </div>
       </div>
 
       <Sheet
@@ -569,9 +699,11 @@ export default function KnowledgeBaseQnAList({
           }
         }}
       >
-        <SheetContent className="min-w-full lg:min-w-[480px] md:min-w-full z-[110] px-[4px]">
+        <SheetContent className="w-full max-w-[380px] z-[110] px-[4px]">
           <SheetHeader>
-            <SheetTitle>{readOnly ? "View QnA Entry" : "Edit QnA Entry"}</SheetTitle>
+            <SheetTitle>
+              {readOnly ? "View QnA Entry" : "Edit QnA Entry"}
+            </SheetTitle>
             <SheetDescription className="font-medium">
               {readOnly
                 ? "View the content of this QnA entry."
@@ -596,7 +728,7 @@ export default function KnowledgeBaseQnAList({
                 disabled={
                   readOnly ||
                   (selectedIndex !== null &&
-                  knowledgeBaseQnA[selectedIndex]?.status !== "new")
+                    knowledgeBaseQnA[selectedIndex]?.status !== "new")
                 }
               />
             </div>
@@ -631,14 +763,14 @@ export default function KnowledgeBaseQnAList({
           </div>
           <SheetFooter className="flex-col gap-2">
             {!readOnly && (
-            <PrimaryButton
-              type="button"
-              onClick={handleUpdate}
-              disabled={!question.trim() || !answer.trim()}
-              className="w-full text-[12px] font-semibold"
-            >
-              Save changes
-            </PrimaryButton>
+              <PrimaryButton
+                type="button"
+                onClick={handleUpdate}
+                disabled={!question.trim() || !answer.trim()}
+                className="w-full text-[12px] font-semibold"
+              >
+                Save changes
+              </PrimaryButton>
             )}
             <SheetClose asChild>
               <CancelButton

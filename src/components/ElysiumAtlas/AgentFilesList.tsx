@@ -1,15 +1,23 @@
 "use client";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
 import {
   X,
-  ChevronLeft,
-  ChevronRight,
   Search,
   Trash2,
   FileText,
 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import TablePaginationControls from "./TablePaginationControls";
+import { type VisitorPageSize } from "@/lib/config";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Tooltip,
@@ -43,18 +51,34 @@ import Cookies from "js-cookie";
 import { toast } from "sonner";
 import { formatDateTime12hr } from "@/utils/formatDate";
 
-const FILES_PER_PAGE = 6; // 3 rows × 2 columns
-
 interface AgentFilesListProps {
   isLoadingFiles: boolean;
   onRemoveFile: (fileName: string) => void;
   readOnly?: boolean;
+  currentPage: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+  total: number;
+  pageSize: number;
+  pageSizeOptions: readonly number[];
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: VisitorPageSize) => void;
 }
 
 export default function AgentFilesList({
   isLoadingFiles,
   onRemoveFile,
   readOnly = false,
+  currentPage,
+  totalPages,
+  hasNext,
+  hasPrev,
+  total,
+  pageSize,
+  pageSizeOptions,
+  onPageChange,
+  onPageSizeChange,
 }: AgentFilesListProps) {
   const dispatch = useDispatch();
   const knowledgeBaseFiles = useSelector(
@@ -62,8 +86,9 @@ export default function AgentFilesList({
   );
   const agentID = useSelector((state: RootState) => state.agent.agentID);
 
-  const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [showRightGradient, setShowRightGradient] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
@@ -80,20 +105,25 @@ export default function AgentFilesList({
     );
   }, [knowledgeBaseFiles, searchTerm]);
 
-  // Reset to page 1 when search term changes
+  const currentFiles = filteredFiles;
+
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
-  const totalPages = Math.ceil(filteredFiles.length / FILES_PER_PAGE);
-  const startIndex = (currentPage - 1) * FILES_PER_PAGE;
-  const endIndex = startIndex + FILES_PER_PAGE;
-  const currentFiles = filteredFiles.slice(startIndex, endIndex);
+    const handleScroll = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = container;
+      setShowRightGradient(scrollLeft + clientWidth < scrollWidth - 5);
+    };
 
-  // Reset to page 1 if current page is out of bounds
-  if (currentPage > totalPages && totalPages > 0) {
-    setCurrentPage(1);
-  }
+    handleScroll();
+    container.addEventListener("scroll", handleScroll);
+    window.addEventListener("resize", handleScroll);
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, [currentFiles]);
 
   // Calculate if all files are checked
   const allChecked = useMemo(() => {
@@ -243,22 +273,6 @@ export default function AgentFilesList({
     setIsDeleting(false);
   };
 
-  const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  const handlePageClick = (page: number) => {
-    setCurrentPage(page);
-  };
-
   // Function to highlight matching text in search results
   const highlightMatch = (text: string, searchTerm: string) => {
     if (!searchTerm.trim()) {
@@ -296,29 +310,23 @@ export default function AgentFilesList({
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
   };
 
-  if (knowledgeBaseFiles.length === 0 && !isLoadingFiles) {
-    return null;
-  }
+  const fileColumnCount = readOnly ? 3 : 5;
+  const emptyFilesMessage = searchTerm
+    ? `No files found matching "${searchTerm}"`
+    : "No files found";
 
   return (
     <div className="flex flex-col mt-6">
-      {isLoadingFiles && knowledgeBaseFiles.length === 0 ? (
-        <div className="flex justify-center items-center py-8">
-          <Spinner className="border-serene-purple dark:border-pure-mist" />
-        </div>
-      ) : (
-        <>
           <div className="flex items-center justify-between mb-4">
             <div className="lg:text-[14px] text-[12px] font-bold text-deep-onyx dark:text-pure-mist">
-              Files ({knowledgeBaseFiles.length})
+              Files ({total + knowledgeBaseFiles.filter((f) => f.status === "new").length})
               {searchTerm && (
                 <span className="text-gray-500 dark:text-gray-400 font-normal ml-1">
                   ({filteredFiles.length} found)
                 </span>
               )}
             </div>
-            {knowledgeBaseFiles.length > 0 && (
-              <div className="relative w-[200px] md:w-[300px]">
+            <div className="relative w-[200px] md:w-[300px]">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                 <CustomInput
                   type="text"
@@ -328,7 +336,6 @@ export default function AgentFilesList({
                   className="w-full pl-9 pr-3 py-2 text-[11px] h-8"
                 />
               </div>
-            )}
           </div>
 
           {/* Master Checkbox, Clear Selected, and Pagination */}
@@ -417,199 +424,201 @@ export default function AgentFilesList({
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-            {totalPages > 1 && (
-              <div className="w-full md:w-auto flex justify-end md:justify-start">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handlePreviousPage}
-                    disabled={currentPage === 1}
-                    className="p-1.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                    aria-label="Previous page"
-                  >
-                    <ChevronLeft className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                  </button>
-
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                      (page) => {
-                        if (
-                          page === 1 ||
-                          page === totalPages ||
-                          (page >= currentPage - 1 && page <= currentPage + 1)
-                        ) {
-                          return (
-                            <button
-                              key={page}
-                              onClick={() => handlePageClick(page)}
-                              className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors cursor-pointer ${
-                                currentPage === page
-                                  ? "bg-serene-purple text-white border-serene-purple"
-                                  : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                              }`}
-                            >
-                              {page}
-                            </button>
-                          );
-                        } else if (
-                          page === currentPage - 2 ||
-                          page === currentPage + 2
-                        ) {
-                          return (
-                            <span
-                              key={page}
-                              className="px-1 text-[11px] text-gray-400 dark:text-gray-500"
-                            >
-                              ...
-                            </span>
-                          );
-                        }
-                        return null;
-                      },
-                    )}
-                  </div>
-
-                  <button
-                    onClick={handleNextPage}
-                    disabled={currentPage >= totalPages}
-                    className="p-1.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                    aria-label="Next page"
-                  >
-                    <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
 
-          {filteredFiles.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-[12px]">
-              {searchTerm
-                ? `No files found matching "${searchTerm}"`
-                : "No files found"}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-              {currentFiles.map((item, localIndex) => {
-                const originalIndex = knowledgeBaseFiles.findIndex(
-                  (fileItem) => fileItem.name === item.name,
-                );
-                return (
-                  <div
-                    key={item.name}
-                    onClick={() => {
-                      if (!readOnly) handleToggleCheckbox(originalIndex);
-                    }}
-                    className={`group flex items-center justify-between gap-2 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 w-full ${readOnly ? "" : "cursor-pointer"}`}
-                  >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      {!readOnly && (
-                      <Checkbox
-                        id={`file-${originalIndex}`}
-                        checked={item.checked ?? true}
-                        onCheckedChange={() =>
-                          handleToggleCheckbox(originalIndex)
-                        }
-                        onClick={(e) => e.stopPropagation()}
-                        className="shrink-0 border-2 border-gray-300 dark:border-gray-500 data-[state=checked]:border-serene-purple data-[state=checked]:bg-serene-purple data-[state=checked]:text-white dark:data-[state=checked]:text-black"
-                      />
-                      )}
-                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <FileText
-                          size={20}
-                          className="text-serene-purple shrink-0"
-                        />
-                        <div className="flex flex-col flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="font-mono text-[12px] text-gray-700 dark:text-gray-300 truncate cursor-pointer">
-                                  {highlightMatch(item.name, searchTerm)}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="max-w-xs break-all">
-                                  {item.name}
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                            {item.status === "new" ? (
-                              <Badge>New</Badge>
-                            ) : item.status !== "indexed" ? (
-                              <span
-                                className={`px-2 py-0.5 text-[10px] font-semibold rounded-full shrink-0 flex items-center gap-[1px] ${
-                                  item.status === "indexing"
-                                    ? "bg-serene-purple/10 text-[#6c5f8d] dark:bg-serene-purple/20 dark:text-[#c4bcd6]"
-                                    : item.status === "failed" ||
-                                        item.status === "error"
-                                      ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
-                                      : item.status === "pending"
-                                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
-                                        : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                                }`}
-                              >
-                                {item.status === "indexing" ? (
-                                  <span className="inline-flex items-center gap-[2px]">
-                                    <span>Indexing</span>
-                                    <span className="inline-flex items-end gap-[2px] ml-[2px]">
-                                      {[0, 0.2, 0.4].map((delay, i) => (
-                                        <span
-                                          key={i}
-                                          style={{
-                                            display: "inline-block",
-                                            width: "3px",
-                                            height: "3px",
-                                            borderRadius: "50%",
-                                            background: "currentColor",
-                                            animation: `bounce-dot 1.2s ${delay}s infinite ease-in-out`,
-                                          }}
-                                        />
-                                      ))}
-                                    </span>
-                                  </span>
-                                ) : (
-                                  item.status.charAt(0).toUpperCase() +
-                                  item.status.slice(1)
-                                )}
-                              </span>
-                            ) : null}
-                          </div>
-                          <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                            {item.updated_at ? (
-                              <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                                updated at {formatDateTime12hr(item.updated_at)}
-                              </span>
-                            ) : item.size > 0 ? (
-                              formatFileSize(item.size)
-                            ) : null}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {!readOnly && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveFile(item.name, item.status !== "new");
-                        }}
-                        className="group/btn p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 cursor-pointer"
-                        aria-label="Remove file"
-                      >
-                        {item.status !== "new" ? (
-                          <Trash2 className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 group-hover/btn:text-danger-red transition-colors" />
-                        ) : (
-                          <X className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 group-hover/btn:text-danger-red transition-colors" />
+          <TablePaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            hasNext={hasNext}
+            hasPrev={hasPrev}
+            total={total}
+            pageSize={pageSize}
+            pageSizeOptions={pageSizeOptions}
+            isLoading={isLoadingFiles}
+            onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
+          />
+
+          <div className="relative">
+              <div
+                ref={scrollContainerRef}
+                className="overflow-x-auto md:overflow-visible"
+              >
+                <div className="inline-block min-w-full align-middle">
+                  <Table className="w-full table-fixed min-w-[600px] lg:min-w-full">
+                    <colgroup>
+                      {!readOnly && <col className="w-[40px]" />}
+                      <col className="w-[38%]" />
+                      <col className="w-[96px]" />
+                      <col className="w-[32%]" />
+                      {!readOnly && <col className="w-[60px]" />}
+                    </colgroup>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        {!readOnly && (
+                          <TableHead className="font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap" />
                         )}
-                      </button>
+                        <TableHead className="font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
+                          File name
+                        </TableHead>
+                        <TableHead className="font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap text-center">
+                          Status
+                        </TableHead>
+                        <TableHead className="font-[600] py-3 pl-8 md:pl-12 pr-[10px] text-[14px] whitespace-nowrap">
+                          Updated at
+                        </TableHead>
+                        {!readOnly && (
+                          <TableHead className="w-[60px] text-right font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap" />
+                        )}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {isLoadingFiles && currentFiles.length === 0 ? (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell
+                            colSpan={fileColumnCount}
+                            className="py-10 text-center"
+                          >
+                            <Spinner className="border-serene-purple dark:border-pure-mist mx-auto" />
+                          </TableCell>
+                        </TableRow>
+                      ) : currentFiles.length === 0 ? (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell
+                            colSpan={fileColumnCount}
+                            className="py-10 text-center text-[12px] text-gray-500 dark:text-gray-400"
+                          >
+                            {emptyFilesMessage}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                      currentFiles.map((item) => {
+                        const originalIndex = knowledgeBaseFiles.findIndex(
+                          (fileItem) => fileItem.name === item.name,
+                        );
+                        return (
+                          <TableRow
+                            key={item.name}
+                            onClick={() => {
+                              if (!readOnly) handleToggleCheckbox(originalIndex);
+                            }}
+                            className={`border-b border-gray-100 dark:border-deep-onyx transition-all duration-200 ${
+                              readOnly ? "" : "cursor-pointer hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20"
+                            }`}
+                          >
+                            {!readOnly && (
+                              <TableCell className="py-4 px-[10px] whitespace-nowrap">
+                                <Checkbox
+                                  id={`file-${originalIndex}`}
+                                  checked={item.checked ?? true}
+                                  onCheckedChange={() =>
+                                    handleToggleCheckbox(originalIndex)
+                                  }
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="border-2 border-gray-300 dark:border-gray-500 data-[state=checked]:border-serene-purple data-[state=checked]:bg-serene-purple data-[state=checked]:text-white dark:data-[state=checked]:text-black"
+                                />
+                              </TableCell>
+                            )}
+                            <TableCell className="font-medium py-4 px-[10px] text-[14px] text-deep-onyx dark:text-pure-mist overflow-hidden">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <FileText size={18} className="text-serene-purple shrink-0" />
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="font-mono text-[12px] truncate block min-w-0">
+                                      {highlightMatch(item.name, searchTerm)}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="max-w-xs break-all">{item.name}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-4 px-[10px] text-[14px] whitespace-nowrap text-center">
+                              <div className="flex items-center justify-center">
+                              {item.status === "new" ? (
+                                <Badge>New</Badge>
+                              ) : item.status !== "indexed" ? (
+                                <span
+                                  className={`px-2 py-0.5 text-[10px] font-semibold rounded-full shrink-0 inline-flex items-center gap-[1px] ${
+                                    item.status === "indexing"
+                                      ? "bg-serene-purple/10 text-[#6c5f8d] dark:bg-serene-purple/20 dark:text-[#c4bcd6]"
+                                      : item.status === "failed" ||
+                                          item.status === "error"
+                                        ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                                        : item.status === "pending"
+                                          ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                                          : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                  }`}
+                                >
+                                  {item.status === "indexing" ? (
+                                    <span className="inline-flex items-center gap-[2px]">
+                                      <span>Indexing</span>
+                                      <span className="inline-flex items-end gap-[2px] ml-[2px]">
+                                        {[0, 0.2, 0.4].map((delay, i) => (
+                                          <span
+                                            key={i}
+                                            style={{
+                                              display: "inline-block",
+                                              width: "3px",
+                                              height: "3px",
+                                              borderRadius: "50%",
+                                              background: "currentColor",
+                                              animation: `bounce-dot 1.2s ${delay}s infinite ease-in-out`,
+                                            }}
+                                          />
+                                        ))}
+                                      </span>
+                                    </span>
+                                  ) : (
+                                    item.status.charAt(0).toUpperCase() +
+                                    item.status.slice(1)
+                                  )}
+                                </span>
+                              ) : (
+                                <Badge className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 border-0">
+                                  Indexed
+                                </Badge>
+                              )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-4 pl-8 md:pl-12 pr-[10px] text-[14px] whitespace-nowrap text-gray-500 dark:text-gray-400">
+                              {item.updated_at
+                                ? formatDateTime12hr(item.updated_at)
+                                : item.size > 0
+                                  ? formatFileSize(item.size)
+                                  : "—"}
+                            </TableCell>
+                            {!readOnly && (
+                              <TableCell className="w-[60px] text-right py-4 px-[10px] whitespace-nowrap">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveFile(item.name, item.status !== "new");
+                                  }}
+                                  className="p-2 rounded-[8px] text-danger-red hover:bg-danger-red hover:text-white transition-colors cursor-pointer"
+                                  aria-label="Remove file"
+                                >
+                                  {item.status !== "new" ? (
+                                    <Trash2 size={14} />
+                                  ) : (
+                                    <X size={14} />
+                                  )}
+                                </button>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        );
+                      })
                       )}
-                    </div>
-                  </div>
-                );
-              })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+              {showRightGradient && currentFiles.length > 0 && (
+                <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
+              )}
             </div>
-          )}
-        </>
-      )}
     </div>
   );
 }

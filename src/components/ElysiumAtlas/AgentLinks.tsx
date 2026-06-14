@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
 import {
@@ -18,6 +18,13 @@ import fastApiAxios from "@/utils/fastapi_axios";
 import Cookies from "js-cookie";
 import { cleanAndDeduplicateLinks } from "@/utils/linkUtils";
 import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
+import {
+  readDatasourcePageSize,
+  writeDatasourcePageSize,
+  VISITOR_PAGE_SIZE_OPTIONS,
+  type VisitorPageSize,
+} from "@/lib/config";
+import { KnowledgeBaseLink } from "@/store/types/AgentBuilderTypes";
 
 export default function AgentLinks() {
   const dispatch = useDispatch();
@@ -32,7 +39,21 @@ export default function AgentLinks() {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingLinks, setIsLoadingLinks] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrev, setHasPrev] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [pageSize, setPageSize] = useState<VisitorPageSize>(() =>
+    readDatasourcePageSize(),
+  );
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pageSizeRef = useRef(pageSize);
+  const currentPageRef = useRef(currentPage);
+  const knowledgeBaseLinksRef = useRef(knowledgeBaseLinks);
+  pageSizeRef.current = pageSize;
+  currentPageRef.current = currentPage;
+  knowledgeBaseLinksRef.current = knowledgeBaseLinks;
 
   const stopPolling = () => {
     if (pollingRef.current) {
@@ -48,81 +69,152 @@ export default function AgentLinks() {
     return url.trim().length > 0;
   };
 
-  const fetchAgentLinks = async (isPolling = false): Promise<boolean> => {
-    if (!agentID) return false;
+  const mergeWithNewLinks = useCallback((mappedLinks: KnowledgeBaseLink[]) => {
+    const fetchedUrls = new Set(mappedLinks.map((l) => l.link));
+    const newItems = knowledgeBaseLinksRef.current.filter(
+      (item) => item.status === "new" && !fetchedUrls.has(item.link),
+    );
+    return [...newItems, ...mappedLinks];
+  }, []);
 
-    if (!isPolling) setIsLoadingLinks(true);
-    const token = Cookies.get("elysium_atlas_session_token");
-
-    try {
-      const response = await fastApiAxios.post(
-        "/elysium-agents/elysium-atlas/agent/v1/get-agent-urls",
-        {
-          agent_id: agentID,
-          limit: 1000,
-          cursor: null,
-          include_count: false,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
+  const applyPagination = useCallback(
+    (payload: {
+      total: number;
+      page: number;
+      total_pages: number;
+      has_next: boolean;
+      has_prev: boolean;
+    }) => {
+      setCurrentPage(payload.page);
+      setTotal(payload.total);
+      setHasNext(payload.has_next);
+      setHasPrev(payload.has_prev);
+      setTotalPages(
+        payload.total_pages > 0
+          ? payload.total_pages
+          : payload.total > 0
+            ? Math.max(1, Math.ceil(payload.total / pageSizeRef.current))
+            : 0,
       );
+    },
+    [],
+  );
 
-      if (response.data.success === true) {
-        const urls = response.data.urls;
-        const mappedLinks = urls.data.map((urlItem: any) => ({
-          link: urlItem.url,
-          checked: false,
-          status: "existing",
-          updated_at: urlItem.updated_at ?? null,
-          api_status: urlItem.status ?? undefined,
-        }));
+  const fetchAgentLinks = useCallback(
+    async (
+      page = currentPageRef.current,
+      limit = pageSizeRef.current,
+      isPolling = false,
+    ): Promise<boolean> => {
+      if (!agentID) return false;
 
-        dispatch(setKnowledgeBaseLinks(mappedLinks));
+      if (!isPolling) setIsLoadingLinks(true);
+      const token = Cookies.get("elysium_atlas_session_token");
 
-        const hasIndexing = mappedLinks.some(
-          (l: any) => l.api_status === "indexing",
+      try {
+        const response = await fastApiAxios.post(
+          "/elysium-agents/elysium-atlas/agent/v1/get-agent-urls",
+          {
+            agent_id: agentID,
+            page,
+            limit,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
         );
-        if (!hasIndexing) stopPolling();
-        return hasIndexing;
-      }
-    } catch (error: any) {
-      const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to fetch agent links";
-      if (!isPolling) toast.error(errorMessage);
-      stopPolling();
-    } finally {
-      if (!isPolling) setIsLoadingLinks(false);
-    }
-    return false;
-  };
 
-  const startPollingIfNeeded = (hasIndexing: boolean) => {
-    if (hasIndexing && !pollingRef.current) {
-      pollingRef.current = setInterval(() => {
-        fetchAgentLinks(true);
-      }, 5000);
-    }
-  };
+        if (response.data.success === true) {
+          const urls = response.data.urls || [];
+          const mappedLinks = urls.map((urlItem: any) => ({
+            link: urlItem.url,
+            checked: false,
+            status: "existing" as const,
+            updated_at: urlItem.updated_at ?? null,
+            api_status: urlItem.status ?? undefined,
+          }));
+
+          dispatch(setKnowledgeBaseLinks(mergeWithNewLinks(mappedLinks)));
+          applyPagination({
+            total: response.data.total ?? 0,
+            page: response.data.page ?? page,
+            total_pages: response.data.total_pages ?? 0,
+            has_next: response.data.has_next ?? false,
+            has_prev: response.data.has_prev ?? false,
+          });
+
+          const hasIndexing = mappedLinks.some(
+            (l: KnowledgeBaseLink) => l.api_status === "indexing",
+          );
+          if (!hasIndexing) stopPolling();
+          return hasIndexing;
+        }
+      } catch (error: any) {
+        const errorMessage =
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to fetch agent links";
+        if (!isPolling) toast.error(errorMessage);
+        stopPolling();
+      } finally {
+        if (!isPolling) setIsLoadingLinks(false);
+      }
+      return false;
+    },
+    [agentID, dispatch, mergeWithNewLinks, applyPagination],
+  );
+
+  const startPollingIfNeeded = useCallback(
+    (hasIndexing: boolean) => {
+      if (hasIndexing && !pollingRef.current) {
+        pollingRef.current = setInterval(() => {
+          fetchAgentLinks(
+            currentPageRef.current,
+            pageSizeRef.current,
+            true,
+          );
+        }, 5000);
+      }
+    },
+    [fetchAgentLinks],
+  );
 
   useEffect(() => {
     if (!agentID) return;
-    fetchAgentLinks().then(startPollingIfNeeded);
+    setCurrentPage(1);
+    fetchAgentLinks(1, pageSizeRef.current).then(startPollingIfNeeded);
     return () => stopPolling();
-  }, [agentID]);
+  }, [agentID, fetchAgentLinks, startPollingIfNeeded]);
 
   useEffect(() => {
     if (!agentID || triggerFetchAgentUrls === 0) return;
     stopPolling();
-    fetchAgentLinks().then(startPollingIfNeeded);
-  }, [triggerFetchAgentUrls]);
+    setCurrentPage(1);
+    fetchAgentLinks(1, pageSizeRef.current).then(startPollingIfNeeded);
+  }, [triggerFetchAgentUrls, agentID, fetchAgentLinks, startPollingIfNeeded]);
+
+  const handlePageChange = useCallback(
+    (page: number) => {
+      stopPolling();
+      fetchAgentLinks(page, pageSizeRef.current).then(startPollingIfNeeded);
+    },
+    [fetchAgentLinks, startPollingIfNeeded],
+  );
+
+  const handlePageSizeChange = useCallback(
+    (size: VisitorPageSize) => {
+      setPageSize(size);
+      writeDatasourcePageSize(size);
+      stopPolling();
+      setCurrentPage(1);
+      fetchAgentLinks(1, size).then(startPollingIfNeeded);
+    },
+    [fetchAgentLinks, startPollingIfNeeded],
+  );
 
   const handleExtractLinks = async () => {
-    // Basic validation
     if (!validateURL(baseURL)) {
       toast.error("Please enter a valid URL");
       return;
@@ -151,10 +243,8 @@ export default function AgentLinks() {
         const normalized_base_url = response.data.base_url || baseURL;
         dispatch(setBaseURL(normalized_base_url));
 
-        // Clean and deduplicate links from response
         const cleanedLinks = cleanAndDeduplicateLinks(responseLinks);
 
-        // Get existing links set
         const existingLinksSet = new Set(
           knowledgeBaseLinks.map((item) => item.link),
         );
@@ -163,7 +253,6 @@ export default function AgentLinks() {
         );
 
         if (uniqueNewLinks.length > 0) {
-          // Add new links with checked: true by default
           dispatch(
             addKnowledgeBaseLinks({ links: uniqueNewLinks, checked: true }),
           );
@@ -224,7 +313,19 @@ export default function AgentLinks() {
         )}
       </div>
       <div className="mt-[2px]">
-        <AgentLinksList isLoadingLinks={isLoadingLinks} readOnly={readOnly} />
+        <AgentLinksList
+          isLoadingLinks={isLoadingLinks}
+          readOnly={readOnly}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          total={total}
+          pageSize={pageSize}
+          pageSizeOptions={VISITOR_PAGE_SIZE_OPTIONS}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
       </div>
     </div>
   );

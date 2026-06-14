@@ -7,6 +7,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Trash2,
+  UserCog,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -37,11 +38,16 @@ import CustomInput from "@/components/inputs/CustomInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import Spinner from "@/components/ui/Spinner";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   VISITOR_PAGE_SIZE_OPTIONS,
   type VisitorPageSize,
 } from "@/lib/config";
-import { removeTeamMember } from "@/utils/teamApi";
-import type { TeamMember } from "@/types/teamMembers";
+import { removeTeamMember, updateTeamMemberRole } from "@/utils/teamApi";
+import type { InvitableRole, TeamMember } from "@/types/teamMembers";
 
 interface TeamMembersTableProps {
   members: TeamMember[];
@@ -56,6 +62,7 @@ interface TeamMembersTableProps {
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: VisitorPageSize) => void;
   onMemberRemoved?: () => void;
+  onMemberRoleUpdated?: () => void;
 }
 
 type TablePerson = {
@@ -82,10 +89,12 @@ function getPersonDisplayName(person: TablePerson): string {
 function PersonRow({
   person,
   canManageMembers,
+  onUpdateRole,
   onRemove,
 }: {
   person: TablePerson;
   canManageMembers: boolean;
+  onUpdateRole: (person: TablePerson) => void;
   onRemove: (person: TablePerson) => void;
 }) {
   const displayName = getPersonDisplayName(person);
@@ -115,16 +124,36 @@ function PersonRow({
       </TableCell>
 
       {canManageMembers && (
-        <TableCell className={`${cellClass} w-[72px] min-w-[72px] text-right`}>
+        <TableCell className={`${cellClass} w-[100px] min-w-[100px] text-right`}>
           {!person.isOwner && (
-            <button
-              type="button"
-              onClick={() => onRemove(person)}
-              className="inline-flex items-center justify-center p-2 rounded-[8px] text-danger-red hover:bg-danger-red hover:text-white transition-colors cursor-pointer"
-              aria-label={`Remove ${displayName}`}
-            >
-              <Trash2 size={14} />
-            </button>
+            <div className="inline-flex items-center justify-end gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateRole(person)}
+                    className="inline-flex items-center justify-center p-2 rounded-[8px] text-serene-purple hover:bg-serene-purple hover:text-white transition-colors cursor-pointer"
+                    aria-label={`Change role for ${displayName}`}
+                  >
+                    <UserCog size={14} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Change member role</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(person)}
+                    className="inline-flex items-center justify-center p-2 rounded-[8px] text-danger-red hover:bg-danger-red hover:text-white transition-colors cursor-pointer"
+                    aria-label={`Remove ${displayName}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Remove team member</TooltipContent>
+              </Tooltip>
+            </div>
           )}
         </TableCell>
       )}
@@ -144,6 +173,7 @@ export default function TeamMembersTable({
   onPageChange,
   onPageSizeChange,
   onMemberRemoved,
+  onMemberRoleUpdated,
 }: TeamMembersTableProps) {
   const [pageInput, setPageInput] = useState("1");
   const [showRightGradient, setShowRightGradient] = useState(true);
@@ -151,6 +181,12 @@ export default function TeamMembersTable({
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<TablePerson | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const [memberToUpdateRole, setMemberToUpdateRole] = useState<TablePerson | null>(
+    null,
+  );
+  const [selectedRole, setSelectedRole] = useState<InvitableRole>("member");
+  const [isUpdatingRole, setIsUpdatingRole] = useState(false);
 
   const tableRows: TablePerson[] = members.map((member) => ({
     user_id: member.user_id,
@@ -164,6 +200,55 @@ export default function TeamMembersTable({
   const handleRemoveClick = (person: TablePerson) => {
     setMemberToRemove(person);
     setRemoveDialogOpen(true);
+  };
+
+  const handleUpdateRoleClick = (person: TablePerson) => {
+    setMemberToUpdateRole(person);
+    setSelectedRole(
+      person.role === "admin" || person.role === "member"
+        ? person.role
+        : "member",
+    );
+    setRoleDialogOpen(true);
+  };
+
+  const handleConfirmUpdateRole = async () => {
+    if (!memberToUpdateRole) return;
+
+    setIsUpdatingRole(true);
+    try {
+      const response = await updateTeamMemberRole(
+        memberToUpdateRole.user_id,
+        selectedRole,
+      );
+
+      if (response.success) {
+        toast.success(response.message || "Team member role updated.");
+        setRoleDialogOpen(false);
+        setMemberToUpdateRole(null);
+        onMemberRoleUpdated?.();
+        return;
+      }
+
+      toast.error(response.message || "Failed to update team member role.");
+      if (response.message?.toLowerCase().includes("already been removed")) {
+        setRoleDialogOpen(false);
+        setMemberToUpdateRole(null);
+        onMemberRoleUpdated?.();
+      }
+    } catch (error: unknown) {
+      const err = error as {
+        response?: { data?: { message?: string } };
+        message?: string;
+      };
+      toast.error(
+        err.response?.data?.message ||
+          err.message ||
+          "Failed to update team member role.",
+      );
+    } finally {
+      setIsUpdatingRole(false);
+    }
   };
 
   const handleConfirmRemove = async () => {
@@ -418,7 +503,7 @@ export default function TeamMembersTable({
                     Role
                   </TableHead>
                   {canManageMembers && (
-                    <TableHead className="h-10 w-[72px] min-w-[72px] font-[600] !py-0 px-[10px] text-[13px] whitespace-nowrap align-middle text-right">
+                    <TableHead className="h-10 w-[100px] min-w-[100px] font-[600] !py-0 px-[10px] text-[13px] whitespace-nowrap align-middle text-right">
                       Actions
                     </TableHead>
                   )}
@@ -451,6 +536,7 @@ export default function TeamMembersTable({
                       key={person.user_id}
                       person={person}
                       canManageMembers={canManageMembers}
+                      onUpdateRole={handleUpdateRoleClick}
                       onRemove={handleRemoveClick}
                     />
                   ))
@@ -464,6 +550,95 @@ export default function TeamMembersTable({
           <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
         )}
       </div>
+
+      <Dialog
+        open={roleDialogOpen}
+        onOpenChange={(open) => {
+          setRoleDialogOpen(open);
+          if (!open) setMemberToUpdateRole(null);
+        }}
+      >
+        <DialogContent
+          className="sm:max-w-[425px]"
+          onPointerDownOutside={(event) => {
+            const target = event.target;
+            if (
+              target instanceof Element &&
+              target.closest('[data-slot="select-content"]')
+            ) {
+              event.preventDefault();
+            }
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Update member role</DialogTitle>
+            <DialogDescription>
+              Change the role for this team member.
+            </DialogDescription>
+          </DialogHeader>
+
+          {memberToUpdateRole && (
+            <div className="grid gap-3 py-2">
+              <div className="rounded-[10px] border border-gray-200 dark:border-deep-onyx bg-gray-50 dark:bg-deep-onyx/50 px-3 py-2.5">
+                <p className="text-[13px] font-semibold text-deep-onyx dark:text-pure-mist">
+                  {getPersonDisplayName(memberToUpdateRole)}
+                </p>
+                <p className="text-[12px] text-gray-500 dark:text-gray-400 mt-0.5">
+                  {memberToUpdateRole.email}
+                </p>
+              </div>
+
+              <div className="grid gap-1.5">
+                <p className="font-bold text-[13px]">Role</p>
+                <Select
+                  value={selectedRole}
+                  onValueChange={(value) =>
+                    setSelectedRole(value as InvitableRole)
+                  }
+                  disabled={isUpdatingRole}
+                >
+                  <SelectTrigger
+                    aria-label="Member role"
+                    className="h-12 min-h-12 w-full cursor-pointer border-[2px] border-gray-300 dark:border-deep-onyx rounded-[10px] bg-white dark:bg-deep-onyx text-[13px] font-[600] text-deep-onyx dark:text-pure-mist shadow-none focus-visible:border-serene-purple focus-visible:ring-serene-purple/30 px-3 data-[size=default]:!h-12 data-[size=default]:!min-h-12"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-[1100]">
+                    <SelectItem value="member">Member</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <PrimaryButton
+                className="bg-transparent border border-gray-300 dark:border-white text-gray-700 dark:text-white text-[12px] hover:bg-white dark:hover:bg-pure-mist dark:hover:text-deep-onyx"
+                disabled={isUpdatingRole}
+              >
+                Cancel
+              </PrimaryButton>
+            </DialogClose>
+            <PrimaryButton
+              className="min-w-[95px] text-[12px] font-semibold flex items-center gap-2"
+              onClick={handleConfirmUpdateRole}
+              disabled={
+                isUpdatingRole ||
+                !memberToUpdateRole ||
+                selectedRole === memberToUpdateRole.role
+              }
+            >
+              {isUpdatingRole ? (
+                <Spinner className="border-white dark:border-deep-onyx" />
+              ) : (
+                "Update"
+              )}
+            </PrimaryButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={removeDialogOpen}
