@@ -13,7 +13,9 @@ export default function BuildAgent() {
 
   if (!hasCompletedInitialAgentsFetch || agents.length > 0 || !canManageAgents) {
     return null;
-  }  return (
+  }
+
+  return (
     <div className="w-full h-full">
       <div className=" flex flex-col">
         <div className="lg:text-[22px] text-[18px] font-bold flex flex-wrap items-center gap-1 md:gap-2">

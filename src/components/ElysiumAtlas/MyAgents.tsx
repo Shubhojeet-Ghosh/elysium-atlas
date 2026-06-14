@@ -148,28 +148,14 @@ export default function MyAgents() {
   }
 
   if (agents.length === 0) {
+    if (canManageAgents) {
+      return null;
+    }
+
     return (
-      <div className="w-full h-full">
-        <div className="flex flex-col">
-          <div className="lg:text-[22px] text-[18px] font-bold flex justify-between items-center">
-            <div>Agents</div>
-            {canManageAgents && (
-              <PrimaryButton
-                onClick={handleBuildNewAgent}
-                className="font-[600] flex items-center justify-center gap-2 min-w-[100px] min-h-[40px] text-[13px]"
-              >
-                <Plus size={16} className="-ml-1" />
-                <span>New Agent</span>
-              </PrimaryButton>
-            )}
-          </div>
-          <p className="mt-6 text-[14px] text-gray-500 dark:text-gray-400">
-            {canManageAgents
-              ? "No agents yet. Create your first agent to get started."
-              : "No agents in this team yet."}
-          </p>
-        </div>
-      </div>
+      <p className="text-[14px] text-gray-500 dark:text-gray-400">
+        No agents in this team yet.
+      </p>
     );
   }
 
