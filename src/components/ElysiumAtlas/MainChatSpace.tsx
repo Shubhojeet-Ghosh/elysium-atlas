@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, Fragment } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  Fragment,
+} from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { ArrowUp, ArrowDown } from "lucide-react";
@@ -74,6 +81,8 @@ export default function MainChatSpace() {
   const separatorIndexRef = useRef(-1);
   /** True once we've snapshotted unread separator for this open session */
   const separatorSnapshottedRef = useRef(false);
+  /** Gates read receipts until the "New" separator index is captured */
+  const [separatorSnapshotReady, setSeparatorSnapshotReady] = useState(false);
   useEffect(() => {
     separatorIndexRef.current = separatorIndex;
   }, [separatorIndex]);
@@ -107,7 +116,7 @@ export default function MainChatSpace() {
 
   const { markVisible: markIncomingMessageVisible, reset: resetReadReceipts } =
     useMarkMessagesReadWhenVisible({
-      enabled: !isFetching && isAgentOpen,
+      enabled: !isFetching && isAgentOpen && separatorSnapshotReady,
       agent_id,
       chat_session_id,
       onMessageMarked: handleIncomingMessageMarked,
@@ -308,15 +317,17 @@ export default function MainChatSpace() {
     setSeparatorIndex(-1);
     separatorIndexRef.current = -1;
     separatorSnapshottedRef.current = false;
+    setSeparatorSnapshotReady(false);
     resetReadReceipts();
   }, [agent_id, chat_session_id, resetReadReceipts]);
 
-  // Snapshot "New" separator only when chat opens with existing unread history
-  useEffect(() => {
+  // Snapshot before paint so mobile viewports don't mark unread messages read first
+  useLayoutEffect(() => {
     if (!isAgentOpen) {
       setSeparatorIndex(-1);
       separatorIndexRef.current = -1;
       separatorSnapshottedRef.current = false;
+      setSeparatorSnapshotReady(false);
       resetReadReceipts();
       return;
     }
@@ -326,10 +337,11 @@ export default function MainChatSpace() {
 
     separatorSnapshottedRef.current = true;
     const firstUnread = findFirstIncomingUnreadSeparatorIndex(conversation_chain);
-    if (firstUnread === -1) return;
-
-    separatorIndexRef.current = firstUnread;
-    setSeparatorIndex(firstUnread);
+    if (firstUnread !== -1) {
+      separatorIndexRef.current = firstUnread;
+      setSeparatorIndex(firstUnread);
+    }
+    setSeparatorSnapshotReady(true);
   }, [isAgentOpen, isFetching, conversation_chain, resetReadReceipts]);
 
   useEffect(() => {
@@ -467,7 +479,9 @@ export default function MainChatSpace() {
                     <ReadReceiptMarker
                       messageId={message.message_id}
                       mongoId={message._id ?? null}
-                      enabled={!isFetching && isAgentOpen}
+                      enabled={
+                        !isFetching && isAgentOpen && separatorSnapshotReady
+                      }
                       scrollRootRef={scrollContainerRef}
                       onVisible={markIncomingMessageVisible}
                     >
