@@ -17,6 +17,7 @@ import {
   VISITOR_PAGE_SIZE_OPTIONS,
   type VisitorPageSize,
 } from "@/lib/config";
+import { SHEET_CONTENT_CLASSNAME } from "@/lib/sheetConfig";
 import {
   Sheet,
   SheetClose,
@@ -699,7 +700,7 @@ export default function KnowledgeBaseQnAList({
           }
         }}
       >
-        <SheetContent className="w-full max-w-[380px] z-[110] px-[4px]">
+        <SheetContent className={SHEET_CONTENT_CLASSNAME}>
           <SheetHeader>
             <SheetTitle>
               {readOnly ? "View QnA Entry" : "Edit QnA Entry"}

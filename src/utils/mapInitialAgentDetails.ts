@@ -12,6 +12,7 @@ export function mapInitialAgentDetails(details: any) {
     welcomeMessage: details.welcome_message,
     llmModel: details.llm_model,
     retrievalStrategy: details.retrieval_strategy || "simple",
+    toolIds: Array.isArray(details.tool_ids) ? details.tool_ids : [],
     knowledgeBaseLinks: [],
     knowledgeBaseFiles: [],
     knowledgeBaseText: [],

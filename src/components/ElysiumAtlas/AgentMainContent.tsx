@@ -1,12 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
 
 import AgentNameField from "./AgentNameField";
 import SystemPrompt from "./SystemPrompt";
 import WelcomeMessage from "./WelcomeMessage";
 import LlmModelSelector from "./LlmModelSelector";
 import RetrievalStrategySelector from "./RetrievalStrategySelector";
-import AgentReadyCard from "./AgentReadyCard";
+import AgentToolsSelector from "./AgentToolsSelector";import AgentReadyCard from "./AgentReadyCard";
 import AgentEmbedCard from "./AgentEmbedCard";
 import AgentProgressCard from "./AgentProgressCard";
 import DeleteAgentCard from "./DeleteAgentCard";
@@ -57,6 +56,7 @@ export default function AgentMainContent({
           <SystemPrompt />
           <RetrievalStrategySelector />
           <WelcomeMessage />
+          <AgentToolsSelector />
         </div>
         <div className="flex lg:flex-row md:flex-row flex-col mt-[40px] mb-[10px] lg:justify-start md:justify-start justify-center items-start">
           <DeleteAgentCard />

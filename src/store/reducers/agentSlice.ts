@@ -73,6 +73,7 @@ interface UserAgentState {
   welcomeMessage: string;
   llmModel: string;
   retrievalStrategy: string;
+  toolIds: string[];
   triggerGetAgentDetails: number;
   triggerFetchAgentUrls: number;
   triggerFetchAgentFiles: number;
@@ -110,6 +111,7 @@ const initialState: UserAgentState = {
   welcomeMessage: "",
   llmModel: "",
   retrievalStrategy: "simple",
+  toolIds: [],
   triggerGetAgentDetails: 0,
   triggerFetchAgentUrls: 0,
   triggerFetchAgentFiles: 0,
@@ -331,6 +333,9 @@ const agentSlice = createSlice({
     },
     setRetrievalStrategy: (state, action: PayloadAction<string>) => {
       state.retrievalStrategy = action.payload;
+    },
+    setToolIds: (state, action: PayloadAction<string[]>) => {
+      state.toolIds = action.payload;
     },
     setTriggerGetAgentDetails: (state, action: PayloadAction<number>) => {
       state.triggerGetAgentDetails = action.payload;
@@ -745,6 +750,7 @@ const agentSlice = createSlice({
       state.welcomeMessage = "";
       state.llmModel = "";
       state.retrievalStrategy = "simple";
+      state.toolIds = [];
       state.triggerGetAgentDetails = 0;
       state.triggerFetchAgentUrls = 0;
       state.triggerFetchAgentFiles = 0;
@@ -795,6 +801,7 @@ export const {
   setWelcomeMessage,
   setLlmModel,
   setRetrievalStrategy,
+  setToolIds,
   setTriggerGetAgentDetails,
   setTriggerFetchAgentUrls,
   setTriggerFetchAgentFiles,

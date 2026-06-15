@@ -19,6 +19,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { SHEET_CONTENT_CLASSNAME } from "@/lib/sheetConfig";
 import { Label } from "@/components/ui/label";
 import CustomInput from "@/components/inputs/CustomInput";
 import CustomTextareaPrimary from "@/components/inputs/CustomTextareaPrimary";
@@ -348,7 +349,7 @@ export default function KnowledgeBaseQnAList({
           }
         }}
       >
-        <SheetContent className="min-w-full lg:min-w-[480px] md:min-w-full z-[110] px-[4px]">
+        <SheetContent className={SHEET_CONTENT_CLASSNAME}>
           <SheetHeader>
             <SheetTitle>Edit QnA Entry</SheetTitle>
             <SheetDescription className="font-medium">

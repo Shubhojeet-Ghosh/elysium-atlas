@@ -23,6 +23,7 @@ import {
   setWelcomeMessage,
   setLlmModel,
   setRetrievalStrategy,
+  setToolIds,
   setKnowledgeBaseLinks,
   setKnowledgeBaseFiles,
   setKnowledgeBaseText,
@@ -356,6 +357,12 @@ export default function MyAgent({
       !isEquivalent(mappedInitial.retrievalStrategy, current.retrievalStrategy)
     ) {
       payload.retrieval_strategy = current.retrievalStrategy;
+    }
+
+    const initialToolIds = [...(mappedInitial.toolIds ?? [])].sort().join(",");
+    const currentToolIds = [...(current.toolIds ?? [])].sort().join(",");
+    if (initialToolIds !== currentToolIds) {
+      payload.tool_ids = current.toolIds ?? [];
     }
 
     if (mappedInitial.temperature !== current.temperature) {
@@ -733,6 +740,7 @@ export default function MyAgent({
       dispatch(setLlmModel(dataToUse.llmModel || ""));
     if (dataToUse.retrievalStrategy !== undefined)
       dispatch(setRetrievalStrategy(dataToUse.retrievalStrategy || "simple"));
+    dispatch(setToolIds(dataToUse.toolIds ?? []));
     dispatch(setAgentIcon(dataToUse.agent_icon ?? null));
     dispatch(setPrimaryColor(dataToUse.primary_color || "#fff"));
     dispatch(setSecondaryColor(dataToUse.secondary_color || "#fff"));
