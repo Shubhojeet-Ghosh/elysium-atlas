@@ -53,4 +53,14 @@ export const AVAILABLE_MODELS = [
     model_icon:
       "https://cdn.sgdevstudio.in/assets/icons/llm_icons/grok_icon.svg",
   },
+  {
+    model_code: "deepseek-v4-flash",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/deepseek_icon.svg",
+  },
+  {
+    model_code: "deepseek-v4-pro",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/deepseek_icon.svg",
+  },
 ];

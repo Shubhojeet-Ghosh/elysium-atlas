@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { setTemperature } from "@/store/reducers/agentSlice";
 import { AVAILABLE_MODELS } from "@/lib/llmConfig";
+import { SHEET_CONTENT_CLASSNAME } from "@/lib/sheetConfig";
 import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
 export default function LlmModelSelector() {
@@ -61,7 +62,7 @@ export default function LlmModelSelector() {
           if (!readOnly) setOpen(nextOpen);
         }}
       >
-        <SheetContent className="min-w-full lg:min-w-[480px] md:min-w-full z-[110] px-[4px]">
+        <SheetContent className={SHEET_CONTENT_CLASSNAME}>
           <SheetHeader>
             <SheetTitle>
               <div className="flex items-center justify-start">

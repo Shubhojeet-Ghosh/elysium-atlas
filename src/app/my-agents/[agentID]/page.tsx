@@ -27,6 +27,7 @@ import {
   setWelcomeMessage,
   setLlmModel,
   setRetrievalStrategy,
+  setToolIds,
   setTriggerGetAgentDetails,
   setWidgetScript,
   setAgentIcon,
@@ -81,6 +82,11 @@ export default function AgentPage() {
           dispatch(setLlmModel(agentDetails.llm_model));
           dispatch(
             setRetrievalStrategy(agentDetails.retrieval_strategy || "simple"),
+          );
+          dispatch(
+            setToolIds(
+              Array.isArray(agentDetails.tool_ids) ? agentDetails.tool_ids : [],
+            ),
           );
           dispatch(setWidgetScript(agentDetails.widget_script || null));
           dispatch(setAgentIcon(agentDetails.agent_icon || null));
