@@ -16,7 +16,7 @@ All authenticated routes expect `Authorization: Bearer <session_jwt>`. The JWT m
 | Only the creator could access their agents  | **All team members** can **view** team agents                             |
 | Owner-only checks on some routes            | **Owner + admin** can **create / edit / delete**; **member** is read-only |
 
-`list-agents` now returns every agent for the JWT’s active `team_id`, not just agents created by the logged-in user.
+`list-agents` returns agents for the JWT’s active `team_id` (not just agents created by the logged-in user), with **page-based pagination** — same model as the datasource list endpoints below.
 
 ---
 
@@ -38,16 +38,50 @@ Use JWT `role` to **disable UI controls** (buttons, inputs, upload zones). The b
 
 User must be an active member of the **agent’s team** (resolved from the agent document, not only JWT `team_id`).
 
-| Endpoint                           | Description                         |
-| ---------------------------------- | ----------------------------------- |
-| `POST /v1/list-agents`             | List all agents for the active team |
-| `POST /v1/get-agent-details`       | Full agent config/details           |
-| `POST /v1/get-agent-urls`          | Paginated indexed URLs              |
-| `POST /v1/get-agent-files`         | Paginated uploaded files            |
-| `POST /v1/get-agent-custom-texts`  | Paginated custom texts              |
-| `POST /v1/get-agent-qa-pairs`      | Paginated QA pairs                  |
-| `POST /v1/get-custom-text-content` | Custom text body from vector store  |
-| `POST /v1/get-qa-pair-content`     | QA pair body from vector store      |
+| Endpoint                           | Description                          |
+| ---------------------------------- | ------------------------------------ |
+| `POST /v1/list-agents`             | Paginated agents for the active team |
+| `POST /v1/get-agent-details`       | Full agent config/details            |
+| `POST /v1/get-agent-urls`          | Paginated indexed URLs               |
+| `POST /v1/get-agent-files`         | Paginated uploaded files             |
+| `POST /v1/get-agent-custom-texts`  | Paginated custom texts               |
+| `POST /v1/get-agent-qa-pairs`      | Paginated QA pairs                   |
+| `POST /v1/get-custom-text-content` | Custom text body from vector store   |
+| `POST /v1/get-qa-pair-content`     | QA pair body from vector store       |
+
+#### `POST /v1/list-agents` — pagination
+
+Request body (all fields optional):
+
+| Parameter | Type     | Default | Description                |
+| --------- | -------- | ------- | -------------------------- |
+| `page`    | `number` | `1`     | 1-based page number        |
+| `limit`   | `number` | `10`    | Items per page (max `100`) |
+
+Example:
+
+```json
+{
+  "page": 1,
+  "limit": 10
+}
+```
+
+Success response (`200`) includes the current page in `agents` plus pagination fields on the response root:
+
+| Field         | Type      | Description                                    |
+| ------------- | --------- | ---------------------------------------------- |
+| `agents`      | `array`   | Agent summaries for the current page           |
+| `total`       | `number`  | Total agents for the active team               |
+| `page`        | `number`  | Page returned (clamped if out of range)        |
+| `limit`       | `number`  | Page size used                                 |
+| `total_pages` | `number`  | `ceil(total / limit)`; `0` when `total` is `0` |
+| `has_next`    | `boolean` | `true` if another page exists                  |
+| `has_prev`    | `boolean` | `true` if a previous page exists               |
+
+**Sort order:** Newest first by `updated_at`, then `_id`. Out-of-range `page` values clamp to the last valid page (same behavior as [agents-datasource.md](./agents-datasource.md#pagination-shared)).
+
+For paginated knowledge lists (URLs, files, custom texts, QA pairs), see [agents-datasource.md](./agents-datasource.md).
 
 ### Write — owner and admin only
 
@@ -119,3 +153,5 @@ admin   → READ + WRITE
 ```
 
 For related team-member management (invite/remove), see the Express Atlas API docs referenced in [backend-team-rbac-guide.md](./backend-team-rbac-guide.md).
+
+For **create/update request body parameters** (fields, validation, sync vs async), see [frontend-agent-create-update-api-guide.md](./frontend-agent-create-update-api-guide.md).

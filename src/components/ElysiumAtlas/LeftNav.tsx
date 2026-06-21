@@ -1,6 +1,7 @@
 "use client";
 import { PanelRightOpen, AlignStartVertical } from "lucide-react";
 import { usePathname } from "next/navigation";
+import NProgress from "nprogress";
 import Logo from "@/components/ElysiumAtlas/LogoComponent";
 import ThemeToggle from "@/components/ElysiumAtlas/ThemeToggle";
 import NavItems from "@/components/ElysiumAtlas/NavItems";
@@ -18,6 +19,10 @@ function isAgentDetailPage(pathname: string) {
   return /^\/my-agents\/(?!build$)[^/]+$/.test(pathname);
 }
 
+function isMobileScreen() {
+  return window.matchMedia("(max-width: 1023px)").matches;
+}
+
 export default function LeftNav() {
   const dispatch = useDispatch();
   const pathname = usePathname();
@@ -32,6 +37,17 @@ export default function LeftNav() {
 
   const closeNav = () => {
     dispatch(setLeftNavOpen(false));
+  };
+
+  const closeNavIfMobile = () => {
+    if (isMobileScreen()) {
+      closeNav();
+    }
+  };
+
+  const handleNavigate = () => {
+    NProgress.start();
+    closeNavIfMobile();
   };
 
   return (
@@ -106,9 +122,17 @@ export default function LeftNav() {
             {/* Navigation Items */}
             <div className="flex-1 w-full overflow-y-auto">
               {showAgentNav ? (
-                <AgentNavItems isCollapsed={!isOpen} />
+                <AgentNavItems
+                  isCollapsed={!isOpen}
+                  onNavigate={handleNavigate}
+                  onCloseNav={closeNavIfMobile}
+                />
               ) : (
-                <NavItems isCollapsed={!isOpen} />
+                <NavItems
+                  isCollapsed={!isOpen}
+                  onNavigate={handleNavigate}
+                  onCloseNav={closeNavIfMobile}
+                />
               )}
             </div>
 

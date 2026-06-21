@@ -8,6 +8,7 @@ export interface Agent {
 
 export interface UserAgentsState {
   myAgents: Agent[];
+  agentsTotal: number;
   trigger_fetch_agents: number;
   hasCompletedInitialAgentsFetch: boolean;
 }

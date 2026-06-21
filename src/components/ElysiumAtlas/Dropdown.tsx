@@ -130,15 +130,17 @@ export default function Dropdown({ open, onOpenChange }: DropdownProps) {
             <span>Dashboard</span>
           </div>
         </Link>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="flex items-center px-2 py-1.5 text-deep-onyx dark:text-pure-mist rounded-sm cursor-not-allowed">
+        {displayRole === "owner" ? (
+          <Link
+            href="/account-settings"
+            onClick={() => onOpenChange?.(false)}
+          >
+            <div className="flex items-center px-2 py-1.5 text-deep-onyx dark:text-pure-mist hover:bg-serene-purple dark:hover:bg-serene-purple hover:text-pure-mist rounded-sm cursor-pointer">
               <Settings className="mr-2 h-4 w-4" />
               <span>Account Settings</span>
             </div>
-          </TooltipTrigger>
-          <TooltipContent>Coming Soon</TooltipContent>
-        </Tooltip>
+          </Link>
+        ) : null}
         <PlanBadge />
       </div>
 

@@ -3,6 +3,7 @@ import { Agent, UserAgentsState } from "../types/UserAgentsTypes";
 
 const initialState: UserAgentsState = {
   myAgents: [],
+  agentsTotal: 0,
   trigger_fetch_agents: 0,
   hasCompletedInitialAgentsFetch: false,
 };
@@ -13,6 +14,13 @@ const userAgentsSlice = createSlice({
   reducers: {
     setMyAgents: (state, action: PayloadAction<Agent[]>) => {
       state.myAgents = action.payload;
+    },
+    setAgentsList: (
+      state,
+      action: PayloadAction<{ agents: Agent[]; total: number }>,
+    ) => {
+      state.myAgents = action.payload.agents;
+      state.agentsTotal = action.payload.total;
     },
     addAgent: (state, action: PayloadAction<Agent>) => {
       state.myAgents.push(action.payload);
@@ -32,6 +40,7 @@ const userAgentsSlice = createSlice({
     },
     resetMyAgents: (state) => {
       state.myAgents = [];
+      state.agentsTotal = 0;
       state.hasCompletedInitialAgentsFetch = false;
     },
     setInitialAgentsFetchComplete: (state) => {
@@ -60,6 +69,7 @@ const userAgentsSlice = createSlice({
 
 export const {
   setMyAgents,
+  setAgentsList,
   addAgent,
   removeAgent,
   updateAgent,

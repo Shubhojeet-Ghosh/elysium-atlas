@@ -92,7 +92,7 @@ export default function TeamTools() {
   return (
     <div className="w-full h-full">
       <div className="flex flex-col">
-        <div className="lg:text-[22px] text-[18px] font-bold flex justify-between items-center gap-4">
+        <div className="lg:text-[22px] text-[18px] font-bold flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3 lg:gap-4">
           <div>
             <div>Tools</div>
             <p className="text-[13px] font-medium text-gray-500 dark:text-gray-400 mt-1">
@@ -100,7 +100,9 @@ export default function TeamTools() {
             </p>
           </div>
           {canManageTools && (
-            <ToolFormDialog mode="create" onSuccess={handleToolChanged} />
+            <div className="w-full lg:w-auto shrink-0 flex justify-end">
+              <ToolFormDialog mode="create" onSuccess={handleToolChanged} />
+            </div>
           )}
         </div>
 
