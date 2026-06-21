@@ -47,9 +47,15 @@ const navItems: NavItem[] = [
 
 interface NavItemsProps {
   isCollapsed: boolean;
+  onNavigate?: () => void;
+  onCloseNav?: () => void;
 }
 
-export default function NavItems({ isCollapsed }: NavItemsProps) {
+export default function NavItems({
+  isCollapsed,
+  onNavigate,
+  onCloseNav,
+}: NavItemsProps) {
   const pathname = usePathname();
 
   return (
@@ -75,6 +81,16 @@ export default function NavItems({ isCollapsed }: NavItemsProps) {
         ) : (
           <Link
             href={item.href}
+            onClick={() => {
+              const isSamePage =
+                pathname === item.href ||
+                (item.href === "/my-agents" && pathname === item.href);
+              if (isSamePage) {
+                onCloseNav?.();
+              } else {
+                onNavigate?.();
+              }
+            }}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group
               ${
                 isActive

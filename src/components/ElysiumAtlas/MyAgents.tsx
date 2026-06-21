@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import fastApiAxios from "@/utils/fastapi_axios";
 import { useAppDispatch, useAppSelector } from "@/store";
 import {
-  setMyAgents,
+  setAgentsList,
   setInitialAgentsFetchComplete,
   updateVisitorCounts,
 } from "@/store/reducers/userAgentsSlice";
@@ -20,11 +20,16 @@ import { useRouter } from "next/navigation";
 import { resetAgentBuilder } from "@/store/reducers/agentBuilderSlice";
 import NProgress from "nprogress";
 import { isSettledAgentStatus } from "@/utils/agentStatus";
+import {
+  DEFAULT_DATASOURCE_PAGE_SIZE,
+  VISITOR_PAGE_SIZE_OPTIONS,
+  type VisitorPageSize,
+} from "@/lib/config";
 
 export default function MyAgents() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const agents = useAppSelector((state) => state.userAgents.myAgents);
+  const agentsTotal = useAppSelector((state) => state.userAgents.agentsTotal);
   const hasCompletedInitialAgentsFetch = useAppSelector(
     (state) => state.userAgents.hasCompletedInitialAgentsFetch,
   );
@@ -34,69 +39,116 @@ export default function MyAgents() {
   const teamID = useAppSelector((state) => state.userProfile.teamID);
   const userID = useAppSelector((state) => state.userProfile.userID);
   const canManageAgents = useCanManageAgents();
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const [, setSocket] = useState<Socket | null>(null);
 
-  // Placeholder handler for button
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrev, setHasPrev] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [pageSize, setPageSize] = useState<VisitorPageSize>(
+    DEFAULT_DATASOURCE_PAGE_SIZE,
+  );
+  const [isLoading, setIsLoading] = useState(true);
+
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  const clearPolling = () => {
+    if (pollingRef.current) {
+      clearTimeout(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
+
   const handleBuildNewAgent = () => {
     NProgress.start();
     dispatch(resetAgentBuilder());
     router.push("/my-agents/build");
   };
 
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const loadAgents = useCallback(
+    async (page: number, limit: VisitorPageSize, forPolling = false) => {
+      if (!forPolling) {
+        setIsLoading(true);
+      }
 
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchAgentsAndMaybePoll() {
       try {
         const token = Cookies.get("elysium_atlas_session_token");
         if (!token) {
-          if (isMounted) dispatch(setInitialAgentsFetchComplete());
+          dispatch(setAgentsList({ agents: [], total: 0 }));
+          setTotal(0);
+          setTotalPages(1);
+          setHasNext(false);
+          setHasPrev(false);
           return;
         }
+
         const res = await fastApiAxios.post(
           "/elysium-agents/elysium-atlas/agent/v1/list-agents",
-          {},
+          { page, limit },
           {
             headers: {
               Authorization: `Bearer ${token}`,
             },
           },
         );
+
         if (res.data && res.data.success) {
           const agentsList = Array.isArray(res.data.agents)
             ? res.data.agents
             : [];
-          if (isMounted) dispatch(setMyAgents(agentsList));
+          const responseTotal = res.data.total ?? agentsList.length;
+          const responseLimit = res.data.limit ?? limit;
+          const responsePage = res.data.page ?? page;
 
-          if (agentsList.length > 0) {
-            // Check if any agent_status is not in allowedStatuses
-            const hasPending = agentsList.some(
-              (agent: any) => !isSettledAgentStatus(agent.agent_status),
+          dispatch(setAgentsList({ agents: agentsList, total: responseTotal }));
+          setCurrentPage(responsePage);
+          setTotal(responseTotal);
+          setHasNext(
+            res.data.has_next ??
+              responsePage * responseLimit < responseTotal,
+          );
+          setHasPrev(res.data.has_prev ?? responsePage > 1);
+          setTotalPages(
+            res.data.total_pages ??
+              (responseTotal > 0
+                ? Math.max(1, Math.ceil(responseTotal / responseLimit))
+                : 1),
+          );
+
+          clearPolling();
+          if (
+            agentsList.length > 0 &&
+            agentsList.some(
+              (agent: { agent_status?: string }) =>
+                !isSettledAgentStatus(agent.agent_status ?? ""),
+            )
+          ) {
+            pollingRef.current = setTimeout(
+              () => loadAgents(responsePage, limit, true),
+              5000,
             );
-            if (hasPending && isMounted) {
-              pollingRef.current = setTimeout(fetchAgentsAndMaybePoll, 5000);
-            }
           }
         }
       } catch (err) {
         console.error("Error fetching agents:", err);
       } finally {
-        if (isMounted) {
-          dispatch(setInitialAgentsFetchComplete());
+        dispatch(setInitialAgentsFetchComplete());
+        if (!forPolling) {
+          setIsLoading(false);
         }
       }
-    }
+    },
+    [dispatch],
+  );
 
-    fetchAgentsAndMaybePoll();
+  useEffect(() => {
+    loadAgents(currentPage, pageSize);
 
     return () => {
-      isMounted = false;
-      if (pollingRef.current) {
-        clearTimeout(pollingRef.current);
-      }
+      clearPolling();
     };
-  }, [dispatch, triggerFetch]);
+  }, [currentPage, pageSize, triggerFetch, loadAgents]);
 
   useEffect(() => {
     setSocket(aiSocket);
@@ -140,13 +192,22 @@ export default function MyAgents() {
       aiSocket.off("agents_visitor_counts", handleVisitorCounts);
       aiSocket.off("agent_visitor_count_updated", handleVisitorCountUpdated);
     };
-  }, [teamID, userID]);
+  }, [teamID, userID, dispatch]);
 
-  if (!hasCompletedInitialAgentsFetch && agents.length === 0) {
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: VisitorPageSize) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
+  if (!hasCompletedInitialAgentsFetch && agentsTotal === 0 && isLoading) {
     return <MyAgentsSkeleton />;
   }
 
-  if (agents.length === 0) {
+  if (agentsTotal === 0) {
     if (canManageAgents) {
       return null;
     }
@@ -173,7 +234,18 @@ export default function MyAgents() {
             </PrimaryButton>
           )}
         </div>
-        <MyAgentsTable />
+        <MyAgentsTable
+          currentPage={currentPage}
+          totalPages={totalPages}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          total={total}
+          pageSize={pageSize}
+          pageSizeOptions={VISITOR_PAGE_SIZE_OPTIONS}
+          isLoading={isLoading}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
       </div>
     </div>
   );

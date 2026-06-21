@@ -5,13 +5,13 @@ import { useAppSelector } from "@/store";
 import { useCanManageAgents } from "@/hooks/useCanManageAgents";
 
 export default function BuildAgent() {
-  const agents = useAppSelector((state) => state.userAgents.myAgents);
+  const agentsTotal = useAppSelector((state) => state.userAgents.agentsTotal);
   const hasCompletedInitialAgentsFetch = useAppSelector(
     (state) => state.userAgents.hasCompletedInitialAgentsFetch,
   );
   const canManageAgents = useCanManageAgents();
 
-  if (!hasCompletedInitialAgentsFetch || agents.length > 0 || !canManageAgents) {
+  if (!hasCompletedInitialAgentsFetch || agentsTotal > 0 || !canManageAgents) {
     return null;
   }
 

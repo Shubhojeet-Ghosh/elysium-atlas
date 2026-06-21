@@ -48,3 +48,13 @@ export interface AtlasSelectTeamResponse {
 export type AtlasPhase1LoginResponse =
   | AtlasDirectLoginResponse
   | AtlasTeamSelectionRequiredResponse;
+
+export interface AtlasForgotPasswordResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface AtlasResetPasswordResponse {
+  success: boolean;
+  message: string;
+}

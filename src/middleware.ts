@@ -4,12 +4,14 @@ import type { NextRequest } from "next/server";
 const publicRoutes = [
   "/auth/login",
   "/auth/verify",
+  "/auth/forgot-password",
+  "/auth/reset-password",
   "/",
   "/chat-with-agent",
   "/team/invite/respond",
 ];
 
-const privateRoutes = ["/my-agents", "/team", "/tools"];
+const privateRoutes = ["/my-agents", "/team", "/tools", "/account-settings"];
 
 // Logged-in users may still visit these public routes (no redirect to /my-agents)
 const authenticatedPublicExceptions = [

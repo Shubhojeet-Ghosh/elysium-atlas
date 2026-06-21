@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import CustomInput from "@/components/inputs/CustomInput";
 import { GoogleIcon } from "@/components/TechStacks/Icons.tsx";
 import { toast } from "sonner";
@@ -177,15 +178,27 @@ export default function LoginBox() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-[2px] min-h-[40px]"
               />
-              <label className="flex items-center gap-2 mt-2 text-[13px] text-gray-600 dark:text-pure-mist select-none cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showPwd}
-                  onChange={() => setShowPwd((prev) => !prev)}
-                  className="accent-deep-onyx"
-                />
-                Show password
-              </label>
+              <div className="flex items-center justify-between mt-2">
+                <label className="flex items-center gap-2 text-[13px] text-gray-600 dark:text-pure-mist select-none cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showPwd}
+                    onChange={() => setShowPwd((prev) => !prev)}
+                    className="accent-deep-onyx"
+                  />
+                  Show password
+                </label>
+                <Link
+                  href={
+                    email.trim()
+                      ? `/auth/forgot-password?email=${encodeURIComponent(email.trim().toLowerCase())}`
+                      : "/auth/forgot-password"
+                  }
+                  className="text-ecnavy dark:text-pure-mist hover:underline text-[13px]"
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </div>
           )}
 

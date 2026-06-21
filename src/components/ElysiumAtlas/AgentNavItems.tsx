@@ -90,9 +90,15 @@ const agentNavItems: AgentNavItem[] = [
 
 interface AgentNavItemsProps {
   isCollapsed: boolean;
+  onNavigate?: () => void;
+  onCloseNav?: () => void;
 }
 
-export default function AgentNavItems({ isCollapsed }: AgentNavItemsProps) {
+export default function AgentNavItems({
+  isCollapsed,
+  onNavigate,
+  onCloseNav,
+}: AgentNavItemsProps) {
   const params = useParams();
   const searchParams = useSearchParams();
   const agentID = params.agentID as string;
@@ -120,6 +126,13 @@ export default function AgentNavItems({ isCollapsed }: AgentNavItemsProps) {
         ) : (
           <Link
             href={href}
+            onClick={() => {
+              if (isActive) {
+                onCloseNav?.();
+              } else {
+                onNavigate?.();
+              }
+            }}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group
               ${
                 isActive
