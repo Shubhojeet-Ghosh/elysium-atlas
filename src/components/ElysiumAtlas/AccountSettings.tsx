@@ -22,7 +22,7 @@ const FORM_MAX_WIDTH = "max-w-md lg:max-w-4xl";
 
 const FIELD_LABEL_CLASS =
   "block text-[13px] font-medium text-deep-onyx dark:text-pure-mist mb-1 leading-5 min-h-[20px]";
-const FIELD_INPUT_CLASS = "min-h-[38px]";
+const FIELD_INPUT_CLASS = "min-h-[45px]";
 const FIELD_FOOTER_CLASS =
   "mt-2 flex min-h-[22px] items-center justify-end";
 const SECTION_TITLE_CLASS =
