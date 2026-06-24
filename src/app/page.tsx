@@ -12,6 +12,8 @@ import ChatbotWidget from "@/components/ChatbotWidget";
 export const metadata = homePageMetadata;
 
 export default function Home() {
+  const enableChatbot = false;
+
   return (
     <>
       {/* Remove dark mode */}
@@ -49,7 +51,7 @@ export default function Home() {
                 ]}
                 className={cn(
                   "mask-[radial-gradient(400px_circle_at_center,white,transparent)]",
-                  "inset-x-0 top-[-40%] h-[200%] skew-y-12"
+                  "inset-x-0 top-[-40%] h-[200%] skew-y-12",
                 )}
               />
             </div>
@@ -60,7 +62,7 @@ export default function Home() {
           <div className="relative z-20 bg-transparent text-deep-onyx"></div>
         </main>
       </div>
-      <ChatbotWidget agentId="695c3cd289c5797e0f344593" />
+      {enableChatbot && <ChatbotWidget agentId="695c3cd289c5797e0f344593" />}
     </>
   );
 }
