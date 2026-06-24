@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot, Home, Settings, Users, Wrench } from "lucide-react";
+import { BookOpen, Bot, Home, Settings, Users, Wrench } from "lucide-react";
 import {
   Tooltip,
   TooltipTrigger,
@@ -25,6 +25,12 @@ const navItems: NavItem[] = [
     name: "Dashboard",
     href: "/dashboard",
     icon: Home,
+    disabled: true,
+  },
+  {
+    name: "Knowledge Base",
+    href: "/knowledge-base",
+    icon: BookOpen,
     disabled: true,
   },
   {
