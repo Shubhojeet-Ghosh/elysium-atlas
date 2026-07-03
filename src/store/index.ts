@@ -56,6 +56,7 @@ const userAgentsPersistConfig = {
 const agentPersistConfig = {
   key: "agent",
   storage: storage,
+  blacklist: ["captured_sessions", "active_visitors"],
 };
 
 const agentChatPersistConfig = {

@@ -12,11 +12,14 @@ import {
   markConversationLogAsRead,
   incrementConversationLogUnread,
   type ConversationMessage,
+  type CapturedSessionMode,
 } from "@/store/reducers/agentSlice";
 import { formatChatTimestamp } from "@/utils/formatDate";
 import {
   isVisitorMessageUnread,
+  isMonitorMessageUnread,
   findFirstUnreadSeparatorIndex,
+  resolveMarkReadMessageId,
 } from "@/utils/conversationMessageUtils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -38,12 +41,17 @@ const conversationMarkdownComponents = createMarkdownComponents({
 export default function ConversationChatBody({
   chat_session_id,
   agent_id,
+  conversationMode = "monitor",
   isVisible = true,
+  pauseAgentMirror = false,
 }: {
   chat_session_id: string;
   agent_id: string;
+  conversationMode?: CapturedSessionMode;
   isVisible?: boolean;
+  pauseAgentMirror?: boolean;
 }) {
+  const isMonitorMode = conversationMode === "monitor";
   const dispatch = useAppDispatch();
   const userID = useAppSelector((state) => state.userProfile.userID);
   const [inputValue, setInputValue] = useState("");
@@ -86,12 +94,13 @@ export default function ConversationChatBody({
     separatorIndexRef.current = separatorIndex;
   }, [separatorIndex]);
 
-  const handleVisitorMessageMarked = useCallback(
-    (messageId: string, readAt: string) => {
+  const handleMessageMarked = useCallback(
+    (messageId: string, readAt: string, mongoId?: string | null) => {
       dispatch(
         markCapturedMessageAsRead({
           chat_session_id,
           message_id: messageId,
+          _id: mongoId ?? null,
           read_at: readAt,
         }),
       );
@@ -105,25 +114,52 @@ export default function ConversationChatBody({
 
       if (!chain.some(isVisitorMessageUnread)) {
         dispatch(markConversationLogAsRead(chat_session_id));
+        setSeparatorIndex(-1);
+        separatorIndexRef.current = -1;
       }
     },
     [chat_session_id, dispatch],
   );
 
-  const { markVisible: markVisitorMessageVisible, reset: resetReadReceipts } =
+  const { markVisible: markMessageVisible, reset: resetReadReceipts } =
     useMarkMessagesReadWhenVisible({
       enabled: isVisible,
       agent_id,
       chat_session_id,
       read_by: userID,
-      onMessageMarked: handleVisitorMessageMarked,
+      onMessageMarked: handleMessageMarked,
     });
+
+  const markMessageVisibleRef = useRef(markMessageVisible);
+  useEffect(() => {
+    markMessageVisibleRef.current = markMessageVisible;
+  }, [markMessageVisible]);
+
+  const queueMarkMessageRead = useCallback((message: ConversationMessage) => {
+    const markReadId = resolveMarkReadMessageId(message);
+    if (!markReadId) return;
+    markMessageVisibleRef.current(message.message_id, message._id ?? markReadId);
+  }, []);
 
   useEffect(() => {
     if (!isVisible) {
       resetReadReceipts();
     }
   }, [isVisible, resetReadReceipts]);
+
+  useEffect(() => {
+    if (isVisible) return;
+
+    const chain =
+      store
+        .getState()
+        .agent.captured_sessions.find(
+          (s) => s.chat_session_id === chat_session_id,
+        )?.conversation_chain ?? [];
+    if (!chain.some(isVisitorMessageUnread)) {
+      dispatch(markConversationLogAsRead(chat_session_id));
+    }
+  }, [isVisible, chat_session_id, dispatch]);
 
   const hasUnreadMessages =
     separatorIndex >= 0 ||
@@ -169,38 +205,90 @@ export default function ConversationChatBody({
     resetReadReceipts,
   ]);
 
-  // Listen for incoming visitor messages on this session
+  // Clear stale separator / log unread once all visitor messages are read
   useEffect(() => {
-    const handleMessageFromVisitor = (data: {
-      agent_id: string;
-      chat_session_id: string;
-      message: string;
-      sender: string;
-      message_id?: string;
-    }) => {
-      if (data.chat_session_id !== chat_session_id) return;
+    if (!isVisible) return;
 
-      const visitorMsgAt = new Date().toISOString();
-      const messageId = data.message_id ?? uuidv4();
+    const stillUnread = conversation_chain.some(isVisitorMessageUnread);
+    if (stillUnread) return;
 
+    if (separatorIndexRef.current !== -1) {
+      setSeparatorIndex(-1);
+      separatorIndexRef.current = -1;
+    }
+    if (messagingUnreadCount > 0) {
+      dispatch(markConversationLogAsRead(chat_session_id));
+    }
+  }, [
+    isVisible,
+    conversation_chain,
+    messagingUnreadCount,
+    chat_session_id,
+    dispatch,
+  ]);
+
+  // Mark visible unread messages when panel is open (incl. after history load)
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const unread = conversation_chain.filter((msg) =>
+      isMonitorMode ? isMonitorMessageUnread(msg) : isVisitorMessageUnread(msg),
+    );
+    if (unread.length === 0) return;
+
+    const rafId = requestAnimationFrame(() => {
+      unread.forEach((msg) => queueMarkMessageRead(msg));
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [isVisible, conversation_chain, isMonitorMode, queueMarkMessageRead]);
+
+  // Listen for incoming visitor and agent messages on this session
+  useEffect(() => {
+    const appendMessage = (
+      message: ConversationMessage,
+      lastMessage: string,
+      lastMessageAt: string,
+    ) => {
       dispatch(
         addMessageToCapturedSession({
           chat_session_id,
-          message: {
-            message_id: messageId,
-            role: "user",
-            content: data.message,
-            created_at: visitorMsgAt,
-          },
+          message,
         }),
       );
 
       dispatch(
         updateConversationLogLastMessage({
           chat_session_id,
-          last_message: data.message,
-          last_message_at: visitorMsgAt,
+          last_message: lastMessage,
+          last_message_at: lastMessageAt,
         }),
+      );
+    };
+
+    const handleMessageFromVisitor = (data: {
+      agent_id: string;
+      chat_session_id: string;
+      message: string;
+      sender: string;
+      message_id?: string;
+      _id?: string;
+      created_at?: string;
+    }) => {
+      if (data.chat_session_id !== chat_session_id) return;
+
+      const visitorMsgAt = data.created_at ?? new Date().toISOString();
+
+      appendMessage(
+        {
+          message_id: data.message_id ?? data._id ?? uuidv4(),
+          _id: data._id,
+          role: "user",
+          content: data.message,
+          created_at: visitorMsgAt,
+        },
+        data.message,
+        visitorMsgAt,
       );
 
       // When the panel is not visible, treat this as unread for history
@@ -213,16 +301,68 @@ export default function ConversationChatBody({
       if (isVisibleRef.current && separatorIndexRef.current === -1) {
         setSeparatorIndex(conversationChainRef.current.length);
       }
+
+      if (isVisibleRef.current && data._id) {
+        requestAnimationFrame(() => {
+          markMessageVisibleRef.current(
+            data.message_id ?? data._id!,
+            data._id ?? null,
+          );
+        });
+      }
+    };
+
+    const handleMessageFromAgent = (data: {
+      agent_id: string;
+      chat_session_id: string;
+      message?: string;
+      content?: string;
+      sender: string;
+      message_id?: string;
+      _id?: string;
+      role?: string;
+      created_at?: string;
+    }) => {
+      if (data.chat_session_id !== chat_session_id) return;
+      if (pauseAgentMirror) return;
+
+      const agentMsgAt = data.created_at ?? new Date().toISOString();
+      const content = data.content ?? data.message ?? "";
+
+      appendMessage(
+        {
+          message_id: data.message_id ?? data._id ?? uuidv4(),
+          _id: data._id,
+          role: (data.role as "user" | "agent" | "human") ?? "agent",
+          content,
+          created_at: agentMsgAt,
+        },
+        content,
+        agentMsgAt,
+      );
+
+      if (isVisibleRef.current && isMonitorMode && data._id) {
+        requestAnimationFrame(() => {
+          markMessageVisibleRef.current(
+            data.message_id ?? data._id!,
+            data._id ?? null,
+          );
+        });
+      }
     };
 
     aiSocket.on("message_from_visitor", handleMessageFromVisitor);
+    aiSocket.on("message_from_agent", handleMessageFromAgent);
     return () => {
       aiSocket.off("message_from_visitor", handleMessageFromVisitor);
+      aiSocket.off("message_from_agent", handleMessageFromAgent);
     };
-  }, [chat_session_id, dispatch]);
+  }, [chat_session_id, dispatch, isMonitorMode, pauseAgentMirror]);
 
   const handleSendMessage = useCallback(
     (message?: string) => {
+      if (isMonitorMode) return;
+
       const msg = (message ?? inputValue).trim();
       if (!msg) return;
 
@@ -264,7 +404,7 @@ export default function ConversationChatBody({
         textareaRef.current.style.height = "auto";
       }
     },
-    [inputValue, agent_id, chat_session_id, dispatch, scrollToBottomOnSend],
+    [inputValue, isMonitorMode, agent_id, chat_session_id, dispatch, scrollToBottomOnSend],
   );
 
   const handleInputChange = useCallback(
@@ -306,7 +446,7 @@ export default function ConversationChatBody({
           {conversation_chain.length === 0 ? (
             <div className="flex items-center justify-center py-6">
               <span className="text-[13px] text-gray-400 dark:text-gray-500 text-center">
-                No messages yet. Say hello!
+                No messages yet.
               </span>
             </div>
           ) : (
@@ -314,8 +454,37 @@ export default function ConversationChatBody({
               {conversation_chain.map((msg, index) => {
                 const isTeamMember =
                   msg.role === "human" || msg.role === "agent";
+                const needsReadReceipt = isMonitorMode
+                  ? isMonitorMessageUnread(msg)
+                  : isVisitorMessageUnread(msg);
+
+                const messageBubble = (
+                  <>
+                    <div
+                      className={`max-w-[80%] px-3 py-2 text-[13px] leading-relaxed font-[500] break-words ${
+                        isTeamMember
+                          ? "bg-serene-purple text-white rounded-2xl rounded-br-sm"
+                          : "bg-pure-mist text-gray-800 dark:text-gray-900 rounded-2xl rounded-bl-sm"
+                      }`}
+                    >
+                      <div className="prose prose-sm max-w-none [&_*]:text-inherit [&_a]:underline [&_a]:cursor-pointer">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeHighlight]}
+                          components={conversationMarkdownComponents}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-gray-400 dark:text-pure-mist px-1">
+                      {formatChatTimestamp(msg.created_at)}
+                    </span>
+                  </>
+                );
+
                 return (
-                  <Fragment key={msg.message_id}>
+                  <Fragment key={msg._id ?? msg.message_id}>
                     {index === separatorIndex && (
                       <div
                         ref={separatorElRef}
@@ -329,30 +498,18 @@ export default function ConversationChatBody({
                         <div className="flex-1 h-px bg-serene-purple/40" />
                       </div>
                     )}
-                    {isVisitorMessageUnread(msg) ? (
+                    {needsReadReceipt ? (
                       <ReadReceiptMarker
                         messageId={msg.message_id}
+                        mongoId={msg._id ?? null}
                         enabled={isVisible}
                         scrollRootRef={scrollContainerRef}
-                        onVisible={markVisitorMessageVisible}
-                        className={`flex flex-col gap-0.5 items-start`}
+                        onVisible={markMessageVisible}
+                        className={`flex flex-col gap-0.5 ${
+                          isTeamMember ? "items-end" : "items-start"
+                        }`}
                       >
-                        <div
-                          className={`max-w-[80%] px-3 py-2 text-[13px] leading-relaxed font-[500] break-words bg-pure-mist text-gray-800 dark:text-gray-900 rounded-2xl rounded-bl-sm`}
-                        >
-                          <div className="prose prose-sm max-w-none [&_*]:text-inherit [&_a]:underline [&_a]:cursor-pointer">
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              rehypePlugins={[rehypeHighlight]}
-                              components={conversationMarkdownComponents}
-                            >
-                              {msg.content}
-                            </ReactMarkdown>
-                          </div>
-                        </div>
-                        <span className="text-[10px] text-gray-400 dark:text-pure-mist px-1">
-                          {formatChatTimestamp(msg.created_at)}
-                        </span>
+                        {messageBubble}
                       </ReadReceiptMarker>
                     ) : (
                       <div
@@ -360,26 +517,7 @@ export default function ConversationChatBody({
                           isTeamMember ? "items-end" : "items-start"
                         }`}
                       >
-                        <div
-                          className={`max-w-[80%] px-3 py-2 text-[13px] leading-relaxed font-[500] break-words ${
-                            isTeamMember
-                              ? "bg-serene-purple text-white rounded-2xl rounded-br-sm"
-                              : "bg-pure-mist text-gray-800 dark:text-gray-900 rounded-2xl rounded-bl-sm"
-                          }`}
-                        >
-                          <div className="prose prose-sm max-w-none [&_*]:text-inherit [&_a]:underline [&_a]:cursor-pointer">
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              rehypePlugins={[rehypeHighlight]}
-                              components={conversationMarkdownComponents}
-                            >
-                              {msg.content}
-                            </ReactMarkdown>
-                          </div>
-                        </div>
-                        <span className="text-[10px] text-gray-400 dark:text-pure-mist px-1">
-                          {formatChatTimestamp(msg.created_at)}
-                        </span>
+                        {messageBubble}
                       </div>
                     )}
                   </Fragment>
@@ -393,25 +531,35 @@ export default function ConversationChatBody({
 
       {/* ── Input area ── */}
       <div className="flex-shrink-0 pt-[6px] pb-[18px] px-[12px]">
-        <div className="pr-[10px] relative flex items-end gap-2 bg-white dark:bg-pure-mist border border-gray-200 dark:border-black rounded-xl shadow-sm transition-all py-2">
+        <div
+          className={`pr-[10px] relative flex items-end gap-2 bg-white dark:bg-pure-mist border border-gray-200 dark:border-black rounded-xl shadow-sm transition-all py-2 ${
+            isMonitorMode ? "opacity-70" : ""
+          }`}
+        >
           <textarea
             ref={textareaRef}
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message…"
-            className="font-[500] w-full py-1.5 bg-transparent text-[13px] text-gray-800 dark:text-deep-onyx placeholder-gray-400 focus:outline-none resize-none overflow-y-auto pl-3"
+            placeholder={
+              isMonitorMode
+                ? "Monitoring only — take over to reply to this visitor"
+                : "Type a message…"
+            }
+            disabled={isMonitorMode}
+            className="font-[500] w-full py-1.5 bg-transparent text-[13px] text-gray-800 dark:text-deep-onyx placeholder-gray-400 focus:outline-none resize-none overflow-y-auto pl-3 disabled:cursor-not-allowed disabled:text-gray-500 dark:disabled:text-gray-400"
             rows={2}
             style={{ minHeight: "60px", maxHeight: "100px" }}
           />
           <button
+            type="button"
             className={`p-1.5 rounded-lg transition-all duration-300 shadow-sm mb-[-2px] mr-[-2px] ${
-              inputValue.trim() === ""
+              isMonitorMode || inputValue.trim() === ""
                 ? "cursor-not-allowed bg-serene-purple/30 text-white/60"
                 : "cursor-pointer bg-serene-purple text-white"
             }`}
             onClick={() => handleSendMessage()}
-            disabled={inputValue.trim() === ""}
+            disabled={isMonitorMode || inputValue.trim() === ""}
           >
             <ArrowUp size={16} />
           </button>

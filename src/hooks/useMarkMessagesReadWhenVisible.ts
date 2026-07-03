@@ -1,11 +1,14 @@
 import { useCallback, useRef } from "react";
-import { markChatMessageRead } from "@/utils/conversationMessageUtils";
+import {
+  markChatMessageRead,
+  resolveMarkReadMessageId,
+} from "@/utils/conversationMessageUtils";
 
 type UseMarkMessagesReadWhenVisibleOptions = {
   enabled: boolean;
   agent_id: string;
   chat_session_id: string;
-  /** MongoDB user id- agent-side read receipts only */
+  /** Team member user_id for agent-side read receipts */
   read_by?: string;
   onMessageMarked: (
     messageId: string,
@@ -28,32 +31,36 @@ export function useMarkMessagesReadWhenVisible({
 
   const markVisible = useCallback(
     async (messageId: string, mongoId?: string | null) => {
-      if (!enabled || !messageId || !agent_id || !chat_session_id) return;
+      if (!enabled || !agent_id || !chat_session_id) return;
 
-      const dedupeKey = mongoId ?? messageId;
-      if (
-        doneRef.current.has(dedupeKey) ||
-        inFlightRef.current.has(dedupeKey)
-      ) {
+      const apiMessageId = resolveMarkReadMessageId({
+        _id: mongoId ?? undefined,
+        message_id: messageId,
+      });
+      if (!apiMessageId) return;
+
+      if (doneRef.current.has(apiMessageId) || inFlightRef.current.has(apiMessageId)) {
         return;
       }
 
-      inFlightRef.current.add(dedupeKey);
+      inFlightRef.current.add(apiMessageId);
 
-      const readAt = new Date().toISOString();
-      const ok = await markChatMessageRead({
-        message_id: messageId,
-        _id: mongoId ?? null,
+      const { ok, read_at: readAtFromApi } = await markChatMessageRead({
+        message_id: apiMessageId,
         agent_id,
         chat_session_id,
         read_by,
       });
 
-      inFlightRef.current.delete(dedupeKey);
+      inFlightRef.current.delete(apiMessageId);
 
       if (ok) {
-        doneRef.current.add(dedupeKey);
-        onMessageMarkedRef.current(messageId, readAt, mongoId ?? null);
+        doneRef.current.add(apiMessageId);
+        onMessageMarkedRef.current(
+          messageId,
+          readAtFromApi ?? new Date().toISOString(),
+          mongoId ?? apiMessageId,
+        );
       }
     },
     [enabled, agent_id, chat_session_id, read_by],

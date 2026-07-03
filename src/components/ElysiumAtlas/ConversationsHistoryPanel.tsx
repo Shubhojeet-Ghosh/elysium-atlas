@@ -5,11 +5,18 @@ import { useAppSelector } from "@/store";
 import { useTeamMemberChatSessions } from "@/hooks/useTeamMemberChatSessions";
 import ConversationsHistoryHeader from "./ConversationsHistory/ConversationsHistoryHeader";
 import ConversationsHistoryBody from "./ConversationsHistory/ConversationsHistoryBody";
+import {
+  countDisplayUnreadForLogs,
+  hasDisplayUnreadForLogs,
+} from "@/utils/conversationLogUnreadUtils";
 
 export default function ConversationsHistoryPanel() {
   const agentID = useAppSelector((state) => state.agent.agentID);
   const conversationLogs = useAppSelector(
     (state) => state.agent.team_member_conversation_logs,
+  );
+  const capturedSessions = useAppSelector(
+    (state) => state.agent.captured_sessions,
   );
   const { fetchSessions, page, hasNext, loading, initialLoaded } =
     useTeamMemberChatSessions();
@@ -20,13 +27,14 @@ export default function ConversationsHistoryPanel() {
     fetchSessions(1, { replace: true });
   }, [isExpanded, agentID, fetchSessions]);
 
-  const totalUnread = conversationLogs.reduce(
-    (acc, l) => acc + (l.unread_count ?? 0),
-    0,
+  const totalUnread = countDisplayUnreadForLogs(
+    conversationLogs,
+    capturedSessions,
   );
 
-  const hasCollapsedUnread = conversationLogs.some(
-    (l) => l.is_unread || (l.unread_count ?? 0) > 0,
+  const hasCollapsedUnread = hasDisplayUnreadForLogs(
+    conversationLogs,
+    capturedSessions,
   );
 
   return (

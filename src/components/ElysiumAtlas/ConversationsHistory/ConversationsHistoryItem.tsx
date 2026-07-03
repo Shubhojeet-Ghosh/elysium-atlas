@@ -5,10 +5,12 @@ import { SquarePen, Save } from "lucide-react";
 import type { TeamMemberConversationLog } from "@/store/reducers/agentSlice";
 import {
   addOrUpdateConversationLog,
-  addCapturedSession,
 } from "@/store/reducers/agentSlice";
 import { useAppDispatch, useAppSelector } from "@/store";
 import aiSocket from "@/lib/aiSocket";
+import { captureChatSession } from "@/utils/chatSessionListUtils";
+import { useActiveTeamRole } from "@/hooks/useActiveTeamRole";
+import { isConversationLogUnreadForDisplay } from "@/utils/conversationLogUnreadUtils";
 import { formatSmartDateUTC } from "@/utils/formatDate";
 import {
   Tooltip,
@@ -18,6 +20,24 @@ import {
 
 interface ConversationsHistoryItemProps {
   log: TeamMemberConversationLog;
+  highlightQuery?: string;
+}
+
+function highlightMatch(text: string, term: string) {
+  if (!term.trim()) return text;
+  const lowerText = text.toLowerCase();
+  const lowerTerm = term.toLowerCase();
+  const idx = lowerText.indexOf(lowerTerm);
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.substring(0, idx)}
+      <span className="bg-serene-purple/80 text-white font-semibold rounded-sm">
+        {text.substring(idx, idx + term.length)}
+      </span>
+      {text.substring(idx + term.length)}
+    </>
+  );
 }
 
 function truncateMiddle(s?: string) {
@@ -62,6 +82,7 @@ function stripMarkdown(text: string): string {
 
 export default function ConversationsHistoryItem({
   log,
+  highlightQuery,
 }: ConversationsHistoryItemProps) {
   const dispatch = useAppDispatch();
   const displayName = log.alias_name ?? log.chat_session_id;
@@ -106,28 +127,31 @@ export default function ConversationsHistoryItem({
   }, [isEditing]);
 
   // Derive unread from the log (API + live chat updates)
-  const capturedSession = useAppSelector((state) =>
-    state.agent.captured_sessions.find(
-      (s) => s.chat_session_id === log.chat_session_id,
-    ),
+  const capturedSessions = useAppSelector(
+    (state) => state.agent.captured_sessions,
   );
-  const isCaptured = !!capturedSession;
-  const hideUnreadIndicators = capturedSession?.is_expanded ?? false;
-  const hasUnread =
-    !hideUnreadIndicators && (log.is_unread || (log.unread_count ?? 0) > 0);
+  const activeVisitors = useAppSelector((state) => state.agent.active_visitors);
+  const userID = useAppSelector((state) => state.userProfile.userID);
+  const teamRole = useActiveTeamRole();
+  const hasUnread = isConversationLogUnreadForDisplay(log, capturedSessions);
   const showUnreadCount = hasUnread && (log.unread_count ?? 0) > 0;
 
   const handleItemClick = () => {
     if (isEditing) return;
-    dispatch(
-      addCapturedSession({
-        chat_session_id: log.chat_session_id,
-        captured_at: new Date().toISOString(),
-      }),
+    if (!userID) return;
+
+    const visitor = activeVisitors.find(
+      (v) => v.chat_session_id === log.chat_session_id,
     );
-    aiSocket.emit("atlas-team-member-start-conversation", {
+
+    captureChatSession(dispatch, {
       agent_id: log.agent_id,
+      user_id: userID,
       chat_session_id: log.chat_session_id,
+      in_conversation_with: visitor?.in_conversation_with,
+      in_conversation_with_name: visitor?.in_conversation_with_name,
+      team_role: teamRole,
+      openAs: "takeover",
     });
   };
 
@@ -154,14 +178,17 @@ export default function ConversationsHistoryItem({
     setIsEditing(false);
   };
 
+  const truncatedName = truncateMiddle(displayName);
+  const nameContent = highlightQuery
+    ? highlightMatch(truncatedName, highlightQuery)
+    : truncatedName;
+
   return (
     <div
       className={`group flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
         hasUnread
           ? "bg-serene-purple hover:bg-serene-purple/90"
-          : isCaptured
-            ? "bg-serene-purple/10 dark:bg-serene-purple/20"
-            : "hover:bg-gray-50 dark:hover:bg-white/5"
+          : "hover:bg-gray-50 dark:hover:bg-white/5"
       }`}
       onClick={handleItemClick}
     >
@@ -216,7 +243,7 @@ export default function ConversationsHistoryItem({
                         : "font-normal text-gray-800 dark:text-gray-200"
                     }`}
                   >
-                    {truncateMiddle(displayName)}
+                    {nameContent}
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="top">{displayName}</TooltipContent>

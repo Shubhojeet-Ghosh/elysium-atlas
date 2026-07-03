@@ -3,13 +3,10 @@ import {
   User,
   Database,
   Palette,
-  Settings,
   Globe,
   FileText,
   Type,
   MessagesSquare,
-  BarChart3,
-  Radio,
 } from "lucide-react";
 import {
   CustomTabs,
@@ -106,8 +103,8 @@ export default function AgentBuilderTabs({
           value="live-visitors"
           className="flex items-center gap-2 font-[600]"
         >
-          <Radio className="w-4 h-4 shrink-0" />
-          <span className="whitespace-nowrap">Live Visitors</span>
+          <MessagesSquare className="w-4 h-4 shrink-0" />
+          <span className="whitespace-nowrap">Chat Sessions</span>
         </CustomTabsTrigger>
       </CustomTabsList>
     </div>

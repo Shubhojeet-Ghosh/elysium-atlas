@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAppDispatch, useAppSelector } from "@/store";
+import { useAppDispatch, useAppSelector, store } from "@/store";
 import {
   removeCapturedSession,
   expandCapturedSession,
@@ -14,11 +14,16 @@ import {
 import fastApiAxios from "@/utils/fastapi_axios";
 import { normalizeConversationMessage } from "@/utils/conversationMessageUtils";
 import aiSocket from "@/lib/aiSocket";
+import { emitStopMonitorConversation } from "@/utils/chatMonitorUtils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import ConversationChatHeader, {
   type CapturedSession,
 } from "@/components/ElysiumAtlas/ConversationChatHeader";
 import ConversationChatBody from "@/components/ElysiumAtlas/ConversationChatBody";
+import ConversationMonitorBanner from "@/components/ElysiumAtlas/ConversationMonitorBanner";
+import { useCapturedSessionTakeover } from "@/hooks/useCapturedSessionTakeover";
+import { useActiveTeamRole } from "@/hooks/useActiveTeamRole";
+import { canResolveChatSession } from "@/utils/teamPermissions";
 
 const MAX_VISIBLE = 2;
 
@@ -43,6 +48,102 @@ function ChatBox({
   const [isClosing, setIsClosing] = useState(false);
 
   const dispatch = useAppDispatch();
+  const userID = useAppSelector((state) => state.userProfile.userID);
+  const teamRole = useActiveTeamRole();
+  const liveSession = useAppSelector((state) =>
+    state.agent.captured_sessions.find(
+      (s) => s.chat_session_id === session.chat_session_id,
+    ),
+  );
+  const conversationMode =
+    liveSession?.conversation_mode ?? session.conversation_mode;
+  const activeVisitor = useAppSelector((state) =>
+    state.agent.active_visitors.find(
+      (v) => v.chat_session_id === session.chat_session_id,
+    ),
+  );
+  const inConversationWith =
+    activeVisitor?.in_conversation_with ?? session.in_conversation_with;
+  const isPeerTakeover = Boolean(
+    inConversationWith && inConversationWith !== userID,
+  );
+  const canTakeOver = !isPeerTakeover;
+  const pauseAgentMirror = isPeerTakeover && conversationMode === "monitor";
+  const handlerName =
+    activeVisitor?.in_conversation_with_name ?? session.in_conversation_with_name;
+
+  const handleClose = () => {
+    // Collapse first, then remove after transition
+    setIsClosing(true);
+    setVisuallyExpanded(false);
+    setTimeout(() => onClose(), 310);
+  };
+
+  const canManageTakeover =
+    conversationMode === "takeover" && !isPeerTakeover;
+  const canMarkResolved = canResolveChatSession(teamRole, {
+    conversation_mode: conversationMode,
+    in_conversation_with: inConversationWith,
+    user_id: userID,
+  });
+
+  const { requestTakeover, requestRelease, requestResolve, isTakeoverPending, isReleasePending, isResolvePending } =
+    useCapturedSessionTakeover({
+    agent_id: agentID,
+    chat_session_id: session.chat_session_id,
+    conversation_mode: conversationMode,
+    user_id: userID,
+    team_role: teamRole,
+    onReleased: handleClose,
+    onResolved: handleClose,
+  });
+
+  const showMonitorBanner =
+    visuallyExpanded && conversationMode === "monitor" && !isClosing;
+
+  const chatPanelBody = (
+    <div
+      className={
+        visuallyExpanded
+          ? "flex flex-col flex-1 min-h-0 overflow-hidden"
+          : "hidden"
+      }
+    >
+      <ConversationChatBody
+        chat_session_id={session.chat_session_id}
+        agent_id={agentID}
+        conversationMode={conversationMode}
+        isVisible={visuallyExpanded}
+        pauseAgentMirror={pauseAgentMirror}
+      />
+    </div>
+  );
+
+  const headerWithBanner = (
+    <>
+      <ConversationChatHeader
+        session={{ ...session, conversation_mode: conversationMode }}
+        isExpanded={visuallyExpanded}
+        onToggle={isClosing ? () => {} : onToggle}
+        onClose={handleClose}
+        onRelease={requestRelease}
+        onResolve={requestResolve}
+        canRelease={canManageTakeover}
+        canMarkResolved={canMarkResolved}
+        isReleasePending={isReleasePending}
+        isResolvePending={isResolvePending}
+      />
+      {showMonitorBanner && (
+        <ConversationMonitorBanner
+          variant={isPeerTakeover ? "peer" : "self"}
+          handlerName={handlerName}
+          onTakeOver={requestTakeover}
+          isTakeoverPending={isTakeoverPending}
+          canTakeOver={canTakeOver}
+        />
+      )}
+    </>
+  );
 
   // Fetch existing conversation messages once when this session box mounts
   useEffect(() => {
@@ -94,13 +195,6 @@ function ChatBox({
     return () => cancelAnimationFrame(raf);
   }, [isExpanded, isClosing]);
 
-  const handleClose = () => {
-    // Collapse first, then remove after transition
-    setIsClosing(true);
-    setVisuallyExpanded(false);
-    setTimeout(() => onClose(), 310);
-  };
-
   // ── Desktop: inline animated box, no Dialog ──
   if (isDesktop) {
     return (
@@ -109,25 +203,8 @@ function ChatBox({
           visuallyExpanded ? "w-[480px] h-[520px]" : "w-72 h-12"
         }`}
       >
-        <ConversationChatHeader
-          session={session}
-          isExpanded={visuallyExpanded}
-          onToggle={isClosing ? () => {} : onToggle}
-          onClose={handleClose}
-        />
-        <div
-          className={
-            visuallyExpanded
-              ? "flex flex-col flex-1 min-h-0 overflow-hidden"
-              : "hidden"
-          }
-        >
-          <ConversationChatBody
-            chat_session_id={session.chat_session_id}
-            agent_id={agentID}
-            isVisible={visuallyExpanded}
-          />
-        </div>
+        {headerWithBanner}
+        {chatPanelBody}
       </div>
     );
   }
@@ -148,15 +225,35 @@ function ChatBox({
           <DialogTitle className="sr-only">
             Chat with {session.chat_session_id}
           </DialogTitle>
-          <ConversationChatHeader
-            session={session}
-            isExpanded={true}
-            onToggle={onToggle}
-            onClose={handleClose}
-          />
+          <div className="flex flex-col shrink-0">
+            <ConversationChatHeader
+              session={{ ...session, conversation_mode: conversationMode }}
+              isExpanded={true}
+              onToggle={onToggle}
+              onClose={handleClose}
+              onRelease={requestRelease}
+              onResolve={requestResolve}
+              canRelease={canManageTakeover}
+              canMarkResolved={canMarkResolved}
+              isReleasePending={isReleasePending}
+              isResolvePending={isResolvePending}
+            />
+            {conversationMode === "monitor" && (
+              <ConversationMonitorBanner
+                variant={isPeerTakeover ? "peer" : "self"}
+                handlerName={handlerName}
+                onTakeOver={requestTakeover}
+                isTakeoverPending={isTakeoverPending}
+                canTakeOver={canTakeOver}
+              />
+            )}
+          </div>
           <ConversationChatBody
             chat_session_id={session.chat_session_id}
             agent_id={agentID}
+            conversationMode={conversationMode}
+            isVisible
+            pauseAgentMirror={pauseAgentMirror}
           />
         </DialogContent>
       </Dialog>
@@ -198,10 +295,11 @@ export default function TeamMemberConversationsPanel({
   };
 
   const handleClose = (id: string) => {
-    aiSocket.emit("atlas-team-member-end-conversation", {
-      agent_id: agentID,
-      chat_session_id: id,
-    });
+    const session = capturedSessions.find((s) => s.chat_session_id === id);
+    if (session?.conversation_mode === "monitor") {
+      emitStopMonitorConversation(agentID, id);
+    }
+    // Takeover stays active on the server until the agent clicks Release.
     dispatch(removeCapturedSession(id));
   };
 
@@ -220,20 +318,22 @@ export default function TeamMemberConversationsPanel({
       message: string;
       sender: string;
       message_id?: string;
+      _id?: string;
+      created_at?: string;
     }) => {
       const session = capturedSessions.find(
         (s) => s.chat_session_id === data.chat_session_id,
       );
       if (!session || session.is_expanded) return;
 
-      const visitorMsgAt = new Date().toISOString();
+      const visitorMsgAt = data.created_at ?? new Date().toISOString();
 
       dispatch(
         addMessageToCapturedSession({
           chat_session_id: data.chat_session_id,
           message: {
-            message_id:
-              data.message_id ?? `${data.chat_session_id}-${visitorMsgAt}`,
+            message_id: data.message_id ?? data._id ?? `${data.chat_session_id}-${visitorMsgAt}`,
+            _id: data._id,
             role: "user",
             content: data.message,
             created_at: visitorMsgAt,
@@ -252,9 +352,63 @@ export default function TeamMemberConversationsPanel({
       dispatch(incrementConversationLogUnread(data.chat_session_id));
     };
 
+    const handleMessageFromAgent = (data: {
+      agent_id: string;
+      chat_session_id: string;
+      message?: string;
+      content?: string;
+      sender: string;
+      message_id?: string;
+      _id?: string;
+      role?: string;
+      created_at?: string;
+    }) => {
+      const session = capturedSessions.find(
+        (s) => s.chat_session_id === data.chat_session_id,
+      );
+      if (!session || session.is_expanded) return;
+
+      if (session.conversation_mode === "monitor") {
+        const visitor = store
+          .getState()
+          .agent.active_visitors.find(
+            (v) => v.chat_session_id === data.chat_session_id,
+          );
+        const handlerId = visitor?.in_conversation_with;
+        const userID = store.getState().userProfile.userID;
+        if (handlerId && handlerId !== userID) return;
+      }
+
+      const agentMsgAt = data.created_at ?? new Date().toISOString();
+      const content = data.content ?? data.message ?? "";
+
+      dispatch(
+        addMessageToCapturedSession({
+          chat_session_id: data.chat_session_id,
+          message: {
+            message_id: data.message_id ?? data._id ?? `${data.chat_session_id}-${agentMsgAt}`,
+            _id: data._id,
+            role: (data.role as "user" | "agent" | "human") ?? "agent",
+            content,
+            created_at: agentMsgAt,
+          },
+        }),
+      );
+
+      dispatch(
+        updateConversationLogLastMessage({
+          chat_session_id: data.chat_session_id,
+          last_message: content,
+          last_message_at: agentMsgAt,
+        }),
+      );
+    };
+
     aiSocket.on("message_from_visitor", handleMessageFromVisitor);
+    aiSocket.on("message_from_agent", handleMessageFromAgent);
     return () => {
       aiSocket.off("message_from_visitor", handleMessageFromVisitor);
+      aiSocket.off("message_from_agent", handleMessageFromAgent);
     };
   }, [capturedSessions, dispatch]);
 
