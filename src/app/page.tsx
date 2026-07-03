@@ -12,7 +12,7 @@ import ChatbotWidget from "@/components/ChatbotWidget";
 export const metadata = homePageMetadata;
 
 export default function Home() {
-  const enableChatbot = false;
+  const enableChatbot = true;
 
   return (
     <>
