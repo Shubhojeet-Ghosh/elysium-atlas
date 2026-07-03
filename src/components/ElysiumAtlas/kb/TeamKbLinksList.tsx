@@ -421,17 +421,17 @@ export default function TeamKbLinksList({
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-auto shrink-0">
           {!readOnly && (
             <OutlineButton
-              className={`${actionButtonClassName} !py-0 border-[2px]`}
+              className={`${actionButtonClassName} !py-0 border-[2px] shrink-0`}
               onClick={() => setManualLinkDialogOpen(true)}
             >
               <span className="text-[16px] leading-none">+</span>
               <span className="hidden md:inline">Add More</span>
             </OutlineButton>
           )}
-          <div className="relative w-[200px] h-[41px]">
+          <div className="relative w-[200px] h-[41px] shrink-0">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
             <CustomInput
               type="text"
