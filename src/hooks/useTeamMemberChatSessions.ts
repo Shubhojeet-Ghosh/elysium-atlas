@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Cookies from "js-cookie";
+import { toast } from "sonner";
 import aiSocket from "@/lib/aiSocket";
 import { useAppDispatch, useAppSelector, store } from "@/store";
 import {
@@ -62,7 +63,15 @@ export function mapApiItemToConversationLog(
 type FetchOptions = {
   replace?: boolean;
   silent?: boolean;
+  /** When set, uses POST /team-member-chat-sessions/search */
+  query?: string;
 };
+
+const SESSIONS_LIMIT = 20;
+const LIST_ENDPOINT =
+  "/elysium-agents/atlas-team-members/team-member-chat-sessions";
+const SEARCH_ENDPOINT =
+  "/elysium-agents/atlas-team-members/team-member-chat-sessions/search";
 
 export function useTeamMemberChatSessions() {
   const dispatch = useAppDispatch();
@@ -75,26 +84,55 @@ export function useTeamMemberChatSessions() {
   const [hasNext, setHasNext] = useState(false);
   const [loading, setLoading] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(false);
+  const requestIdRef = useRef(0);
 
   const fetchSessions = useCallback(
     async (pageNum: number, options?: FetchOptions) => {
       if (!agentID) return;
 
+      const query = options?.query?.trim() ?? "";
+      const requestId = ++requestIdRef.current;
       const token = Cookies.get("elysium_atlas_session_token");
       if (!options?.silent) setLoading(true);
 
       try {
         const res = await fastApiAxios.post(
-          "/elysium-agents/atlas-team-members/team-member-chat-sessions",
-          { agent_id: agentID, page: pageNum, limit: 20 },
+          query ? SEARCH_ENDPOINT : LIST_ENDPOINT,
+          query
+            ? {
+                agent_id: agentID,
+                query,
+                page: pageNum,
+                limit: SESSIONS_LIMIT,
+              }
+            : { agent_id: agentID, page: pageNum, limit: SESSIONS_LIMIT },
           { headers: { Authorization: `Bearer ${token}` } },
         );
-        const { data, has_next } = res.data as {
+
+        if (requestId !== requestIdRef.current) return;
+
+        const payload = res.data as {
+          success?: boolean;
+          message?: string;
           data: ApiResponseItem[];
           has_next: boolean;
         };
 
-        const logs = data.map((item) => mapApiItemToConversationLog(item, agentID));
+        if (payload.success === false) {
+          if (!options?.silent && payload.message) {
+            toast.error(payload.message);
+          }
+          if (pageNum === 1 && options?.replace) {
+            dispatch(setTeamMemberConversationLogs([]));
+          }
+          setHasNext(false);
+          setPage(pageNum);
+          return;
+        }
+
+        const logs = (payload.data ?? []).map((item) =>
+          mapApiItemToConversationLog(item, agentID),
+        );
 
         if (pageNum === 1 && options?.replace) {
           dispatch(setTeamMemberConversationLogs(logs));
@@ -104,13 +142,30 @@ export function useTeamMemberChatSessions() {
           });
         }
 
-        setHasNext(has_next);
+        setHasNext(payload.has_next ?? false);
         setPage(pageNum);
-      } catch {
-        // silently ignore fetch errors
+      } catch (error: unknown) {
+        if (requestId !== requestIdRef.current) return;
+
+        const err = error as {
+          response?: { data?: { message?: string } };
+          message?: string;
+        };
+        if (!options?.silent) {
+          toast.error(
+            err.response?.data?.message ||
+              err.message ||
+              "Failed to fetch conversations",
+          );
+        }
+        if (pageNum === 1 && options?.replace) {
+          dispatch(setTeamMemberConversationLogs([]));
+        }
       } finally {
-        if (!options?.silent) setLoading(false);
-        if (pageNum === 1) setInitialLoaded(true);
+        if (requestId === requestIdRef.current) {
+          if (!options?.silent) setLoading(false);
+          if (pageNum === 1) setInitialLoaded(true);
+        }
       }
     },
     [agentID, dispatch],
@@ -137,7 +192,19 @@ export function useTeamMemberChatSessions() {
       if (!exists) return;
 
       const mapped = mapApiItemToConversationLog(row, agentID);
-      dispatch(addOrUpdateConversationLog(mapped));
+      const capturedSessions = store.getState().agent.captured_sessions;
+      const isActivelyViewing = capturedSessions.some(
+        (session) =>
+          session.chat_session_id === row.chat_session_id && session.is_expanded,
+      );
+
+      dispatch(
+        addOrUpdateConversationLog(
+          isActivelyViewing
+            ? { ...mapped, is_unread: false, unread_count: 0 }
+            : mapped,
+        ),
+      );
       dispatch(
         updateConversationLogLastMessage({
           chat_session_id: row.chat_session_id,

@@ -5,6 +5,11 @@ import {
   CustomText,
   QnA,
 } from "../types/AgentBuilderTypes";
+import {
+  type ChatSessionListRow,
+  deriveVisitorDisplayStatus,
+  normalizeChatSessionRow,
+} from "@/utils/chatSessionListUtils";
 
 export interface GeoData {
   country_name: string | null;
@@ -16,6 +21,8 @@ export interface GeoData {
 
 export interface ConversationMessage {
   message_id: string;
+  /** MongoDB _id — used for mark-chat-message-read when available */
+  _id?: string;
   role: "user" | "agent" | "human";
   content: string;
   created_at: string;
@@ -30,14 +37,22 @@ export interface ActiveVisitor {
   created_at: string;
   last_message_at: string | null;
   last_connected_at: string;
-  sid: string;
+  sid: string | null;
   alias_name: string | null;
   newly_joined: boolean;
   status: string;
+  /** From Redis overlay — true when visitor socket is connected. */
+  visitor_online: boolean;
+  /** Team member user_id during active human takeover (Mongo; Redis overlay when online). */
+  in_conversation_with: string | null;
+  /** Full name of the handling team member when takeover is active. */
+  in_conversation_with_name: string | null;
   geo_data: GeoData | null;
   visitor_at: string | null;
   color: string;
 }
+
+export type CapturedSessionMode = "monitor" | "takeover";
 
 export interface TeamMemberConversationLog {
   chat_session_id: string;
@@ -89,6 +104,7 @@ interface UserAgentState {
   captured_sessions: (ActiveVisitor & {
     captured_at: string;
     is_expanded: boolean;
+    conversation_mode: CapturedSessionMode;
     conversation_chain: ConversationMessage[];
   })[];
   team_member_conversation_logs: TeamMemberConversationLog[];
@@ -128,6 +144,45 @@ const initialState: UserAgentState = {
   team_member_conversation_logs: [],
 };
 
+function findCapturedSession(
+  state: UserAgentState,
+  chat_session_id: string,
+) {
+  return state.captured_sessions.find(
+    (s) => s.chat_session_id === chat_session_id,
+  );
+}
+
+function capturedSessionMode(
+  state: UserAgentState,
+  chat_session_id: string,
+): CapturedSessionMode | null {
+  return findCapturedSession(state, chat_session_id)?.conversation_mode ?? null;
+}
+
+function normalizeSessionForState(
+  state: UserAgentState,
+  row: ChatSessionListRow,
+): ActiveVisitor {
+  return normalizeChatSessionRow(
+    row,
+    capturedSessionMode(state, row.chat_session_id),
+  );
+}
+
+function applyDerivedStatus(
+  state: UserAgentState,
+  visitor: ActiveVisitor,
+): void {
+  visitor.status = deriveVisitorDisplayStatus(
+    {
+      visitor_online: visitor.visitor_online,
+      in_conversation_with: visitor.in_conversation_with,
+    },
+    capturedSessionMode(state, visitor.chat_session_id),
+  );
+}
+
 function buildConversationLogFromSources(
   state: UserAgentState,
   chat_session_id: string,
@@ -154,7 +209,8 @@ function buildConversationLogFromSources(
       new Date().toISOString(),
     ended_at: overrides.ended_at ?? null,
     status:
-      overrides.status ?? (visitor?.status === "offline" ? "ended" : "live"),
+      overrides.status ??
+      (visitor && !visitor.visitor_online ? "ended" : "live"),
     unread_count: overrides.unread_count ?? 0,
     is_unread: overrides.is_unread ?? false,
     color: overrides.color ?? source?.color ?? "",
@@ -369,48 +425,52 @@ const agentSlice = createSlice({
     setTextColor: (state, action: PayloadAction<string>) => {
       state.text_color = action.payload;
     },
-    addActiveVisitor: (state, action: PayloadAction<ActiveVisitor>) => {
-      state.active_visitors = [
-        ...state.active_visitors,
-        {
-          ...action.payload,
-          newly_joined: true,
-          status: "online",
-          color: action.payload.color || "",
-        },
-      ];
+    addActiveVisitor: (state, action: PayloadAction<ChatSessionListRow>) => {
+      const visitor = normalizeSessionForState(state, {
+        ...action.payload,
+        visitor_online: action.payload.visitor_online ?? true,
+        newly_joined: true,
+      });
+      state.active_visitors = [...state.active_visitors, visitor];
     },
-    upsertActiveVisitor: (state, action: PayloadAction<ActiveVisitor>) => {
+    upsertActiveVisitor: (state, action: PayloadAction<ChatSessionListRow>) => {
       const existing = state.active_visitors.find(
         (v) => v.chat_session_id === action.payload.chat_session_id,
       );
+      const normalized = normalizeSessionForState(state, {
+        ...action.payload,
+        visitor_online: action.payload.visitor_online ?? true,
+        newly_joined: existing ? false : true,
+      });
       if (existing) {
-        existing.status = "online";
+        Object.assign(existing, normalized, { newly_joined: false });
       } else {
-        state.active_visitors = [
-          ...state.active_visitors,
-          {
-            ...action.payload,
-            newly_joined: true,
-            status: "online",
-            color: action.payload.color || "",
-          },
-        ];
+        state.active_visitors = [...state.active_visitors, normalized];
       }
     },
     reconnectActiveVisitorIfPresent: (
       state,
-      action: PayloadAction<ActiveVisitor>,
+      action: PayloadAction<ChatSessionListRow>,
     ) => {
       const existing = state.active_visitors.find(
         (v) => v.chat_session_id === action.payload.chat_session_id,
       );
       if (!existing) return;
 
-      existing.status = "online";
+      existing.visitor_online = action.payload.visitor_online ?? true;
+      existing.sid = action.payload.sid ?? existing.sid;
+      existing.in_conversation_with =
+        action.payload.in_conversation_with ?? existing.in_conversation_with;
+      if (action.payload.in_conversation_with_name !== undefined) {
+        existing.in_conversation_with_name =
+          action.payload.in_conversation_with_name;
+      }
       existing.newly_joined = false;
       if (action.payload.last_connected_at) {
         existing.last_connected_at = action.payload.last_connected_at;
+      }
+      if (action.payload.last_message_at != null) {
+        existing.last_message_at = action.payload.last_message_at;
       }
       if (action.payload.alias_name != null) {
         existing.alias_name = action.payload.alias_name;
@@ -418,14 +478,19 @@ const agentSlice = createSlice({
       if (action.payload.geo_data) {
         existing.geo_data = action.payload.geo_data;
       }
+      applyDerivedStatus(state, existing);
     },
-    setActiveVisitors: (state, action: PayloadAction<ActiveVisitor[]>) => {
-      state.active_visitors = action.payload.map((v) => ({
-        ...v,
-        newly_joined: v.newly_joined ?? false,
-        status: v.status ?? "online",
-        color: v.color || "",
-      }));
+    setActiveVisitors: (state, action: PayloadAction<ChatSessionListRow[]>) => {
+      const seen = new Set<string>();
+      state.active_visitors = action.payload
+        .filter((row) => {
+          if (!row.chat_session_id || seen.has(row.chat_session_id)) {
+            return false;
+          }
+          seen.add(row.chat_session_id);
+          return true;
+        })
+        .map((row) => normalizeSessionForState(state, row));
     },
     updateActiveVisitorStatus: (
       state,
@@ -436,7 +501,41 @@ const agentSlice = createSlice({
       );
       if (visitor) {
         visitor.status = action.payload.status;
+        if (action.payload.status === "offline") {
+          visitor.visitor_online = false;
+          visitor.sid = null;
+        }
       }
+    },
+    updateChatSessionPresence: (
+      state,
+      action: PayloadAction<{
+        chat_session_id: string;
+        visitor_online: boolean;
+        sid?: string | null;
+        in_conversation_with?: string | null;
+        in_conversation_with_name?: string | null;
+      }>,
+    ) => {
+      const visitor = state.active_visitors.find(
+        (v) => v.chat_session_id === action.payload.chat_session_id,
+      );
+      if (!visitor) return;
+
+      visitor.visitor_online = action.payload.visitor_online;
+      if (action.payload.sid !== undefined) {
+        visitor.sid = action.payload.sid;
+      }
+      if (action.payload.in_conversation_with !== undefined) {
+        visitor.in_conversation_with = action.payload.in_conversation_with;
+        if (action.payload.in_conversation_with === null) {
+          visitor.in_conversation_with_name = null;
+        }
+      }
+      if (action.payload.in_conversation_with_name !== undefined) {
+        visitor.in_conversation_with_name = action.payload.in_conversation_with_name;
+      }
+      applyDerivedStatus(state, visitor);
     },
     removeActiveVisitor: (state, action: PayloadAction<string>) => {
       state.active_visitors = state.active_visitors.filter(
@@ -445,8 +544,13 @@ const agentSlice = createSlice({
     },
     addCapturedSession: (
       state,
-      action: PayloadAction<{ chat_session_id: string; captured_at: string }>,
+      action: PayloadAction<{
+        chat_session_id: string;
+        captured_at: string;
+        conversation_mode?: CapturedSessionMode;
+      }>,
     ) => {
+      const conversation_mode = action.payload.conversation_mode ?? "monitor";
       const existing = state.captured_sessions.find(
         (s) => s.chat_session_id === action.payload.chat_session_id,
       );
@@ -456,11 +560,11 @@ const agentSlice = createSlice({
           s.is_expanded = false;
         });
         existing.is_expanded = true;
-        // mark active visitor as in-conversation
+        existing.conversation_mode = conversation_mode;
         const av = state.active_visitors.find(
           (v) => v.chat_session_id === action.payload.chat_session_id,
         );
-        if (av) av.status = "in-conversation";
+        if (av) applyDerivedStatus(state, av);
       } else {
         // Prefer full visitor data from active_visitors when present, but
         // also merge in geo/color/name from team_member_conversation_logs
@@ -484,10 +588,13 @@ const agentSlice = createSlice({
             created_at: "",
             last_message_at: null,
             last_connected_at: "",
-            sid: "",
+            sid: null,
             alias_name: null,
             newly_joined: false,
-            status: "online",
+            status: "offline",
+            visitor_online: false,
+            in_conversation_with: null,
+            in_conversation_with_name: null,
             geo_data: null,
             visitor_at: null,
             color: "",
@@ -510,11 +617,12 @@ const agentSlice = createSlice({
           ...mergedVisitor,
           captured_at: action.payload.captured_at,
           is_expanded: true,
+          conversation_mode,
           conversation_chain: [],
         });
         // mark the active visitor as in-conversation when we capture them
         if (visitor) {
-          visitor.status = "in-conversation";
+          applyDerivedStatus(state, visitor);
         }
       }
     },
@@ -530,9 +638,6 @@ const agentSlice = createSlice({
       if (session) session.is_expanded = false;
     },
     removeCapturedSession: (state, action: PayloadAction<string>) => {
-      const session = state.captured_sessions.find(
-        (s) => s.chat_session_id === action.payload,
-      );
       state.captured_sessions = state.captured_sessions.filter(
         (s) => s.chat_session_id !== action.payload,
       );
@@ -540,10 +645,30 @@ const agentSlice = createSlice({
         (v) => v.chat_session_id === action.payload,
       );
       if (visitor) {
-        const wasOffline =
-          visitor.status === "offline" || session?.status === "offline";
-        visitor.status = wasOffline ? "offline" : "online";
+        applyDerivedStatus(state, visitor);
       }
+    },
+    clearCapturedSessions: (state) => {
+      state.captured_sessions = [];
+      state.active_visitors.forEach((visitor) => applyDerivedStatus(state, visitor));
+    },
+    setCapturedSessionMode: (
+      state,
+      action: PayloadAction<{
+        chat_session_id: string;
+        conversation_mode: CapturedSessionMode;
+      }>,
+    ) => {
+      const session = state.captured_sessions.find(
+        (s) => s.chat_session_id === action.payload.chat_session_id,
+      );
+      if (!session) return;
+
+      session.conversation_mode = action.payload.conversation_mode;
+      const visitor = state.active_visitors.find(
+        (v) => v.chat_session_id === action.payload.chat_session_id,
+      );
+      if (visitor) applyDerivedStatus(state, visitor);
     },
     setCapturedSessions: (
       state,
@@ -551,11 +676,15 @@ const agentSlice = createSlice({
         (ActiveVisitor & {
           captured_at: string;
           is_expanded: boolean;
+          conversation_mode?: CapturedSessionMode;
           conversation_chain: ConversationMessage[];
         })[]
       >,
     ) => {
-      state.captured_sessions = action.payload;
+      state.captured_sessions = action.payload.map((session) => ({
+        ...session,
+        conversation_mode: session.conversation_mode ?? "monitor",
+      }));
     },
     addMessageToCapturedSession: (
       state,
@@ -590,6 +719,7 @@ const agentSlice = createSlice({
       action: PayloadAction<{
         chat_session_id: string;
         message_id: string;
+        _id?: string | null;
         read_at: string;
       }>,
     ) => {
@@ -597,11 +727,15 @@ const agentSlice = createSlice({
         (s) => s.chat_session_id === action.payload.chat_session_id,
       );
       if (session) {
+        const { message_id, _id, read_at } = action.payload;
         const message = session.conversation_chain.find(
-          (m) => m.message_id === action.payload.message_id,
+          (m) =>
+            m.message_id === message_id ||
+            (_id != null && m._id != null && m._id === _id) ||
+            (m._id != null && m._id === message_id),
         );
         if (message) {
-          message.read_at = action.payload.read_at;
+          message.read_at = read_at;
           message.is_read = true;
         }
       }
@@ -822,15 +956,18 @@ export const {
   reconnectActiveVisitorIfPresent,
   setActiveVisitors,
   updateActiveVisitorStatus,
+  updateChatSessionPresence,
   removeActiveVisitor,
   addCapturedSession,
   removeCapturedSession,
+  clearCapturedSessions,
   setCapturedSessions,
   addMessageToCapturedSession,
   markSessionMessagesAsRead,
   markCapturedMessageAsRead,
   setConversationChainForSession,
   setCapturedSessionAlias,
+  setCapturedSessionMode,
   expandCapturedSession,
   collapseCapturedSession,
   setTeamMemberConversationLogs,

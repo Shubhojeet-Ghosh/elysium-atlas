@@ -4,7 +4,7 @@ export const AGENT_SECTION_LABELS: Record<string, string> = {
   general: "General",
   personalize: "Personalize",
   "data-source": "Data Source",
-  "live-visitors": "Live Visitors",
+  "live-visitors": "Chat Sessions",
 };
 
 export function getSectionLabel(section: string) {

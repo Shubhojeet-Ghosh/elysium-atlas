@@ -1,17 +1,5 @@
 "use client";
-import { useState, useMemo, useEffect, useRef } from "react";
-
-interface VisitorsListProps {
-  currentPage: number;
-  totalPages: number;
-  hasNext: boolean;
-  hasPrev: boolean;
-  total: number;
-  pageSize: number;
-  pageSizeOptions: readonly number[];
-  onPageChange: (page: number) => void;
-  onPageSizeChange: (size: VisitorPageSize) => void;
-}
+import { useState, useEffect, useRef } from "react";
 import { type VisitorPageSize } from "@/lib/config";
 import {
   Table,
@@ -38,15 +26,35 @@ import {
 } from "lucide-react";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { formatDateTime12hr } from "@/utils/formatDate";
-import Badge from "@/components/ui/Badge";
-import { addCapturedSession } from "@/store/reducers/agentSlice";
-import aiSocket from "@/lib/aiSocket";
+import { captureChatSession, formatInConversationHandlerLabel } from "@/utils/chatSessionListUtils";
+import { useActiveTeamRole } from "@/hooks/useActiveTeamRole";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { isKbSearchInProgress } from "@/utils/kbSearchUi";
+import KbSearchingTableRow from "./kb/KbSearchingTableRow";
+import Spinner from "@/components/ui/Spinner";
 import LiveVisitorsRefetchButton from "./LiveVisitorsRefetchButton";
+
+interface VisitorsListProps {
+  currentPage: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+  total: number;
+  pageSize: number;
+  pageSizeOptions: readonly number[];
+  searchQuery: string;
+  debouncedSearchQuery: string;
+  isSearchActive: boolean;
+  isLoadingSessions: boolean;
+  onSearchChange: (query: string) => void;
+  onRefresh: () => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: VisitorPageSize) => void;
+}
 
 export default function VisitorsList({
   currentPage,
@@ -56,38 +64,35 @@ export default function VisitorsList({
   total,
   pageSize,
   pageSizeOptions,
+  searchQuery,
+  debouncedSearchQuery,
+  isSearchActive,
+  isLoadingSessions,
+  onSearchChange,
+  onRefresh,
   onPageChange,
   onPageSizeChange,
 }: VisitorsListProps) {
   const activeVisitors = useAppSelector((state) => state.agent.active_visitors);
   const agentID = useAppSelector((state) => state.agent.agentID);
-  const capturedSessions = useAppSelector(
-    (state) => state.agent.captured_sessions,
-  );
+  const userID = useAppSelector((state) => state.userProfile.userID);
+  const teamRole = useActiveTeamRole();
   const dispatch = useAppDispatch();
 
-  const [searchTerm, setSearchTerm] = useState("");
   const [pageInput, setPageInput] = useState("1");
   const [showRightGradient, setShowRightGradient] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  const isSearching = isKbSearchInProgress(
+    searchQuery,
+    debouncedSearchQuery,
+    isLoadingSessions,
+  );
+  const displayVisitors = isSearching ? [] : activeVisitors;
+
   useEffect(() => {
     setPageInput(String(currentPage));
   }, [currentPage]);
-
-  // Filter by session ID or alias name
-  const filteredVisitors = useMemo(() => {
-    if (!searchTerm.trim()) return activeVisitors;
-    const lower = searchTerm.toLowerCase();
-    return activeVisitors.filter(
-      (v) =>
-        v.chat_session_id?.toLowerCase().includes(lower) ||
-        v.alias_name?.toLowerCase().includes(lower),
-    );
-  }, [activeVisitors, searchTerm]);
-
-  // currentVisitors is the full filtered set- server already returns one page
-  const currentVisitors = filteredVisitors;
 
   const truncateMiddle = (s?: string) => {
     if (!s) return "";
@@ -122,7 +127,6 @@ export default function VisitorsList({
     );
   };
 
-  // Horizontal scroll gradient
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -139,36 +143,21 @@ export default function VisitorsList({
       container.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleScroll);
     };
-  }, [currentVisitors]);
-
-  // Highlight matching text
-  const highlightMatch = (text: string, term: string) => {
-    if (!term.trim()) return text;
-    const lowerText = text.toLowerCase();
-    const lowerTerm = term.toLowerCase();
-    const idx = lowerText.indexOf(lowerTerm);
-    if (idx === -1) return text;
-    return (
-      <>
-        {text.substring(0, idx)}
-        <span className="bg-serene-purple/80 text-white font-semibold">
-          {text.substring(idx, idx + term.length)}
-        </span>
-        {text.substring(idx + term.length)}
-      </>
-    );
-  };
+  }, [displayVisitors]);
 
   const handleVisitorClick = (chat_session_id: string) => {
-    dispatch(
-      addCapturedSession({
-        chat_session_id,
-        captured_at: new Date().toISOString(),
-      }),
+    const visitor = activeVisitors.find(
+      (v) => v.chat_session_id === chat_session_id,
     );
-    aiSocket.emit("atlas-team-member-start-conversation", {
+    if (!agentID || !userID) return;
+
+    captureChatSession(dispatch, {
       agent_id: agentID,
+      user_id: userID,
       chat_session_id,
+      in_conversation_with: visitor?.in_conversation_with,
+      in_conversation_with_name: visitor?.in_conversation_with_name,
+      team_role: teamRole,
     });
   };
 
@@ -206,10 +195,14 @@ export default function VisitorsList({
     "p-1.5 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors";
 
   const effectiveTotalPages = Math.max(1, totalPages);
-  const paginationDisabled = total === 0;
+  const paginationDisabled = total === 0 && !isSearching;
+
+  const emptyMessage = isSearchActive
+    ? `No chat sessions found matching "${debouncedSearchQuery.trim()}"`
+    : "No chat sessions yet.";
 
   const paginationControls = (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 mb-3">
+    <div className="flex flex-row flex-wrap items-center justify-end gap-2 mt-3">
       <div className="flex items-center justify-end gap-1.5 flex-wrap">
         <button
           type="button"
@@ -293,11 +286,9 @@ export default function VisitorsList({
         >
           <ChevronsRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
         </button>
-      </div>
 
-      <div className="flex items-center justify-between w-full sm:contents">
-        <div className="flex items-center gap-2 text-[12px] text-gray-500 dark:text-gray-400">
-          <span className="whitespace-nowrap">Rows per page</span>
+        <div className="flex items-center gap-1.5 sm:gap-2 text-[12px] text-gray-500 dark:text-gray-400 ml-1">
+          <span className="whitespace-nowrap hidden sm:inline">Rows per page</span>
           <Select
             value={String(pageSize)}
             onValueChange={(value) =>
@@ -320,8 +311,8 @@ export default function VisitorsList({
           </Select>
         </div>
 
-        <div className="flex items-center gap-2 text-[12px] text-gray-500 dark:text-gray-400">
-          <span className="whitespace-nowrap">Go to</span>
+        <div className="flex items-center gap-1.5 sm:gap-2 text-[12px] text-gray-500 dark:text-gray-400">
+          <span className="whitespace-nowrap hidden sm:inline">Go to</span>
           <CustomInput
             type="number"
             min={1}
@@ -337,9 +328,12 @@ export default function VisitorsList({
             onBlur={commitPageJump}
             disabled={paginationDisabled}
             aria-label="Page number"
-            className="w-[52px] h-9 text-center text-[13px] py-2 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-[44px] sm:w-[52px] h-9 text-center text-[13px] py-2 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
           />
-          <span className="whitespace-nowrap">of {effectiveTotalPages}</span>
+          <span className="whitespace-nowrap sm:hidden">/{effectiveTotalPages}</span>
+          <span className="whitespace-nowrap hidden sm:inline">
+            of {effectiveTotalPages}
+          </span>
         </div>
       </div>
     </div>
@@ -347,23 +341,25 @@ export default function VisitorsList({
 
   return (
     <div className="w-full mt-[12px] overflow-hidden">
-      {/* Search + Refresh */}
       <div className="flex items-center justify-end gap-2 mb-4 px-0">
-        <LiveVisitorsRefetchButton className="shrink-0" />
+        <LiveVisitorsRefetchButton
+          className="shrink-0"
+          disabled={!agentID}
+          isLoading={isLoadingSessions && !isSearching}
+          onRefresh={onRefresh}
+        />
         <div className="relative w-full max-w-[220px] lg:max-w-[300px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
           <CustomInput
             type="text"
-            placeholder="Search visitors..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search sessions..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            maxLength={200}
             className="w-full pl-9 pr-3 py-2 text-[13px] h-9"
           />
         </div>
       </div>
-
-      {/* Pagination Controls */}
-      {paginationControls}
 
       <div className="relative">
         <div
@@ -384,133 +380,161 @@ export default function VisitorsList({
                     Visitor At
                   </TableHead>
                   <TableHead className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
-                    Connected Since
+                    Last Active
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {currentVisitors.map((visitor, index) => {
-                  const displayName =
-                    visitor.alias_name || visitor.chat_session_id;
-                  const matchesName =
-                    searchTerm.trim() &&
-                    displayName
-                      ?.toLowerCase()
-                      .includes(searchTerm.toLowerCase());
-
-                  const isCaptured = capturedSessions.some(
-                    (s) => s.chat_session_id === visitor.chat_session_id,
-                  );
-
-                  return (
-                    <TableRow
-                      key={visitor.sid || visitor.chat_session_id || index}
-                      onClick={() =>
-                        handleVisitorClick(visitor.chat_session_id)
-                      }
-                      className={`cursor-pointer border-b border-gray-100 dark:border-deep-onyx transition-all duration-200 ${
-                        isCaptured
-                          ? "bg-serene-purple/10 dark:bg-serene-purple/20"
-                          : "hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 hover:text-serene-purple dark:hover:text-serene-purple"
-                      }`}
+                {isSearching ? (
+                  <KbSearchingTableRow
+                    colSpan={4}
+                    query={searchQuery.trim()}
+                  />
+                ) : isLoadingSessions ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={4} className="py-10 text-center">
+                      <Spinner className="border-serene-purple dark:border-pure-mist mx-auto" />
+                    </TableCell>
+                  </TableRow>
+                ) : displayVisitors.length === 0 ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell
+                      colSpan={4}
+                      className="py-10 text-center text-[14px] text-gray-500 dark:text-gray-400"
                     >
-                      {/* Visitor name / alias */}
-                      <TableCell className="font-medium py-4 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist w-[260px] min-w-[320px] max-w-[260px]">
-                        <span className="flex items-center gap-6">
-                          {/* Circular flag avatar */}
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="shrink-0 w-[34px] h-[34px] rounded-full overflow-hidden block cursor-pointer shadow-sm">
-                                {visitor.geo_data?.country_flag ? (
-                                  <img
-                                    src={visitor.geo_data.country_flag}
-                                    alt={visitor.geo_data.country_name ?? ""}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <span className="w-full h-full flex items-center justify-center text-[11px] font-semibold text-black bg-pure-mist">
-                                    {visitor.chat_session_id
-                                      .slice(-2)
-                                      .toUpperCase()}
-                                  </span>
-                                )}
-                              </span>
-                            </TooltipTrigger>
-                            {visitor.geo_data?.country_name && (
+                      {emptyMessage}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  displayVisitors.map((visitor) => {
+                    const displayName =
+                      visitor.alias_name || visitor.chat_session_id;
+                    const matchesName =
+                      isSearchActive &&
+                      displayName
+                        ?.toLowerCase()
+                        .includes(debouncedSearchQuery.toLowerCase());
+
+                    return (
+                      <TableRow
+                        key={visitor.chat_session_id}
+                        onClick={() =>
+                          handleVisitorClick(visitor.chat_session_id)
+                        }
+                        className="cursor-pointer border-b border-gray-100 dark:border-deep-onyx transition-all duration-200 hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 hover:text-serene-purple dark:hover:text-serene-purple"
+                      >
+                        <TableCell className="font-medium py-4 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist w-[260px] min-w-[320px] max-w-[260px]">
+                          <span className="flex items-center gap-6">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="shrink-0 w-[34px] h-[34px] rounded-full overflow-hidden block cursor-pointer shadow-sm">
+                                  {visitor.geo_data?.country_flag ? (
+                                    <img
+                                      src={visitor.geo_data.country_flag}
+                                      alt={visitor.geo_data.country_name ?? ""}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <span className="w-full h-full flex items-center justify-center text-[11px] font-semibold text-black bg-pure-mist">
+                                      {visitor.chat_session_id
+                                        .slice(-2)
+                                        .toUpperCase()}
+                                    </span>
+                                  )}
+                                </span>
+                              </TooltipTrigger>
+                              {visitor.geo_data?.country_name && (
+                                <TooltipContent side="top">
+                                  {visitor.geo_data.country_name}
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="truncate max-w-[220px] overflow-hidden text-ellipsis">
+                                  {matchesName
+                                    ? highlightTruncated(
+                                        displayName,
+                                        debouncedSearchQuery.trim(),
+                                      )
+                                    : truncateMiddle(displayName)}
+                                </span>
+                              </TooltipTrigger>
                               <TooltipContent side="top">
-                                {visitor.geo_data.country_name}
+                                {displayName}
                               </TooltipContent>
-                            )}
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="truncate max-w-[220px] overflow-hidden text-ellipsis">
-                                {matchesName
-                                  ? highlightTruncated(displayName, searchTerm)
-                                  : truncateMiddle(displayName)}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              {displayName}
-                            </TooltipContent>
-                          </Tooltip>
-                        </span>
-                      </TableCell>
+                            </Tooltip>
+                          </span>
+                        </TableCell>
 
-                      {/* Status pill */}
-                      <TableCell className="min-w-[120px] py-4 px-[10px] text-[14px] whitespace-nowrap">
-                        {visitor.status === "in-conversation" && (
-                          <Badge className="bg-serene-purple text-white">
-                            in conversation
-                          </Badge>
-                        )}
-                        {visitor.status === "online" && (
-                          <Badge>{visitor.status}</Badge>
-                        )}
-                        {visitor.status === "offline" && (
-                          <Badge className="bg-transparent border border-serene-purple !text-serene-purple dark:border-pure-mist dark:!text-pure-mist">
-                            {visitor.status}
-                          </Badge>
-                        )}
-                      </TableCell>
+                        <TableCell className="min-w-[120px] py-4 px-[10px] text-[14px] whitespace-nowrap">
+                          {visitor.status === "in-conversation" && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="font-medium text-serene-purple cursor-default">
+                                  in conversation
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                {formatInConversationHandlerLabel(
+                                  visitor.in_conversation_with,
+                                  visitor.in_conversation_with_name,
+                                  userID,
+                                )}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                          {visitor.status === "online" && (
+                            <span className="font-medium text-serene-purple">
+                              online
+                            </span>
+                          )}
+                          {visitor.status === "offline" && (
+                            <span className="font-medium text-serene-purple">
+                              offline
+                            </span>
+                          )}
+                        </TableCell>
 
-                      {/* Visitor At (first 10 ... last 6, tooltip full url) */}
-                      <TableCell className="font-medium py-4 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist w-[260px] max-w-[260px]">
-                        {visitor.visitor_at ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="inline-block truncate max-w-[220px]">
-                                {truncateVisitorAt(visitor.visitor_at)}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              {visitor.visitor_at}
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </TableCell>
+                        <TableCell className="font-medium py-4 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist w-[260px] max-w-[260px]">
+                          {visitor.visitor_at ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-block truncate max-w-[220px]">
+                                  {truncateVisitorAt(visitor.visitor_at)}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                {visitor.visitor_at}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </TableCell>
 
-                      {/* Connected since */}
-                      <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-4 px-[10px] text-[14px] whitespace-nowrap text-gray-500 dark:text-gray-400">
-                        {visitor.last_connected_at
-                          ? formatDateTime12hr(visitor.last_connected_at)
-                          : "—"}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                        <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-4 px-[10px] text-[14px] whitespace-nowrap text-gray-500 dark:text-gray-400">
+                          {visitor.last_message_at
+                            ? formatDateTime12hr(visitor.last_message_at)
+                            : visitor.last_connected_at
+                              ? formatDateTime12hr(visitor.last_connected_at)
+                              : "—"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
               </TableBody>
             </Table>
           </div>
         </div>
 
-        {/* Right gradient for mobile horizontal scroll */}
-        {showRightGradient && currentVisitors.length > 0 && (
+        {showRightGradient && displayVisitors.length > 0 && (
           <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
         )}
       </div>
+
+      {paginationControls}
     </div>
   );
 }

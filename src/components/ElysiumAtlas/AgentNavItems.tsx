@@ -5,7 +5,7 @@ import {
   Settings,
   Database,
   Palette,
-  Radio,
+  MessagesSquare,
   UserRoundCheck,
   UserPlus,
   Shield,
@@ -46,9 +46,9 @@ const agentNavItems: AgentNavItem[] = [
     hrefSuffix: "?section=data-source&activeTab=links",
   },
   {
-    name: "Live Visitors",
+    name: "Chat Sessions",
     slug: "live-visitors",
-    icon: Radio,
+    icon: MessagesSquare,
     hrefSuffix: "?section=live-visitors",
   },
   {

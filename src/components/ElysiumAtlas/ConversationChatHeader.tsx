@@ -1,8 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { SquarePen, Save } from "lucide-react";
+import { SquarePen, Save, MoreHorizontal } from "lucide-react";
 import aiSocket from "@/lib/aiSocket";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipTrigger,
@@ -11,6 +17,7 @@ import {
 import {
   type ActiveVisitor,
   type ConversationMessage,
+  type CapturedSessionMode,
 } from "@/store/reducers/agentSlice";
 import { isVisitorMessageUnread } from "@/utils/conversationMessageUtils";
 import { useAppSelector, useAppDispatch } from "@/store";
@@ -19,6 +26,7 @@ import { setCapturedSessionAlias } from "@/store/reducers/agentSlice";
 export type CapturedSession = ActiveVisitor & {
   captured_at: string;
   is_expanded: boolean;
+  conversation_mode: CapturedSessionMode;
   conversation_chain: ConversationMessage[];
 };
 
@@ -63,11 +71,23 @@ export default function ConversationChatHeader({
   isExpanded,
   onToggle,
   onClose,
+  onRelease,
+  onResolve,
+  canRelease = false,
+  canMarkResolved = false,
+  isReleasePending = false,
+  isResolvePending = false,
 }: {
   session: CapturedSession;
   isExpanded: boolean;
   onToggle: () => void;
   onClose: () => void;
+  onRelease?: () => void;
+  onResolve?: () => void;
+  canRelease?: boolean;
+  canMarkResolved?: boolean;
+  isReleasePending?: boolean;
+  isResolvePending?: boolean;
 }) {
   const truncateMiddle = (s?: string) => {
     if (!s) return "";
@@ -138,18 +158,36 @@ export default function ConversationChatHeader({
     return s?.conversation_chain.some(isVisitorMessageUnread) ?? false;
   });
 
+  const releaseEnabled =
+    canRelease && Boolean(onRelease) && !isReleasePending;
+  const resolveEnabled =
+    canMarkResolved && Boolean(onResolve) && !isResolvePending;
+
+  const handleHeaderClick = () => {
+    if (isEditing || isExpanded) return;
+    onToggle();
+  };
+
   return (
     <div
-      className={`flex items-center gap-4 px-3 py-3.5 shrink-0 cursor-pointer select-none transition-colors border-b ${
+      className={`flex items-center gap-4 px-3 py-3.5 shrink-0 select-none transition-colors border-b ${
         hasUnread
-          ? "bg-serene-purple hover:bg-serene-purple/90 border-serene-purple/30"
-          : "hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 border-gray-100 dark:border-pure-mist"
+          ? "bg-serene-purple border-serene-purple/30"
+          : "border-gray-100 dark:border-pure-mist"
+      } ${
+        !isExpanded && !isEditing
+          ? `cursor-pointer ${
+              hasUnread
+                ? "hover:bg-serene-purple/90"
+                : "hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20"
+            }`
+          : ""
       }`}
-      onClick={onToggle}
+      onClick={handleHeaderClick}
     >
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="shrink-0 w-7 h-7 rounded-full overflow-hidden block cursor-pointer relative left-1">
+          <span className="shrink-0 w-7 h-7 rounded-full overflow-hidden block relative left-1">
             {showFlag ? (
               <img
                 src={flagSrc}
@@ -171,8 +209,8 @@ export default function ConversationChatHeader({
         )}
       </Tooltip>
 
-      <span className="flex-1 flex items-center">
-        <div className="group flex items-center w-full">
+      <span className="flex-1 flex items-center min-w-0">
+        <div className="group flex items-center w-full min-w-0">
           {!isEditing ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -191,7 +229,6 @@ export default function ConversationChatHeader({
           ) : (
             <input
               ref={inputRef}
-              onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               className="text-sm font-semibold truncate max-w-[200px] bg-transparent border-b border-gray-300 dark:border-gray-700 outline-none px-1 py-0"
               value={inputValue}
@@ -210,10 +247,7 @@ export default function ConversationChatHeader({
 
           {isEditing ? (
             <button
-              onMouseDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.stopPropagation();
                 commitAlias();
@@ -233,7 +267,7 @@ export default function ConversationChatHeader({
                 e.stopPropagation();
                 setIsEditing(true);
               }}
-              onMouseDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.preventDefault()}
               aria-label="Edit alias"
               className={`ml-2 p-1 rounded-full cursor-pointer transition-opacity opacity-100 lg:opacity-0 lg:group-hover:opacity-100 ${
                 hasUnread
@@ -248,7 +282,47 @@ export default function ConversationChatHeader({
       </span>
 
       <div className="flex items-center gap-1">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              onClick={(e) => e.stopPropagation()}
+              className={`p-1 rounded-full cursor-pointer transition-colors hover:ring-2 hover:ring-serene-purple/60 hover:ring-offset-0 dark:hover:ring-pure-mist/60 ${
+                hasUnread ? "text-white" : "text-gray-500"
+              }`}
+              aria-label="Chat options"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-[160px]">
+            <DropdownMenuItem
+              className="cursor-pointer text-[13px]"
+              disabled={!releaseEnabled}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!releaseEnabled || !onRelease) return;
+                onRelease();
+              }}
+            >
+              {isReleasePending ? "Releasing…" : "Release"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer text-[13px]"
+              disabled={!resolveEnabled}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!resolveEnabled || !onResolve) return;
+                onResolve();
+              }}
+            >
+              {isResolvePending ? "Resolving…" : "Mark resolved"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onToggle();
@@ -262,6 +336,7 @@ export default function ConversationChatHeader({
         </button>
 
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onClose();

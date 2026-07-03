@@ -65,6 +65,22 @@ export default function ReadReceiptMarker({
       );
 
       observer.observe(el);
+
+      requestAnimationFrame(() => {
+        if (hasFiredRef.current || !ref.current) return;
+        const root = scrollRootRef.current;
+        if (!root) return;
+
+        const rootRect = root.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const visibleHeight =
+          Math.min(elRect.bottom, rootRect.bottom) -
+          Math.max(elRect.top, rootRect.top);
+        if (visibleHeight >= elRect.height * 0.25) {
+          hasFiredRef.current = true;
+          onVisibleRef.current(messageId, mongoId ?? null);
+        }
+      });
     };
 
     rafId = requestAnimationFrame(setup);
@@ -73,7 +89,7 @@ export default function ReadReceiptMarker({
       cancelAnimationFrame(rafId);
       observer?.disconnect();
     };
-  }, [enabled, messageId, scrollRootRef]);
+  }, [enabled, messageId, mongoId, scrollRootRef]);
 
   return (
     <div ref={ref} className={className}>
