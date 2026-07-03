@@ -29,7 +29,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Search,
+} from "lucide-react";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { formatDateTime12hr } from "@/utils/formatDate";
 import Badge from "@/components/ui/Badge";
@@ -80,7 +86,7 @@ export default function VisitorsList({
     );
   }, [activeVisitors, searchTerm]);
 
-  // currentVisitors is the full filtered set — server already returns one page
+  // currentVisitors is the full filtered set- server already returns one page
   const currentVisitors = filteredVisitors;
 
   const truncateMiddle = (s?: string) => {
@@ -227,45 +233,45 @@ export default function VisitorsList({
         <div className="flex items-center gap-1">
           {Array.from({ length: effectiveTotalPages }, (_, i) => i + 1).map(
             (page) => {
-            if (
-              page === 1 ||
-              page === effectiveTotalPages ||
-              (page >= currentPage - 1 && page <= currentPage + 1)
-            ) {
-              return (
-                <button
-                  type="button"
-                  key={page}
-                  onClick={() => handlePageClick(page)}
-                  disabled={paginationDisabled}
-                  className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors ${
-                    paginationDisabled
-                      ? "opacity-50 cursor-not-allowed border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
-                      : "cursor-pointer"
-                  } ${
-                    !paginationDisabled && currentPage === page
-                      ? "bg-serene-purple text-white border-serene-purple"
-                      : !paginationDisabled
-                        ? "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                        : ""
-                  }`}
-                >
-                  {page}
-                </button>
-              );
-            }
-            if (page === currentPage - 2 || page === currentPage + 2) {
-              return (
-                <span
-                  key={page}
-                  className="px-1 text-[11px] text-gray-400 dark:text-gray-500"
-                >
-                  ...
-                </span>
-              );
-            }
-            return null;
-          },
+              if (
+                page === 1 ||
+                page === effectiveTotalPages ||
+                (page >= currentPage - 1 && page <= currentPage + 1)
+              ) {
+                return (
+                  <button
+                    type="button"
+                    key={page}
+                    onClick={() => handlePageClick(page)}
+                    disabled={paginationDisabled}
+                    className={`px-2.5 py-1 text-[11px] rounded-md border transition-colors ${
+                      paginationDisabled
+                        ? "opacity-50 cursor-not-allowed border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+                        : "cursor-pointer"
+                    } ${
+                      !paginationDisabled && currentPage === page
+                        ? "bg-serene-purple text-white border-serene-purple"
+                        : !paginationDisabled
+                          ? "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                          : ""
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              }
+              if (page === currentPage - 2 || page === currentPage + 2) {
+                return (
+                  <span
+                    key={page}
+                    className="px-1 text-[11px] text-gray-400 dark:text-gray-500"
+                  >
+                    ...
+                  </span>
+                );
+              }
+              return null;
+            },
           )}
         </div>
 
@@ -440,10 +446,7 @@ export default function VisitorsList({
                             <TooltipTrigger asChild>
                               <span className="truncate max-w-[220px] overflow-hidden text-ellipsis">
                                 {matchesName
-                                  ? highlightTruncated(
-                                      displayName,
-                                      searchTerm,
-                                    )
+                                  ? highlightTruncated(displayName, searchTerm)
                                   : truncateMiddle(displayName)}
                               </span>
                             </TooltipTrigger>

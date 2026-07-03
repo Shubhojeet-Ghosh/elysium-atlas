@@ -29,10 +29,10 @@ import {
 export default function AgentAddSitemapDialog() {
   const dispatch = useDispatch();
   const knowledgeBaseSitemap = useSelector(
-    (state: RootState) => state.agent.knowledgeBaseSitemap
+    (state: RootState) => state.agent.knowledgeBaseSitemap,
   );
   const knowledgeBaseLinks = useSelector(
-    (state: RootState) => state.agent.knowledgeBaseLinks
+    (state: RootState) => state.agent.knowledgeBaseLinks,
   );
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -68,7 +68,7 @@ export default function AgentAddSitemapDialog() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.data.success === true) {
@@ -82,30 +82,30 @@ export default function AgentAddSitemapDialog() {
 
         // Get existing links set
         const existingLinksSet = new Set(
-          knowledgeBaseLinks.map((item) => item.link)
+          knowledgeBaseLinks.map((item) => item.link),
         );
         const uniqueNewLinks = cleanedLinks.filter(
-          (link) => !existingLinksSet.has(link)
+          (link) => !existingLinksSet.has(link),
         );
 
         if (uniqueNewLinks.length > 0) {
           // Add new links with checked: true by default
           dispatch(
-            addKnowledgeBaseLinks({ links: uniqueNewLinks, checked: true })
+            addKnowledgeBaseLinks({ links: uniqueNewLinks, checked: true }),
           );
           toast.success(
             response.data.message ||
-              `Successfully extracted ${uniqueNewLinks.length} new unique URLs from sitemap`
+              `Successfully extracted ${uniqueNewLinks.length} new unique URLs from sitemap`,
           );
         } else {
           toast.info(
-            "All extracted links are already in the list or were filtered out"
+            "All extracted links are already in the list or were filtered out",
           );
         }
         setOpen(false);
       } else {
         toast.error(
-          response.data.message || "Failed to extract links from sitemap"
+          response.data.message || "Failed to extract links from sitemap",
         );
       }
     } catch (error: any) {

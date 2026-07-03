@@ -2,7 +2,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface Message {
   message_id: string;
-  /** MongoDB _id — used for mark-chat-message-read API */
+  /** MongoDB _id- used for mark-chat-message-read API */
   _id?: string;
   role: "user" | "agent" | "human";
   content: string;
@@ -127,8 +127,7 @@ const agentChatSlice = createSlice({
       const { _id, message_id, read_at } = action.payload;
       const message = state.conversation_chain.find(
         (m) =>
-          (_id && m._id === _id) ||
-          (message_id && m.message_id === message_id),
+          (_id && m._id === _id) || (message_id && m.message_id === message_id),
       );
       if (message) {
         message.read_at = read_at;

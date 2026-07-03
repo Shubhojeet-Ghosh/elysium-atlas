@@ -72,7 +72,7 @@ function ChatBox({
           );
         }
       } catch (e) {
-        // fail silently — existing empty chain stays
+        // fail silently- existing empty chain stays
       }
     };
     fetchMessages();
@@ -170,7 +170,7 @@ function ChatBox({
 // ─── Panel ────────────────────────────────────────────────────────────────────
 
 /** When `inline` is true the component renders chat boxes only,
- *  without its own fixed wrapper — the parent owns the positioning. */
+ *  without its own fixed wrapper- the parent owns the positioning. */
 export default function TeamMemberConversationsPanel({
   inline = false,
 }: {
@@ -232,7 +232,8 @@ export default function TeamMemberConversationsPanel({
         addMessageToCapturedSession({
           chat_session_id: data.chat_session_id,
           message: {
-            message_id: data.message_id ?? `${data.chat_session_id}-${visitorMsgAt}`,
+            message_id:
+              data.message_id ?? `${data.chat_session_id}-${visitorMsgAt}`,
             role: "user",
             content: data.message,
             created_at: visitorMsgAt,
@@ -271,7 +272,7 @@ export default function TeamMemberConversationsPanel({
   ));
 
   if (inline) {
-    // Render boxes as a fragment — parent owns the layout
+    // Render boxes as a fragment- parent owns the layout
     return <>{boxes}</>;
   }
 

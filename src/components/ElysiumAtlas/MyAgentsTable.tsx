@@ -223,19 +223,6 @@ export default function MyAgentsTable({
 
   return (
     <div className="w-full mt-[24px] overflow-hidden">
-      <TablePaginationControls
-        currentPage={currentPage}
-        totalPages={totalPages}
-        hasNext={hasNext}
-        hasPrev={hasPrev}
-        total={total}
-        pageSize={pageSize}
-        pageSizeOptions={pageSizeOptions}
-        isLoading={isLoading}
-        onPageChange={onPageChange}
-        onPageSizeChange={onPageSizeChange}
-      />
-
       <div className="relative">
         <div
           ref={scrollContainerRef}
@@ -390,6 +377,20 @@ export default function MyAgentsTable({
           )}
         </div>
       </div>
+
+      <TablePaginationControls
+        currentPage={currentPage}
+        totalPages={totalPages}
+        hasNext={hasNext}
+        hasPrev={hasPrev}
+        total={total}
+        pageSize={pageSize}
+        pageSizeOptions={pageSizeOptions}
+        isLoading={isLoading}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        className="mt-3 mb-0"
+      />
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">

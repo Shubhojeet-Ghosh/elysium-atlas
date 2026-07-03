@@ -36,6 +36,7 @@ import {
   setTextColor,
 } from "@/store/reducers/agentSlice";
 import { isSettledAgentStatus } from "@/utils/agentStatus";
+import { mapKbAttachmentsToState } from "@/utils/agentKbUtils";
 
 export default function AgentPage() {
   const params = useParams();
@@ -93,6 +94,12 @@ export default function AgentPage() {
           dispatch(setPrimaryColor(agentDetails.primary_color || "#fff"));
           dispatch(setSecondaryColor(agentDetails.secondary_color || "#fff"));
           dispatch(setTextColor(agentDetails.text_color || "#111"));
+
+          const kbState = mapKbAttachmentsToState(agentDetails.kb_attachments);
+          dispatch(setKnowledgeBaseLinks(kbState.knowledgeBaseLinks));
+          dispatch(setKnowledgeBaseFiles(kbState.knowledgeBaseFiles));
+          dispatch(setKnowledgeBaseText(kbState.knowledgeBaseText));
+          dispatch(setKnowledgeBaseQnA(kbState.knowledgeBaseQnA));
 
           if (!isSettledAgentStatus(agentDetails.agent_status)) {
             setTimeout(fetchAgentDetails, 5000);

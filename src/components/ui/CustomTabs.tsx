@@ -120,7 +120,7 @@ const CustomTabsList = React.forwardRef<HTMLDivElement, CustomTabsListProps>(
         });
       };
 
-      const updateIndicator = () => {
+      const syncActiveTab = (scrollIntoViewIfNeeded: boolean) => {
         if (!listRef.current || !selectedValue) return;
 
         const activeTab = listRef.current.querySelector(
@@ -130,6 +130,8 @@ const CustomTabsList = React.forwardRef<HTMLDivElement, CustomTabsListProps>(
         if (!activeTab) return;
 
         updateIndicatorPosition(activeTab);
+
+        if (!scrollIntoViewIfNeeded) return;
 
         const listRect = listRef.current.getBoundingClientRect();
         const tabRect = activeTab.getBoundingClientRect();
@@ -146,24 +148,17 @@ const CustomTabsList = React.forwardRef<HTMLDivElement, CustomTabsListProps>(
         }
       };
 
-      updateIndicator();
+      syncActiveTab(true);
 
-      const handleResize = () => updateIndicator();
-      const handleScroll = () => updateIndicator();
+      const handleResize = () => syncActiveTab(true);
 
       const resizeObserver = new ResizeObserver(handleResize);
       if (listRef.current) {
         resizeObserver.observe(listRef.current);
-        listRef.current.addEventListener("scroll", handleScroll, {
-          passive: true,
-        });
       }
 
       return () => {
         resizeObserver.disconnect();
-        if (listRef.current) {
-          listRef.current.removeEventListener("scroll", handleScroll);
-        }
       };
     }, [selectedValue]);
 

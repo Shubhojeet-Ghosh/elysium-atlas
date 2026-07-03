@@ -19,7 +19,7 @@ const getSessionToken = (): string => {
 
 // Single shared socket instance for the whole app.
 // `auth` as a callback means socket.io will re-read the token on every
-// connect / reconnect attempt — no manual refresh needed.
+// connect / reconnect attempt- no manual refresh needed.
 //
 // Resilience notes:
 // - We allow both `websocket` and `polling`. If nginx / a proxy in the middle

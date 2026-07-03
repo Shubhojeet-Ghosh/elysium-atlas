@@ -1,4 +1,4 @@
-# Elysium Atlas — Account Settings API
+# Elysium Atlas- Account Settings API
 
 Technical reference for updating the **team owner's** account settings: profile name, owned team name, and password.
 
@@ -12,12 +12,12 @@ Technical reference for updating the **team owner's** account settings: profile 
 
 This endpoint lets the **owner of the active session team** update:
 
-| Field | Scope | Notes |
-|-------|--------|--------|
-| `first_name` | User (`elysium_atlas_users`) | Partial update supported |
-| `last_name` | User | Partial update supported |
-| `team_name` | Team (`atlas_teams`) | Updates the session `team_id` team |
-| `password` | User | Requires correct `current_password` |
+| Field        | Scope                        | Notes                               |
+| ------------ | ---------------------------- | ----------------------------------- |
+| `first_name` | User (`elysium_atlas_users`) | Partial update supported            |
+| `last_name`  | User                         | Partial update supported            |
+| `team_name`  | Team (`atlas_teams`)         | Updates the session `team_id` team  |
+| `password`   | User                         | Requires correct `current_password` |
 
 You may send **one field or several** in a single request. Omitted fields are left unchanged.
 
@@ -51,7 +51,7 @@ If the session team is one the user joined as **admin** or **member**, the reque
 
 `POST /v1/account/settings/update`
 
-### Body (all fields optional — send only what you want to change)
+### Body (all fields optional- send only what you want to change)
 
 ```json
 {
@@ -63,13 +63,13 @@ If the session team is one the user joined as **admin** or **member**, the reque
 }
 ```
 
-| Field | Type | Required when |
-|-------|------|----------------|
-| `first_name` | string | — (if sent, must be non-empty after trim) |
-| `last_name` | string | — (if sent, must be non-empty after trim) |
-| `team_name` | string | — (if sent, must be non-empty after trim) |
-| `current_password` | string | **Required** whenever `password` is sent |
-| `password` | string | **Required** whenever `current_password` is sent |
+| Field              | Type   | Required when                                    |
+| ------------------ | ------ | ------------------------------------------------ |
+| `first_name`       | string | - (if sent, must be non-empty after trim)        |
+| `last_name`        | string | - (if sent, must be non-empty after trim)        |
+| `team_name`        | string | - (if sent, must be non-empty after trim)        |
+| `current_password` | string | **Required** whenever `password` is sent         |
+| `password`         | string | **Required** whenever `current_password` is sent |
 
 ### Partial update examples
 
@@ -124,24 +124,24 @@ Replace the stored session token with the returned `sessionToken` so JWT claims 
 
 ## Error responses
 
-| HTTP | `success` | `message` |
-|------|-----------|-----------|
-| `401` | `false` | No token provided. |
-| `401` | `false` | Invalid or expired token. |
-| `400` | `false` | Team ID is missing from session. |
-| `403` | `false` | Team not found or inactive. |
-| `403` | `false` | You are not a member of this team. |
-| `403` | `false` | Only the team owner can update account settings. |
-| `200` | `false` | No valid fields to update. |
-| `200` | `false` | first_name cannot be empty. |
-| `200` | `false` | last_name cannot be empty. |
-| `200` | `false` | team_name cannot be empty. |
-| `200` | `false` | current_password is required to change your password. |
-| `200` | `false` | password is required when changing your password. |
-| `200` | `false` | Current password is incorrect. |
-| `404` | `false` | User not found. |
-| `404` | `false` | Team not found. |
-| `500` | `false` | Server error. |
+| HTTP  | `success` | `message`                                             |
+| ----- | --------- | ----------------------------------------------------- |
+| `401` | `false`   | No token provided.                                    |
+| `401` | `false`   | Invalid or expired token.                             |
+| `400` | `false`   | Team ID is missing from session.                      |
+| `403` | `false`   | Team not found or inactive.                           |
+| `403` | `false`   | You are not a member of this team.                    |
+| `403` | `false`   | Only the team owner can update account settings.      |
+| `200` | `false`   | No valid fields to update.                            |
+| `200` | `false`   | first_name cannot be empty.                           |
+| `200` | `false`   | last_name cannot be empty.                            |
+| `200` | `false`   | team_name cannot be empty.                            |
+| `200` | `false`   | current_password is required to change your password. |
+| `200` | `false`   | password is required when changing your password.     |
+| `200` | `false`   | Current password is incorrect.                        |
+| `404` | `false`   | User not found.                                       |
+| `404` | `false`   | Team not found.                                       |
+| `500` | `false`   | Server error.                                         |
 
 ---
 
@@ -175,11 +175,11 @@ sequenceDiagram
 
 ## Related
 
-| Document | Purpose |
-|----------|---------|
-| [frontend-auth-guide.md](./frontend-auth-guide.md) | Login and session JWT |
-| [backend-team-rbac-guide.md](./backend-team-rbac-guide.md) | Owner vs admin vs member roles |
-| [atlas-auth-api.md](./atlas-auth-api.md) | Auth endpoints (includes legacy `POST /v1/auth/profile/update`) |
+| Document                                                   | Purpose                                                         |
+| ---------------------------------------------------------- | --------------------------------------------------------------- |
+| [frontend-auth-guide.md](./frontend-auth-guide.md)         | Login and session JWT                                           |
+| [backend-team-rbac-guide.md](./backend-team-rbac-guide.md) | Owner vs admin vs member roles                                  |
+| [atlas-auth-api.md](./atlas-auth-api.md)                   | Auth endpoints (includes legacy `POST /v1/auth/profile/update`) |
 
 > **Note:** `POST /v1/auth/profile/update` still exists for profile completion flows but does **not** enforce owner-only access or current-password verification. Prefer this account settings endpoint for the owner settings page.
 

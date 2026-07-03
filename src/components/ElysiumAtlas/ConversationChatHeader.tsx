@@ -129,7 +129,7 @@ export default function ConversationChatHeader({
   const flagSrc = session.geo_data?.country_flag;
   const showFlag = !!flagSrc && !flagLoadError;
 
-  // Derive unread state from Redux (live) — only show indicator when collapsed
+  // Derive unread state from Redux (live)- only show indicator when collapsed
   const hasUnread = useAppSelector((state) => {
     if (isExpanded) return false;
     const s = state.agent.captured_sessions.find(

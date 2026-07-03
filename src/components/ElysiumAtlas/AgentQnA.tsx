@@ -1,8 +1,5 @@
 "use client";
 import { useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import { RootState } from "@/store";
-import { addKnowledgeBaseQnA } from "@/store/reducers/agentSlice";
 import CustomInput from "@/components/inputs/CustomInput";
 import CustomTextareaPrimary from "@/components/inputs/CustomTextareaPrimary";
 import PrimaryButton from "@/components/ui/PrimaryButton";
@@ -11,6 +8,18 @@ import CancelButton from "../ui/CancelButton";
 import AgentQnAList from "./AgentQnAList";
 import { toast } from "sonner";
 import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
+import Spinner from "@/components/ui/Spinner";
+import {
+  findTeamQnAByAlias,
+  isOnAgentListByQnAlias,
+  LIBRARY_REUSE_TOAST,
+} from "@/utils/teamKbLookup";
+import { extractApiErrorMessage } from "@/utils/toolsFormUtils";
+import {
+  useKbQnAState,
+  useKbDatasourceActions,
+} from "./kb/useKbDatasourceState";
+import { useIsKbBuildFlow } from "./kb/KbDatasourceModeContext";
 import {
   Dialog,
   DialogClose,
@@ -22,16 +31,16 @@ import {
 } from "@/components/ui/dialog";
 
 export default function AgentQnA() {
-  const dispatch = useDispatch();
+  const kbActions = useKbDatasourceActions();
+  const isBuild = useIsKbBuildFlow();
   const readOnly = useAgentReadOnly();
-  const knowledgeBaseQnA = useSelector(
-    (state: RootState) => state.agent.knowledgeBaseQnA,
-  );
+  const knowledgeBaseQnA = useKbQnAState();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [alias, setAlias] = useState("");
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
 
   const resetForm = () => {
     setAlias("");
@@ -46,34 +55,71 @@ export default function AgentQnA() {
     setDialogOpen(open);
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!alias.trim() || !question.trim() || !answer.trim()) {
       return;
     }
 
     const trimmedAlias = alias.trim();
-    const duplicateExists = knowledgeBaseQnA.some(
-      (item) => item.qna_alias.toLowerCase() === trimmedAlias.toLowerCase(),
-    );
+    const trimmedQuestion = question.trim();
+    const trimmedAnswer = answer.trim();
 
-    if (duplicateExists) {
-      toast.error(
-        "An entry with this alias name already exists. Please use a different alias.",
-      );
+    if (isOnAgentListByQnAlias(knowledgeBaseQnA, trimmedAlias)) {
+      toast.error("An entry with this alias is already on this agent.");
       return;
     }
 
-    dispatch(
-      addKnowledgeBaseQnA({
-        qna_alias: trimmedAlias,
-        question: question.trim(),
-        answer: answer.trim(),
-        lastUpdated: new Date().toISOString(),
-        status: "new",
-      }),
-    );
-    resetForm();
-    toast.success("QnA entry added");
+    setIsAdding(true);
+    try {
+      const libraryMatch = await findTeamQnAByAlias(trimmedAlias);
+
+      if (libraryMatch) {
+        const existingQuestion = libraryMatch.question?.trim() ?? "";
+        const existingAnswer = libraryMatch.answer?.trim() ?? "";
+        const contentDiffers =
+          (existingQuestion && existingQuestion !== trimmedQuestion) ||
+          (existingAnswer && existingAnswer !== trimmedAnswer);
+
+        if (contentDiffers) {
+          toast.warning(LIBRARY_REUSE_TOAST.qnaContentMismatch, {
+            duration: 8000,
+          });
+        } else {
+          toast.info(LIBRARY_REUSE_TOAST.qna);
+        }
+
+        kbActions.addKnowledgeBaseQnA({
+          kb_id: libraryMatch.kb_id,
+          qna_alias: libraryMatch.qna_alias,
+          question: trimmedQuestion,
+          answer: trimmedAnswer,
+          lastUpdated: new Date().toISOString(),
+          status: "pending_attach",
+        });
+      } else {
+        kbActions.addKnowledgeBaseQnA({
+          qna_alias: trimmedAlias,
+          question: trimmedQuestion,
+          answer: trimmedAnswer,
+          lastUpdated: new Date().toISOString(),
+          status: "new",
+        });
+        toast.success(
+          isBuild
+            ? "QnA entry added- will be indexed when you build."
+            : "QnA entry added- will be indexed when you save.",
+        );
+      }
+
+      resetForm();
+      setDialogOpen(false);
+    } catch (error: unknown) {
+      toast.error(
+        extractApiErrorMessage(error, "Failed to check team library for Q&A"),
+      );
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   const handleCancel = () => {
@@ -95,7 +141,8 @@ export default function AgentQnA() {
             <DialogTitle>Add QnA Entry</DialogTitle>
             <DialogDescription>
               Add a question and answer pair to your agent&apos;s knowledge
-              base.
+              base. If the alias already exists in your team library, the
+              existing item will be attached without re-indexing.
             </DialogDescription>
           </DialogHeader>
 
@@ -151,6 +198,7 @@ export default function AgentQnA() {
               <CancelButton
                 className="text-[12px] font-semibold flex items-center justify-center gap-2 min-w-[80px] min-h-[36px]"
                 onClick={handleCancel}
+                disabled={isAdding}
               >
                 Done
               </CancelButton>
@@ -158,9 +206,15 @@ export default function AgentQnA() {
             <PrimaryButton
               className="text-[12px] font-semibold flex items-center justify-center gap-2 min-w-[80px] min-h-[36px]"
               onClick={handleAdd}
-              disabled={!alias.trim() || !question.trim() || !answer.trim()}
+              disabled={
+                !alias.trim() || !question.trim() || !answer.trim() || isAdding
+              }
             >
-              Add
+              {isAdding ? (
+                <Spinner className="border-white dark:border-deep-onyx" />
+              ) : (
+                "Add"
+              )}
             </PrimaryButton>
           </DialogFooter>
         </DialogContent>

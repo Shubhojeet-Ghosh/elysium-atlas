@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
 import {
   setBaseURL,
-  addKnowledgeBaseLinks,
+  setKnowledgeBaseLinks,
 } from "@/store/reducers/agentBuilderSlice";
 import CustomInput from "@/components/inputs/CustomInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import fastApiAxios from "@/utils/fastapi_axios";
 import Cookies from "js-cookie";
 import { cleanAndDeduplicateLinks } from "@/utils/linkUtils";
+import { resolveLinksForAgentAdd } from "@/utils/teamKbLookup";
 
 export default function KnowledgeBaseLinks() {
   const dispatch = useDispatch();
@@ -73,13 +74,17 @@ export default function KnowledgeBaseLinks() {
         );
 
         if (uniqueNewLinks.length > 0) {
-          // Add new links with checked: true by default
+          const { rows, libraryCount, newCount } =
+            await resolveLinksForAgentAdd(uniqueNewLinks);
           dispatch(
-            addKnowledgeBaseLinks({ links: uniqueNewLinks, checked: true })
+            setKnowledgeBaseLinks([...rows, ...knowledgeBaseLinks]),
           );
+          const parts: string[] = [];
+          if (newCount > 0) parts.push(`${newCount} new`);
+          if (libraryCount > 0) parts.push(`${libraryCount} from library`);
           toast.success(
             response.data.message ||
-              `Successfully extracted ${uniqueNewLinks.length} new unique links from URL`
+              `Added ${uniqueNewLinks.length} link${uniqueNewLinks.length === 1 ? "" : "s"}${parts.length > 0 ? ` (${parts.join(", ")})` : ""}`,
           );
         } else {
           toast.info(

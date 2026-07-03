@@ -1,4 +1,4 @@
-# Agent datasource APIs — frontend guide
+# Agent datasource APIs- frontend guide
 
 Reference for paginated **agent knowledge source** lists: indexed URLs, uploaded files, custom texts, and QA pairs.
 
@@ -6,7 +6,7 @@ Reference for paginated **agent knowledge source** lists: indexed URLs, uploaded
 
 **Auth:** `Authorization: Bearer <session_jwt>` on every request below.
 
-Team RBAC applies — see [frontend-agents-rbac-guide.md](./frontend-agents-rbac-guide.md). All team members (`owner`, `admin`, `member`) may call these read endpoints.
+Team RBAC applies- see [frontend-agents-rbac-guide.md](./frontend-agents-rbac-guide.md). All team members (`owner`, `admin`, `member`) may call these read endpoints.
 
 ---
 
@@ -14,24 +14,24 @@ Team RBAC applies — see [frontend-agents-rbac-guide.md](./frontend-agents-rbac
 
 All four list endpoints use the same **page-based** pagination model as live visitors and team chat sessions.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `agent_id` | `string` | **required** | Agent to load data for |
-| `page` | `number` | `1` | 1-based page number |
-| `limit` | `number` | `10` | Items per page (max `100`) |
+| Parameter  | Type     | Default      | Description                |
+| ---------- | -------- | ------------ | -------------------------- |
+| `agent_id` | `string` | **required** | Agent to load data for     |
+| `page`     | `number` | `1`          | 1-based page number        |
+| `limit`    | `number` | `10`         | Items per page (max `100`) |
 
 ### Response pagination fields
 
 Every successful list response includes:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `total` | `number` | Total items for this agent and datasource |
-| `page` | `number` | Page returned (may differ from the request if out of range) |
-| `limit` | `number` | Page size used |
-| `total_pages` | `number` | `ceil(total / limit)`; `0` when `total` is `0` |
-| `has_next` | `boolean` | `true` if another page exists after this one |
-| `has_prev` | `boolean` | `true` if a previous page exists |
+| Field         | Type      | Description                                                 |
+| ------------- | --------- | ----------------------------------------------------------- |
+| `total`       | `number`  | Total items for this agent and datasource                   |
+| `page`        | `number`  | Page returned (may differ from the request if out of range) |
+| `limit`       | `number`  | Page size used                                              |
+| `total_pages` | `number`  | `ceil(total / limit)`; `0` when `total` is `0`              |
+| `has_next`    | `boolean` | `true` if another page exists after this one                |
+| `has_prev`    | `boolean` | `true` if a previous page exists                            |
 
 **Out-of-range pages:** If the requested `page` is greater than `total_pages`, the API **clamps** to the last valid page (same behavior as live visitors). Example: 25 items, `limit=10`, request `page=99` → response `page=3`.
 
@@ -80,12 +80,12 @@ Every successful list response includes:
 
 ### Item fields (typical)
 
-| Field | Description |
-|-------|-------------|
-| `url` | Indexed page URL |
-| `status` | Indexing status (e.g. `indexing`, `indexed`, `failed`) |
-| `page_type` | `product`, `content`, or empty while pending |
-| `created_at` / `updated_at` | ISO 8601 timestamps |
+| Field                       | Description                                            |
+| --------------------------- | ------------------------------------------------------ |
+| `url`                       | Indexed page URL                                       |
+| `status`                    | Indexing status (e.g. `indexing`, `indexed`, `failed`) |
+| `page_type`                 | `product`, `content`, or empty while pending           |
+| `created_at` / `updated_at` | ISO 8601 timestamps                                    |
 
 ---
 
@@ -253,20 +253,23 @@ Omit `page` and `limit` to get page 1 with 10 items:
 Use the response metadata directly:
 
 ```ts
-const res = await fetch("/elysium-agents/elysium-atlas/agent/v1/get-agent-urls", {
-  method: "POST",
-  headers: {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
+const res = await fetch(
+  "/elysium-agents/elysium-atlas/agent/v1/get-agent-urls",
+  {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ agent_id, page, limit: 10 }),
   },
-  body: JSON.stringify({ agent_id, page, limit: 10 }),
-}).then((r) => r.json());
+).then((r) => r.json());
 
-// res.urls       — current page items
-// res.total      — total count for pager label
+// res.urls      - current page items
+// res.total     - total count for pager label
 // res.total_pages
-// res.has_next   — enable "Next"
-// res.has_prev   — enable "Previous"
+// res.has_next  - enable "Next"
+// res.has_prev  - enable "Previous"
 ```
 
 ### Tabs with independent pagination
@@ -288,12 +291,12 @@ Each block has the same shape as the dedicated list endpoint (`data`, `total`, `
 
 ## Errors
 
-| Status | When |
-|--------|------|
-| `401` | Missing or invalid JWT |
-| `403` | No team context, or user is not a member of the agent's team |
-| `404` | Agent not found (on content/detail endpoints) |
-| `500` | Unexpected server error |
+| Status | When                                                         |
+| ------ | ------------------------------------------------------------ |
+| `401`  | Missing or invalid JWT                                       |
+| `403`  | No team context, or user is not a member of the agent's team |
+| `404`  | Agent not found (on content/detail endpoints)                |
+| `500`  | Unexpected server error                                      |
 
 Error body shape:
 

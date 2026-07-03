@@ -1,8 +1,5 @@
 "use client";
 import { useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import { RootState } from "@/store";
-import { addKnowledgeBaseText } from "@/store/reducers/agentSlice";
 import CustomInput from "@/components/inputs/CustomInput";
 import CustomTextareaPrimary from "@/components/inputs/CustomTextareaPrimary";
 import PrimaryButton from "@/components/ui/PrimaryButton";
@@ -11,6 +8,18 @@ import CancelButton from "../ui/CancelButton";
 import AgentTextList from "./AgentTextList";
 import { toast } from "sonner";
 import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
+import Spinner from "@/components/ui/Spinner";
+import {
+  findTeamCustomTextByAlias,
+  isOnAgentListByTextAlias,
+  LIBRARY_REUSE_TOAST,
+} from "@/utils/teamKbLookup";
+import { extractApiErrorMessage } from "@/utils/toolsFormUtils";
+import {
+  useKbTextState,
+  useKbDatasourceActions,
+} from "./kb/useKbDatasourceState";
+import { useIsKbBuildFlow } from "./kb/KbDatasourceModeContext";
 import {
   Dialog,
   DialogClose,
@@ -22,15 +31,15 @@ import {
 } from "@/components/ui/dialog";
 
 export default function AgentText() {
-  const dispatch = useDispatch();
+  const kbActions = useKbDatasourceActions();
+  const isBuild = useIsKbBuildFlow();
   const readOnly = useAgentReadOnly();
-  const knowledgeBaseText = useSelector(
-    (state: RootState) => state.agent.knowledgeBaseText,
-  );
+  const knowledgeBaseText = useKbTextState();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [alias, setAlias] = useState("");
   const [text, setText] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
 
   const resetForm = () => {
     setAlias("");
@@ -44,34 +53,63 @@ export default function AgentText() {
     setDialogOpen(open);
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!alias.trim() || !text.trim()) {
       return;
     }
 
     const trimmedAlias = alias.trim();
-    const duplicateExists = knowledgeBaseText.some(
-      (item) =>
-        item.custom_text_alias.toLowerCase() === trimmedAlias.toLowerCase(),
-    );
+    const trimmedText = text.trim();
 
-    if (duplicateExists) {
-      toast.error(
-        "An entry with this alias name already exists. Please use a different alias.",
-      );
+    if (isOnAgentListByTextAlias(knowledgeBaseText, trimmedAlias)) {
+      toast.error("An entry with this alias is already on this agent.");
       return;
     }
 
-    dispatch(
-      addKnowledgeBaseText({
-        custom_text_alias: trimmedAlias,
-        custom_text: text.trim(),
-        lastUpdated: new Date().toISOString(),
-        status: "new",
-      }),
-    );
-    resetForm();
-    toast.success("Text entry added");
+    setIsAdding(true);
+    try {
+      const libraryMatch = await findTeamCustomTextByAlias(trimmedAlias);
+
+      if (libraryMatch) {
+        const existingContent = libraryMatch.content?.trim() ?? "";
+        if (existingContent && existingContent !== trimmedText) {
+          toast.warning(LIBRARY_REUSE_TOAST.textContentMismatch, {
+            duration: 8000,
+          });
+        } else {
+          toast.info(LIBRARY_REUSE_TOAST.text);
+        }
+
+        kbActions.addKnowledgeBaseText({
+          kb_id: libraryMatch.kb_id,
+          custom_text_alias: libraryMatch.custom_text_alias,
+          custom_text: trimmedText,
+          lastUpdated: new Date().toISOString(),
+          status: "pending_attach",
+        });
+      } else {
+        kbActions.addKnowledgeBaseText({
+          custom_text_alias: trimmedAlias,
+          custom_text: trimmedText,
+          lastUpdated: new Date().toISOString(),
+          status: "new",
+        });
+        toast.success(
+          isBuild
+            ? "Text entry added- will be indexed when you build."
+            : "Text entry added- will be indexed when you save.",
+        );
+      }
+
+      resetForm();
+      setDialogOpen(false);
+    } catch (error: unknown) {
+      toast.error(
+        extractApiErrorMessage(error, "Failed to check team library for text"),
+      );
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   const handleCancel = () => {
@@ -92,7 +130,9 @@ export default function AgentText() {
           <DialogHeader>
             <DialogTitle>Add Text Entry</DialogTitle>
             <DialogDescription>
-              Add custom text to your agent&apos;s knowledge base.
+              Add custom text to your agent&apos;s knowledge base. If the alias
+              already exists in your team library, the existing item will be
+              attached without re-indexing.
             </DialogDescription>
           </DialogHeader>
 
@@ -134,6 +174,7 @@ export default function AgentText() {
               <CancelButton
                 className="text-[12px] font-semibold flex items-center justify-center gap-2 min-w-[80px] min-h-[36px]"
                 onClick={handleCancel}
+                disabled={isAdding}
               >
                 Done
               </CancelButton>
@@ -141,9 +182,13 @@ export default function AgentText() {
             <PrimaryButton
               className="text-[12px] font-semibold flex items-center justify-center gap-2 min-w-[80px] min-h-[36px]"
               onClick={handleAdd}
-              disabled={!alias.trim() || !text.trim()}
+              disabled={!alias.trim() || !text.trim() || isAdding}
             >
-              Add
+              {isAdding ? (
+                <Spinner className="border-white dark:border-deep-onyx" />
+              ) : (
+                "Add"
+              )}
             </PrimaryButton>
           </DialogFooter>
         </DialogContent>

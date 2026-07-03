@@ -51,7 +51,7 @@ export default function ConversationChatBody({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const separatorElRef = useRef<HTMLDivElement>(null);
-  // Always holds the latest isVisible value — avoids stale closures in socket handlers
+  // Always holds the latest isVisible value- avoids stale closures in socket handlers
   const isVisibleRef = useRef(isVisible);
   useEffect(() => {
     isVisibleRef.current = isVisible;
@@ -80,7 +80,7 @@ export default function ConversationChatBody({
   // Index of the first unread message when the panel was last opened
   // (-1 = no separator). Stays set until the panel collapses again.
   const [separatorIndex, setSeparatorIndex] = useState(-1);
-  // Mirror of separatorIndex in a ref — lets the socket handler read it without stale closure
+  // Mirror of separatorIndex in a ref- lets the socket handler read it without stale closure
   const separatorIndexRef = useRef(-1);
   useEffect(() => {
     separatorIndexRef.current = separatorIndex;
@@ -127,10 +127,8 @@ export default function ConversationChatBody({
 
   const hasUnreadMessages =
     separatorIndex >= 0 ||
-    findFirstUnreadSeparatorIndex(
-      conversation_chain,
-      messagingUnreadCount,
-    ) !== -1;
+    findFirstUnreadSeparatorIndex(conversation_chain, messagingUnreadCount) !==
+      -1;
 
   const { scrollToBottomOnSend } = useChatScrollToUnreadOrBottom({
     active: isVisible,
@@ -163,7 +161,13 @@ export default function ConversationChatBody({
 
     separatorIndexRef.current = firstUnread;
     setSeparatorIndex(firstUnread);
-  }, [isVisible, conversation_chain, chat_session_id, messagingUnreadCount, resetReadReceipts]);
+  }, [
+    isVisible,
+    conversation_chain,
+    chat_session_id,
+    messagingUnreadCount,
+    resetReadReceipts,
+  ]);
 
   // Listen for incoming visitor messages on this session
   useEffect(() => {
@@ -239,7 +243,7 @@ export default function ConversationChatBody({
 
       scrollToBottomOnSend();
 
-      // Emit socket — payload matches spec: { agent_id, chat_session_id, message }
+      // Emit socket- payload matches spec: { agent_id, chat_session_id, message }
       aiSocket.emit("atlas-team-member-message", {
         agent_id,
         chat_session_id,
@@ -351,32 +355,32 @@ export default function ConversationChatBody({
                         </span>
                       </ReadReceiptMarker>
                     ) : (
-                    <div
-                      className={`flex flex-col gap-0.5 ${
-                        isTeamMember ? "items-end" : "items-start"
-                      }`}
-                    >
                       <div
-                        className={`max-w-[80%] px-3 py-2 text-[13px] leading-relaxed font-[500] break-words ${
-                          isTeamMember
-                            ? "bg-serene-purple text-white rounded-2xl rounded-br-sm"
-                            : "bg-pure-mist text-gray-800 dark:text-gray-900 rounded-2xl rounded-bl-sm"
+                        className={`flex flex-col gap-0.5 ${
+                          isTeamMember ? "items-end" : "items-start"
                         }`}
                       >
-                        <div className="prose prose-sm max-w-none [&_*]:text-inherit [&_a]:underline [&_a]:cursor-pointer">
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            rehypePlugins={[rehypeHighlight]}
-                            components={conversationMarkdownComponents}
-                          >
-                            {msg.content}
-                          </ReactMarkdown>
+                        <div
+                          className={`max-w-[80%] px-3 py-2 text-[13px] leading-relaxed font-[500] break-words ${
+                            isTeamMember
+                              ? "bg-serene-purple text-white rounded-2xl rounded-br-sm"
+                              : "bg-pure-mist text-gray-800 dark:text-gray-900 rounded-2xl rounded-bl-sm"
+                          }`}
+                        >
+                          <div className="prose prose-sm max-w-none [&_*]:text-inherit [&_a]:underline [&_a]:cursor-pointer">
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              rehypePlugins={[rehypeHighlight]}
+                              components={conversationMarkdownComponents}
+                            >
+                              {msg.content}
+                            </ReactMarkdown>
+                          </div>
                         </div>
+                        <span className="text-[10px] text-gray-400 dark:text-pure-mist px-1">
+                          {formatChatTimestamp(msg.created_at)}
+                        </span>
                       </div>
-                      <span className="text-[10px] text-gray-400 dark:text-pure-mist px-1">
-                        {formatChatTimestamp(msg.created_at)}
-                      </span>
-                    </div>
                     )}
                   </Fragment>
                 );
