@@ -53,7 +53,7 @@ export default function AgentAvatarRight({
   }, [agentIcon]);
 
   // When switching to the link tab, seed imageUrl from agentIcon if it's a plain URL
-  // (covers the case where the user saved an avatar via the image tab — CDN URL is in
+  // (covers the case where the user saved an avatar via the image tab- CDN URL is in
   // Redux but imageUrl is still empty because seeding only runs once at init)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -100,24 +100,24 @@ export default function AgentAvatarRight({
   return (
     <div className="lg:w-[60%] w-full flex flex-col items-start lg:items-center p-[24px] gap-[20px]">
       {!readOnly && (
-      <CustomTabs value={activeTab} onValueChange={setActiveTab}>
-        <CustomTabsList className="w-fit">
-          <CustomTabsTrigger
-            value="link"
-            className="flex items-center gap-2 font-[600]"
-          >
-            <Link size={14} />
-            Link
-          </CustomTabsTrigger>
-          <CustomTabsTrigger
-            value="image"
-            className="flex items-center gap-2 font-[600]"
-          >
-            <Image size={14} />
-            Image
-          </CustomTabsTrigger>
-        </CustomTabsList>
-      </CustomTabs>
+        <CustomTabs value={activeTab} onValueChange={setActiveTab}>
+          <CustomTabsList className="w-fit">
+            <CustomTabsTrigger
+              value="link"
+              className="flex items-center gap-2 font-[600]"
+            >
+              <Link size={14} />
+              Link
+            </CustomTabsTrigger>
+            <CustomTabsTrigger
+              value="image"
+              className="flex items-center gap-2 font-[600]"
+            >
+              <Image size={14} />
+              Image
+            </CustomTabsTrigger>
+          </CustomTabsList>
+        </CustomTabs>
       )}
 
       <div

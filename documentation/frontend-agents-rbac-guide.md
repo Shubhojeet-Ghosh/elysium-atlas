@@ -1,4 +1,4 @@
-# Agent APIs — team RBAC (frontend guide)
+# Agent APIs- team RBAC (frontend guide)
 
 Short reference for the **Elysium Agents** agent routes after team-based access was added.
 
@@ -16,25 +16,25 @@ All authenticated routes expect `Authorization: Bearer <session_jwt>`. The JWT m
 | Only the creator could access their agents  | **All team members** can **view** team agents                             |
 | Owner-only checks on some routes            | **Owner + admin** can **create / edit / delete**; **member** is read-only |
 
-`list-agents` returns agents for the JWT’s active `team_id` (not just agents created by the logged-in user), with **page-based pagination** — same model as the datasource list endpoints below.
+`list-agents` returns agents for the JWT’s active `team_id` (not just agents created by the logged-in user), with **page-based pagination**- same model as the datasource list endpoints below.
 
 ---
 
 ## Roles
 
-| Role     | Agent access                                                                             |
-| -------- | ---------------------------------------------------------------------------------------- |
-| `owner`  | Full — create, edit, delete, view                                                        |
-| `admin`  | Full — create, edit, delete, view                                                        |
-| `member` | **View only** — list and read config/knowledge; cannot create, update, upload, or delete |
+| Role     | Agent access                                                                            |
+| -------- | --------------------------------------------------------------------------------------- |
+| `owner`  | Full- create, edit, delete, view                                                        |
+| `admin`  | Full- create, edit, delete, view                                                        |
+| `member` | **View only**- list and read config/knowledge; cannot create, update, upload, or delete |
 
-Use JWT `role` to **disable UI controls** (buttons, inputs, upload zones). The backend **re-checks membership/role in MongoDB** on every request — UI gating alone is not enough.
+Use JWT `role` to **disable UI controls** (buttons, inputs, upload zones). The backend **re-checks membership/role in MongoDB** on every request- UI gating alone is not enough.
 
 ---
 
 ## API permissions
 
-### Read — owner, admin, member
+### Read- owner, admin, member
 
 User must be an active member of the **agent’s team** (resolved from the agent document, not only JWT `team_id`).
 
@@ -49,7 +49,7 @@ User must be an active member of the **agent’s team** (resolved from the agent
 | `POST /v1/get-custom-text-content` | Custom text body from vector store   |
 | `POST /v1/get-qa-pair-content`     | QA pair body from vector store       |
 
-#### `POST /v1/list-agents` — pagination
+#### `POST /v1/list-agents`- pagination
 
 Request body (all fields optional):
 
@@ -83,7 +83,7 @@ Success response (`200`) includes the current page in `agents` plus pagination f
 
 For paginated knowledge lists (URLs, files, custom texts, QA pairs), see [agents-datasource.md](./agents-datasource.md).
 
-### Write — owner and admin only
+### Write- owner and admin only
 
 | Endpoint                              | Description                                  |
 | ------------------------------------- | -------------------------------------------- |
@@ -96,16 +96,16 @@ For paginated knowledge lists (URLs, files, custom texts, QA pairs), see [agents
 | `POST /v1/delete-agent-files`         | Remove uploaded files                        |
 | `POST /v1/delete-agent-custom-data`   | Remove custom texts / QA pairs               |
 
-**Tool linking:** `pre-build-agent-operations`, `build-agent`, and `update-agent` accept optional `tool_ids: string[]` — Mongo `_id` values from team tools in `atlas_tools`. See [frontend-tools-api-guide.md](./frontend-tools-api-guide.md#agent-linking-tool_ids).
+**Tool linking:** `pre-build-agent-operations`, `build-agent`, and `update-agent` accept optional `tool_ids: string[]`- Mongo `_id` values from team tools in `atlas_tools`. See [frontend-tools-api-guide.md](./frontend-tools-api-guide.md#agent-linking-tool_ids).
 
 ### Unchanged (not part of team RBAC)
 
-| Endpoint                          | Notes                                     |
-| --------------------------------- | ----------------------------------------- |
-| `POST /v1/get-agent-fields`       | **No JWT** — used by widget/visitor flows |
-| `POST /v1/query-agent`            | Chat/query — separate plan/usage checks   |
-| `POST /v1/rotate-conversation-id` | Public chat session helper                |
-| `POST /v1/mark-chat-message-read` | Public chat helper                        |
+| Endpoint                          | Notes                                    |
+| --------------------------------- | ---------------------------------------- |
+| `POST /v1/get-agent-fields`       | **No JWT**- used by widget/visitor flows |
+| `POST /v1/query-agent`            | Chat/query- separate plan/usage checks   |
+| `POST /v1/rotate-conversation-id` | Public chat session helper               |
+| `POST /v1/mark-chat-message-read` | Public chat helper                       |
 
 ---
 
@@ -115,7 +115,7 @@ When `role === "member"`:
 
 - **Hide or disable:** Create agent, Save/Update, Build/Re-index, Delete agent, file upload, add/remove links, add/remove custom knowledge, delete files/links/knowledge.
 - **Keep enabled:** Agent list, agent detail/settings **view**, knowledge base **view** (URLs, files, texts, QA lists and content).
-- **Read-only mode:** Prefer disabling entire forms/sections rather than individual fields — all write APIs above return 403 for members.
+- **Read-only mode:** Prefer disabling entire forms/sections rather than individual fields- all write APIs above return 403 for members.
 
 When `role === "owner"` or `role === "admin"`:
 
@@ -129,16 +129,16 @@ When JWT has **no `team_id`** (user has not selected a team):
 
 ## Error responses
 
-| Status | Message                                                            | When                                  |
-| ------ | ------------------------------------------------------------------ | ------------------------------------- |
-| `401`  | Token invalid/expired                                              | Missing or bad JWT                    |
-| `403`  | `No team context. Select a team to continue.`                      | JWT missing `team_id`                 |
-| `403`  | `You are not a member of this team.`                               | User removed or wrong team (list)     |
-| `403`  | `You are not authorized to access this agent.`                     | Read — not on agent’s team            |
-| `403`  | `You are not authorized to modify this agent.`                     | Write — member or not on agent’s team |
-| `403`  | `You are not authorized to create or modify agents for this team.` | Create flow — member role             |
+| Status | Message                                                            | When                                 |
+| ------ | ------------------------------------------------------------------ | ------------------------------------ |
+| `401`  | Token invalid/expired                                              | Missing or bad JWT                   |
+| `403`  | `No team context. Select a team to continue.`                      | JWT missing `team_id`                |
+| `403`  | `You are not a member of this team.`                               | User removed or wrong team (list)    |
+| `403`  | `You are not authorized to access this agent.`                     | Read- not on agent’s team            |
+| `403`  | `You are not authorized to modify this agent.`                     | Write- member or not on agent’s team |
+| `403`  | `You are not authorized to create or modify agents for this team.` | Create flow- member role             |
 
-Always handle `403` gracefully; do not rely only on JWT `role` — membership can change after login.
+Always handle `403` gracefully; do not rely only on JWT `role`- membership can change after login.
 
 ---
 

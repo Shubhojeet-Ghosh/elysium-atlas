@@ -1,4 +1,4 @@
-# Elysium Atlas — Team Members API
+# Elysium Atlas- Team Members API
 
 Technical reference for frontend integration of team member invitations and membership management.
 
@@ -31,7 +31,7 @@ Team owners invite registered Atlas users (with completed profiles) to join thei
 2. Creates or refreshes a pending invitation in `atlas_team_invitations`
 3. Sends a signed JWT invite link by email (7-day TTL)
 4. Lets the invitee preview and accept/decline via token-only APIs (no login required)
-5. Persists accepted members in `atlas_team_members` (one document per member — scalable to thousands)
+5. Persists accepted members in `atlas_team_members` (one document per member- scalable to thousands)
 
 User profile fields (`first_name`, `last_name`, `profile_image_url`) are **never stored** on membership documents. They are always read from `elysium_atlas_users` at response time.
 
@@ -41,7 +41,7 @@ User profile fields (`first_name`, `last_name`, `profile_image_url`) are **never
 
 ### Team-scoped endpoints (invite, list, remove members)
 
-Requires the standard Atlas **session token** from login. All checks use the session's **`team_id`** and the caller's **role** for that team — not whether they are the team owner.
+Requires the standard Atlas **session token** from login. All checks use the session's **`team_id`** and the caller's **role** for that team- not whether they are the team owner.
 
 ```http
 Authorization: Bearer <sessionToken>
@@ -147,7 +147,7 @@ Batch-invite up to **50** emails per request.
 | `emails` | Yes      | `string[]` | 1–50 unique emails (duplicates in the same request are reported as `duplicate_in_request`) |
 | `role`   | No       | `string`   | Default `"member"`. `"admin"` or `"member"`                                                |
 
-#### Success response — `200`
+#### Success response- `200`
 
 ```json
 {
@@ -221,7 +221,7 @@ Load invitation details for the invite landing page. Token-only; no session requ
 }
 ```
 
-#### Success response — `200`
+#### Success response- `200`
 
 ```json
 {
@@ -249,7 +249,7 @@ Load invitation details for the invite landing page. Token-only; no session requ
 }
 ```
 
-#### Failure response — `200`
+#### Failure response- `200`
 
 ```json
 {
@@ -266,7 +266,7 @@ Load invitation details for the invite landing page. Token-only; no session requ
 }
 ```
 
-#### Error response — `400`
+#### Error response- `400`
 
 ```json
 {
@@ -291,7 +291,7 @@ Accept or decline an invitation. Token-only; no session required.
 }
 ```
 
-#### Request body — accept
+#### Request body- accept
 
 ```json
 {
@@ -300,7 +300,7 @@ Accept or decline an invitation. Token-only; no session required.
 }
 ```
 
-#### Request body — decline
+#### Request body- decline
 
 ```json
 {
@@ -314,7 +314,7 @@ Accept or decline an invitation. Token-only; no session required.
 | `token`  | Yes      | `string`  | Invite JWT from email link         |
 | `accept` | Yes      | `boolean` | `true` to join, `false` to decline |
 
-#### Success — accepted — `200`
+#### Success- accepted- `200`
 
 ```json
 {
@@ -329,7 +329,7 @@ Accept or decline an invitation. Token-only; no session required.
 }
 ```
 
-#### Success — declined — `200`
+#### Success- declined- `200`
 
 ```json
 {
@@ -338,7 +338,7 @@ Accept or decline an invitation. Token-only; no session required.
 }
 ```
 
-#### Success — already member (idempotent) — `200`
+#### Success- already member (idempotent)- `200`
 
 ```json
 {
@@ -353,7 +353,7 @@ Accept or decline an invitation. Token-only; no session required.
 }
 ```
 
-#### Failure responses — `200`
+#### Failure responses- `200`
 
 ```json
 {
@@ -376,7 +376,7 @@ Accept or decline an invitation. Token-only; no session required.
 }
 ```
 
-#### Error — `400`
+#### Error- `400`
 
 ```json
 {
@@ -405,13 +405,13 @@ Paginated list of accepted team members. Owner-only. Profile names are joined fr
 
 | Param    | Default  | Max   | Description              |
 | -------- | -------- | ----- | ------------------------ |
-| `page`   | `1`      | —     | Page number (1-based)    |
+| `page`   | `1`      | -     | Page number (1-based)    |
 | `limit`  | `50`     | `100` | Items per page           |
-| `status` | `active` | —     | Membership status filter |
+| `status` | `active` | -     | Membership status filter |
 
 **Example:** `GET /elysium-atlas/v1/team/members?page=1&limit=50&status=active`
 
-#### Success response — `200`
+#### Success response- `200`
 
 ```json
 {
@@ -449,7 +449,7 @@ Paginated list of accepted team members. Owner-only. Profile names are joined fr
 
 > **Note:** `current_team_size` and `max_team_members` come from `atlas_teams` (`member_count` / `max_members`), refreshed before each response. When `status=active`, `members[]` includes the **owner** first (`role: "owner"`), then invited members. `total` = owner + matching `atlas_team_members` rows.
 
-#### Error — `403`
+#### Error- `403`
 
 ```json
 {
@@ -483,7 +483,7 @@ Owner-only. Soft-removes an active member (`status: "removed"`). No counter upda
 }
 ```
 
-#### Success response — `200`
+#### Success response- `200`
 
 ```json
 {
@@ -540,7 +540,7 @@ Owner or admin. Updates the role of an active team member (`admin` or `member`).
 | `user_id` | Yes      | `string` | MongoDB user id of the member |
 | `role`    | Yes      | `string` | `"admin"` or `"member"`       |
 
-#### Success response — `200`
+#### Success response- `200`
 
 ```json
 {
@@ -576,11 +576,11 @@ Owner or admin. Updates the role of an active team member (`admin` or `member`).
 
 Team metadata. One personal team per owner.
 
-| Field           | Purpose                                                                                                              |
-| --------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `owner_user_id` | Team owner                                                                                                           |
-| `member_count`  | Owner (1) + active members — **source of truth**, recomputed on team operations                                      |
-| `max_members`   | Max team size — **source of truth**; set via **`POST /plan/assign`** from `atlas_plans.plan_limits.max_team_members` |
+| Field           | Purpose                                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `owner_user_id` | Team owner                                                                                                          |
+| `member_count`  | Owner (1) + active members- **source of truth**, recomputed on team operations                                      |
+| `max_members`   | Max team size- **source of truth**; set via **`POST /plan/assign`** from `atlas_plans.plan_limits.max_team_members` |
 
 Team capacity in `/plan/info` and invite/list APIs reads from **`atlas_teams`**, not from this collection.
 
@@ -602,9 +602,9 @@ Per-user **consumable** limits remaining for the active plan period (e.g. `ai_qu
 | Rule                | Detail                                                                                                                                        |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Stored here**     | Consumable limits only                                                                                                                        |
-| **Not stored here** | `max_team_members` — use `atlas_teams.max_members`                                                                                            |
+| **Not stored here** | `max_team_members`- use `atlas_teams.max_members`                                                                                             |
 | **Legacy docs**     | Old documents may still have `max_team_members`; removed on next plan sync (`$unset`) and never returned in `/plan/info` → `available_limits` |
-| **Written by**      | `syncUserAvailableLimits` (trial provisioning, `/plan/assign`) — strips capacity keys before `$set`                                           |
+| **Written by**      | `syncUserAvailableLimits` (trial provisioning, `/plan/assign`)- strips capacity keys before `$set`                                            |
 
 ### `atlas_team_invitations` (new)
 
@@ -662,11 +662,11 @@ One document per accepted member. Does **not** store `first_name` / `last_name`.
 
 **Indexes:**
 
-- `{ team_id, user_id }` — **unique**
+- `{ team_id, user_id }`- **unique**
 - `{ team_id, status }`
 - `{ user_id, status }`
 
-### `elysium_atlas_users` (existing — source of truth for profile)
+### `elysium_atlas_users` (existing- source of truth for profile)
 
 Invite eligibility requires:
 
@@ -767,7 +767,7 @@ remaining invite slots = max_members - member_count - pending_invites
 - Each **new** pending invitation consumes one slot until it expires, is declined, or is accepted.
 - Re-inviting an email with an existing pending invite (`already_invited`) does **not** consume an additional slot.
 
-`/plan/info` returns `max_team_members` and `member_count` in **`original_limits`** and **`plan_data.team`** — not in `available_limits`.
+`/plan/info` returns `max_team_members` and `member_count` in **`original_limits`** and **`plan_data.team`**- not in `available_limits`.
 
 ---
 

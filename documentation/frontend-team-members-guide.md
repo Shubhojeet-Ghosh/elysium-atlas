@@ -1,4 +1,4 @@
-# Team Members API — Frontend Integration Guide
+# Team Members API- Frontend Integration Guide
 
 This document is written for the **frontend team**. It covers every endpoint, request/response shape, and every outcome case you need to handle in the UI.
 
@@ -8,14 +8,14 @@ For backend/MongoDB internals, see [`team-members-api.md`](./team-members-api.md
 
 ## Quick reference
 
-| #   | Method | Endpoint                                            | Auth required?            |
-| --- | ------ | --------------------------------------------------- | ------------------------- |
-| 1   | `POST` | `/elysium-atlas/v1/team/members/invite`             | Yes — owner or admin      |
-| 2   | `POST` | `/elysium-atlas/v1/team/members/invitation/preview` | No — invite token in body |
-| 3   | `POST` | `/elysium-atlas/v1/team/members/invitation/respond` | No — invite token in body |
-| 4   | `GET`  | `/elysium-atlas/v1/team/members`                    | Yes — any team member     |
-| 5   | `POST` | `/elysium-atlas/v1/team/members/remove`             | Yes — owner or admin      |
-| 6   | `POST` | `/elysium-atlas/v1/team/members/update-role`        | Yes — owner or admin      |
+| #   | Method | Endpoint                                            | Auth required?           |
+| --- | ------ | --------------------------------------------------- | ------------------------ |
+| 1   | `POST` | `/elysium-atlas/v1/team/members/invite`             | Yes- owner or admin      |
+| 2   | `POST` | `/elysium-atlas/v1/team/members/invitation/preview` | No- invite token in body |
+| 3   | `POST` | `/elysium-atlas/v1/team/members/invitation/respond` | No- invite token in body |
+| 4   | `GET`  | `/elysium-atlas/v1/team/members`                    | Yes- any team member     |
+| 5   | `POST` | `/elysium-atlas/v1/team/members/remove`             | Yes- owner or admin      |
+| 6   | `POST` | `/elysium-atlas/v1/team/members/update-role`        | Yes- owner or admin      |
 
 **Base URL example:** `https://your-api.com/elysium-atlas`
 
@@ -25,11 +25,11 @@ For backend/MongoDB internals, see [`team-members-api.md`](./team-members-api.md
 
 Team size is **not** stored as counters on the team document. The backend counts members live from the database on each request.
 
-| What                  | Where it comes from                                                                                           |
-| --------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **Max team size**     | Owner's `atlas_teams.max_members` — updated on **`POST /plan/assign`** from plan's `max_team_members`         |
-| **Current team size** | Owner's `atlas_teams.member_count` (refreshed live: 1 + active members)                                       |
-| **Plan info API**     | `max_team_members` + `member_count` in **`original_limits`** (from `atlas_teams`) — not in `available_limits` |
+| What                  | Where it comes from                                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **Max team size**     | Owner's `atlas_teams.max_members`- updated on **`POST /plan/assign`** from plan's `max_team_members`         |
+| **Current team size** | Owner's `atlas_teams.member_count` (refreshed live: 1 + active members)                                      |
+| **Plan info API**     | `max_team_members` + `member_count` in **`original_limits`** (from `atlas_teams`)- not in `available_limits` |
 
 **Capacity check (invite / accept):**
 
@@ -44,7 +44,7 @@ Can accept invite if:
   member_count + 1 <= max_team_members
 ```
 
-**Get max team size for UI** — use plan info:
+**Get max team size for UI**- use plan info:
 
 ```
 POST /elysium-atlas/v1/plan/info
@@ -53,7 +53,7 @@ POST /elysium-atlas/v1/plan/info
 → plan_data.team (same values + team_id)
 ```
 
-**Get current size for UI** — use list members:
+**Get current size for UI**- use list members:
 
 ```
 GET /elysium-atlas/v1/team/members
@@ -75,7 +75,7 @@ Authorization: Bearer <sessionToken>
 Content-Type: application/json
 ```
 
-The session token must include `team_id` and `role` — the **active team the user chose at login** (or their only team). See [Frontend Auth Guide](./frontend-auth-guide.md) for the team selection flow and role values (`"owner"` | `"admin"` | `"member"`).
+The session token must include `team_id` and `role`- the **active team the user chose at login** (or their only team). See [Frontend Auth Guide](./frontend-auth-guide.md) for the team selection flow and role values (`"owner"` | `"admin"` | `"member"`).
 
 All team member APIs scope authorization to **`req.user.team_id`** plus the caller's role for that team (resolved from DB on each request).
 
@@ -96,7 +96,7 @@ Members who call invite/remove/update-role receive **403** with a permission mes
 | ---------- | ----------------------------------------------- | ----------------------------------------------------------------- |
 | `"owner"`  | Team creation / login                           | Full team management (list, invite, remove, update role)          |
 | `"admin"`  | Invite API (`role: "admin"`) or update-role API | Same as owner for member APIs (list, invite, remove, update role) |
-| `"member"` | Invite API (`role: "member"`, default)          | List members only — invite/remove/update-role return 403          |
+| `"member"` | Invite API (`role: "member"`, default)          | List members only- invite/remove/update-role return 403           |
 
 When inviting, pass `"admin"` or `"member"` in the request body. Invalid values return `400`:
 
@@ -119,13 +119,13 @@ After login, the user's session `role` reflects their role **for the active team
 
 ## User journeys
 
-### Journey A — Owner invites people
+### Journey A- Owner invites people
 
 ```
 Owner UI → POST /invite → show per-email results → optionally refresh member list
 ```
 
-### Journey B — Invitee accepts from email
+### Journey B- Invitee accepts from email
 
 ```
 Email link → Frontend page /team/invite/respond?token=...
@@ -145,7 +145,7 @@ Read `token` from the URL query string on page load.
 
 ---
 
-# API 1 — Invite team members
+# API 1- Invite team members
 
 **Who calls this:** Team owner only  
 **When:** Owner enters one or more emails and clicks "Invite"
@@ -181,7 +181,7 @@ POST /elysium-atlas/v1/team/members/invite
 
 ---
 
-### Response — success (HTTP 200)
+### Response- success (HTTP 200)
 
 The API **always processes the full batch**. One bad email does not fail the whole request.
 
@@ -229,7 +229,7 @@ The API **always processes the full batch**. One bad email does not fail the who
 
 ---
 
-### Every possible `results[].status` — invite API
+### Every possible `results[].status`- invite API
 
 Handle **each email independently** based on its `status`:
 
@@ -249,7 +249,7 @@ Handle **each email independently** based on its `status`:
 
 ---
 
-### Example responses — one status per email
+### Example responses- one status per email
 
 **Case: user is eligible (first time invite)**
 
@@ -344,7 +344,7 @@ Handle **each email independently** based on its `status`:
 
 ---
 
-### Response — whole-request errors
+### Response- whole-request errors
 
 These mean the **entire request failed** (not per-email):
 
@@ -360,10 +360,10 @@ These mean the **entire request failed** (not per-email):
 
 ---
 
-# API 2 — Preview invitation
+# API 2- Preview invitation
 
 **Who calls this:** Invitee (anyone with the link)  
-**When:** Invite landing page loads — before showing Accept/Decline buttons
+**When:** Invite landing page loads- before showing Accept/Decline buttons
 
 ### Request
 
@@ -393,7 +393,7 @@ POST /elysium-atlas/v1/team/members/invitation/preview
 
 ---
 
-### Response — valid pending invitation (HTTP 200)
+### Response- valid pending invitation (HTTP 200)
 
 ```json
 {
@@ -430,7 +430,7 @@ POST /elysium-atlas/v1/team/members/invitation/preview
 
 ---
 
-### Response — every failure case (HTTP 200)
+### Response- every failure case (HTTP 200)
 
 **Case: token missing (HTTP 400)**
 
@@ -512,13 +512,13 @@ POST /elysium-atlas/v1/team/members/invitation/preview
 
 ---
 
-# API 3 — Respond to invitation
+# API 3- Respond to invitation
 
 **Who calls this:** Invitee  
 **When:** User clicks Accept or Decline on the invite landing page  
-**Auth:** Token only — user does **not** need to be logged in
+**Auth:** Token only- user does **not** need to be logged in
 
-### Request — accept
+### Request- accept
 
 ```
 POST /elysium-atlas/v1/team/members/invitation/respond
@@ -541,7 +541,7 @@ POST /elysium-atlas/v1/team/members/invitation/respond
 }
 ```
 
-### Request — decline
+### Request- decline
 
 **Body:**
 
@@ -559,7 +559,7 @@ POST /elysium-atlas/v1/team/members/invitation/respond
 
 ---
 
-### Response — accept success (HTTP 200)
+### Response- accept success (HTTP 200)
 
 **Case: user joins the team (not a member before)**
 
@@ -597,7 +597,7 @@ POST /elysium-atlas/v1/team/members/invitation/respond
 
 ---
 
-### Response — decline success (HTTP 200)
+### Response- decline success (HTTP 200)
 
 ```json
 {
@@ -610,7 +610,7 @@ POST /elysium-atlas/v1/team/members/invitation/respond
 
 ---
 
-### Response — accept/decline failures (HTTP 200)
+### Response- accept/decline failures (HTTP 200)
 
 **Case: invalid or expired token**
 
@@ -689,7 +689,7 @@ Possible `invitation_status` values: `accepted` | `declined` | `expired` | `revo
 
 ---
 
-### Respond API — decision tree for frontend
+### Respond API- decision tree for frontend
 
 ```
 POST /respond with { token, accept }
@@ -712,7 +712,7 @@ if success === true && membership present
 
 ---
 
-# API 4 — List team members
+# API 4- List team members
 
 **Who calls this:** Team owner only  
 **When:** Owner opens team members page, or after sending invites
@@ -735,15 +735,15 @@ GET /elysium-atlas/v1/team/members?page=1&limit=50&status=active
 
 | Param    | Required | Default  | Max   | Description                   |
 | -------- | -------- | -------- | ----- | ----------------------------- |
-| `page`   | No       | `1`      | —     | Page number (starts at 1)     |
+| `page`   | No       | `1`      | -     | Page number (starts at 1)     |
 | `limit`  | No       | `50`     | `100` | Members per page              |
-| `status` | No       | `active` | —     | Filter: `active` or `removed` |
+| `status` | No       | `active` | -     | Filter: `active` or `removed` |
 
-**No request body** — this is a GET request.
+**No request body**- this is a GET request.
 
 ---
 
-### Response — success (HTTP 200)
+### Response- success (HTTP 200)
 
 ```json
 {
@@ -791,12 +791,12 @@ GET /elysium-atlas/v1/team/members?page=1&limit=50&status=active
 
 **Important fields for UI:**
 
-| Field               | Meaning                                                                                                                    |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `current_team_size` | Live count: **owner (1) + accepted members**                                                                               |
-| `max_team_members`  | Max allowed from owner's `atlas_teams.max_members`                                                                         |
-| `total`             | Count for pagination: **owner + invited members** when `status=active`; invited rows only when `status=removed`            |
-| `members[]`         | Paginated list — when `status=active`, **owner is always first on page 1** (`role: "owner"`), then `admin` / `member` rows |
+| Field               | Meaning                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `current_team_size` | Live count: **owner (1) + accepted members**                                                                              |
+| `max_team_members`  | Max allowed from owner's `atlas_teams.max_members`                                                                        |
+| `total`             | Count for pagination: **owner + invited members** when `status=active`; invited rows only when `status=removed`           |
+| `members[]`         | Paginated list- when `status=active`, **owner is always first on page 1** (`role: "owner"`), then `admin` / `member` rows |
 
 **Suggested UI:**
 
@@ -836,7 +836,7 @@ GET /elysium-atlas/v1/team/members?page=1&limit=50&status=active
 
 ---
 
-### Response — errors
+### Response- errors
 
 | HTTP  | Body                                                                                          | Frontend action   |
 | ----- | --------------------------------------------------------------------------------------------- | ----------------- | ----------------- |
@@ -847,12 +847,12 @@ GET /elysium-atlas/v1/team/members?page=1&limit=50&status=active
 
 ---
 
-# API 5 — Remove team member
+# API 5- Remove team member
 
 **Who calls this:** Team **owner** only  
 **When:** Owner removes an accepted member from the team
 
-Soft-removes the member (`status: "removed"`). No counters are updated — capacity is recalculated live on the next request.
+Soft-removes the member (`status: "removed"`). No counters are updated- capacity is recalculated live on the next request.
 
 ### Request
 
@@ -883,7 +883,7 @@ POST /elysium-atlas/v1/team/members/remove
 
 ---
 
-### Response — success (HTTP 200)
+### Response- success (HTTP 200)
 
 ```json
 {
@@ -902,7 +902,7 @@ POST /elysium-atlas/v1/team/members/remove
 
 ---
 
-### Response — every failure case
+### Response- every failure case
 
 **Case: missing user_id (HTTP 400)**
 
@@ -965,12 +965,12 @@ POST /elysium-atlas/v1/team/members/remove
 
 ---
 
-# API 6 — Update team member role
+# API 6- Update team member role
 
 **Who calls this:** Team **owner** or **admin**  
 **When:** Promote a member to admin, or demote an admin to member
 
-Updates `role` on an active `atlas_team_members` row. The team owner is not in that collection — their role cannot be changed via this API.
+Updates `role` on an active `atlas_team_members` row. The team owner is not in that collection- their role cannot be changed via this API.
 
 ### Request
 
@@ -1003,7 +1003,7 @@ POST /elysium-atlas/v1/team/members/update-role
 
 ---
 
-### Response — success (HTTP 200)
+### Response- success (HTTP 200)
 
 ```json
 {
@@ -1024,7 +1024,7 @@ POST /elysium-atlas/v1/team/members/update-role
 
 ---
 
-### Response — every failure case
+### Response- every failure case
 
 **Case: missing user_id (HTTP 400)**
 
@@ -1108,14 +1108,14 @@ POST /elysium-atlas/v1/team/members/update-role
 
 ## Frontend pages to build
 
-### 1. Team settings — Invite members (owner)
+### 1. Team settings- Invite members (owner)
 
 - Input: comma-separated or multi-email input
 - On submit: `POST /invite`
 - Show results table with status per email (use status table above)
 - Show `{current_team_size}/{max_team_members}` from list API (or plan info for max only)
 
-### 2. Team settings — Members list (owner)
+### 2. Team settings- Members list (owner)
 
 - On load: `GET /team/members?page=1&limit=50`
 - Paginate if `total > limit`
@@ -1287,7 +1287,7 @@ interface ListMembersResponse {
 
 ## Plan info API (team-scoped)
 
-**`POST /elysium-atlas/v1/plan/info`** — Bearer session JWT. Uses **`team_id` from the token** (active team), not the caller's personal plan.
+**`POST /elysium-atlas/v1/plan/info`**- Bearer session JWT. Uses **`team_id` from the token** (active team), not the caller's personal plan.
 
 Returns the **team owner's** subscription (`atlas_user_plans` + `atlas_user_available_plan_limits` for the owner) and **this team's** capacity from `atlas_teams`. Any team member (`owner`, `admin`, `member`) may call it.
 
@@ -1316,24 +1316,24 @@ Returns the **team owner's** subscription (`atlas_user_plans` + `atlas_user_avai
 }
 ```
 
-| Field                              | Source                                              | Notes                                          |
-| ---------------------------------- | --------------------------------------------------- | ---------------------------------------------- |
-| `plan`                             | Team **owner's** `atlas_user_plans`                 | Same plan for all members of that team         |
-| `available_limits`                 | Team **owner's** `atlas_user_available_plan_limits` | Consumable limits only — no `max_team_members` |
-| `original_limits.max_team_members` | Session team's `atlas_teams.max_members`            | Team capacity — **source of truth**            |
-| `original_limits.member_count`     | Session team's `atlas_teams.member_count`           | Owner (1) + active members                     |
-| `plan_data.team.team_id`           | JWT `team_id`                                       | Active team                                    |
-| `plan_data.team.caller_role`       | Caller's role on this team                          | `owner` \| `admin` \| `member`                 |
+| Field                              | Source                                              | Notes                                         |
+| ---------------------------------- | --------------------------------------------------- | --------------------------------------------- |
+| `plan`                             | Team **owner's** `atlas_user_plans`                 | Same plan for all members of that team        |
+| `available_limits`                 | Team **owner's** `atlas_user_available_plan_limits` | Consumable limits only- no `max_team_members` |
+| `original_limits.max_team_members` | Session team's `atlas_teams.max_members`            | Team capacity- **source of truth**            |
+| `original_limits.member_count`     | Session team's `atlas_teams.member_count`           | Owner (1) + active members                    |
+| `plan_data.team.team_id`           | JWT `team_id`                                       | Active team                                   |
+| `plan_data.team.caller_role`       | Caller's role on this team                          | `owner` \| `admin` \| `member`                |
 
 **Errors:** `400` if `team_id` missing from session; `403` if caller is not on the team.
 
-When a user switches teams at login, call `/plan/info` again — they see that team's plan and capacity.
+When a user switches teams at login, call `/plan/info` again- they see that team's plan and capacity.
 
-| Field              | Includes `max_team_members` / `member_count`?                             |
-| ------------------ | ------------------------------------------------------------------------- |
-| `original_limits`  | **Yes** — from `atlas_teams`                                              |
-| `plan_data.team`   | **Yes** — from `atlas_teams`                                              |
-| `available_limits` | **No** — never includes `max_team_members` (legacy DB fields are ignored) |
+| Field              | Includes `max_team_members` / `member_count`?                            |
+| ------------------ | ------------------------------------------------------------------------ |
+| `original_limits`  | **Yes**- from `atlas_teams`                                              |
+| `plan_data.team`   | **Yes**- from `atlas_teams`                                              |
+| `available_limits` | **No**- never includes `max_team_members` (legacy DB fields are ignored) |
 
 ---
 
@@ -1347,19 +1347,19 @@ When a user switches teams at login, call `/plan/info` again — they see that t
 
 4. **Invite link expires in 7 days.** After that, preview/respond return failure.
 
-5. **No login needed** on the invite landing page — the token in the URL is enough.
+5. **No login needed** on the invite landing page- the token in the URL is enough.
 
 6. **Profile names come from the user account**, not stored on the membership. Always use `first_name`, `last_name`, `profile_image_url` from API responses.
 
 7. **HTTP 200 with `success: false`** is normal for business errors (same pattern as Atlas auth). Always check the `success` field, not just HTTP status.
 
-8. **No manual counter increments on join/leave** — `atlas_teams.member_count` is recomputed from active members when plan info, list, invite, accept, or remove runs.
+8. **No manual counter increments on join/leave**- `atlas_teams.member_count` is recomputed from active members when plan info, list, invite, accept, or remove runs.
 
 9. **`max_team_members` and `member_count` come from `atlas_teams`** (in `original_limits` and `plan_data.team`), not from `available_limits`. **`POST /plan/assign`** sets `atlas_teams.max_members` from the plan's `max_team_members`.
 
 10. **Only the team owner** can invite, list, or remove members. Invited members cannot perform these actions.
 
-11. **Remove is a soft delete** — member `status` becomes `"removed"`. They no longer count toward `member_count`. A removed member can be **re-invited**; accepting sets their status back to `"active"` on the same document.
+11. **Remove is a soft delete**- member `status` becomes `"removed"`. They no longer count toward `member_count`. A removed member can be **re-invited**; accepting sets their status back to `"active"` on the same document.
 
 ---
 

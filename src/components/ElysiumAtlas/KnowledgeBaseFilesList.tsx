@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
-import { X, Search, Trash2, FileText } from "lucide-react";
+import { X, Search, Trash2, FileText, BookOpen } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -33,10 +33,17 @@ import {
   setKnowledgeBaseFiles,
 } from "@/store/reducers/agentBuilderSlice";
 import CustomInput from "@/components/inputs/CustomInput";
-import Badge from "@/components/ui/Badge";
 import PrimaryButton from "@/components/ui/PrimaryButton";
+import OutlineButton from "@/components/ui/OutlineButton";
 import TablePaginationControls from "./TablePaginationControls";
 import { useClientSideTablePagination } from "@/hooks/useClientSideTablePagination";
+import AgentKbPickFromLibraryDialog, {
+  type AgentKbLibraryPick,
+} from "./kb/AgentKbPickFromLibraryDialog";
+import KbStatusBadge from "./kb/KbStatusBadge";
+import { getFileAgentKbDisplayStatus } from "@/utils/agentKbUtils";
+import type { FileMetadata } from "@/store/types/AgentBuilderTypes";
+import { toast } from "sonner";
 
 interface KnowledgeBaseFilesListProps {
   onRemoveFile: (fileName: string) => void;
@@ -51,6 +58,7 @@ export default function KnowledgeBaseFilesList({
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
   const [showRightGradient, setShowRightGradient] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -136,6 +144,40 @@ export default function KnowledgeBaseFilesList({
     onRemoveFile(fileName);
   };
 
+  const handleAttachFromLibrary = (items: AgentKbLibraryPick[]) => {
+    const existingKbIds = new Set(
+      knowledgeBaseFiles.map((item) => item.kb_id).filter(Boolean),
+    );
+    const existingNames = new Set(knowledgeBaseFiles.map((item) => item.name));
+
+    const newRows: FileMetadata[] = items
+      .filter(
+        (item) =>
+          !existingKbIds.has(item.kb_id) && !existingNames.has(item.label),
+      )
+      .map((item) => ({
+        kb_id: item.kb_id,
+        name: item.label,
+        size: 0,
+        type: "",
+        checked: true,
+        s3_key: null,
+        cdn_url: null,
+        status: "pending_attach",
+        updated_at: null,
+      }));
+
+    if (newRows.length === 0) {
+      toast.info("Selected files are already in your list");
+      return;
+    }
+
+    dispatch(setKnowledgeBaseFiles([...newRows, ...knowledgeBaseFiles]));
+    toast.success(
+      `${newRows.length} file${newRows.length === 1 ? "" : "s"} added from library`,
+    );
+  };
+
   const highlightMatch = (text: string, term: string) => {
     if (!term.trim()) return text;
     const lowerText = text.toLowerCase();
@@ -176,7 +218,15 @@ export default function KnowledgeBaseFilesList({
             </span>
           )}
         </div>
-        <div className="relative w-[200px] md:w-[300px]">
+        <div className="flex items-center gap-2">
+          <OutlineButton
+            className="text-[12px] font-bold px-3 py-1 h-8"
+            onClick={() => setLibraryDialogOpen(true)}
+          >
+            <BookOpen className="mr-0 md:mr-1" size={14} />
+            <span className="hidden md:inline">From library</span>
+          </OutlineButton>
+          <div className="relative w-[200px] md:w-[300px]">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
           <CustomInput
             type="text"
@@ -185,6 +235,7 @@ export default function KnowledgeBaseFilesList({
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-[11px] h-8"
           />
+          </div>
         </div>
       </div>
 
@@ -330,7 +381,9 @@ export default function KnowledgeBaseFilesList({
                         </TableCell>
                         <TableCell className="min-w-[120px] py-4 px-[10px] text-center">
                           <div className="flex items-center justify-center">
-                            <Badge>New</Badge>
+                            <KbStatusBadge
+                              status={getFileAgentKbDisplayStatus(item)}
+                            />
                           </div>
                         </TableCell>
                         <TableCell className="min-w-[120px] py-4 px-[10px] text-[14px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
@@ -360,6 +413,16 @@ export default function KnowledgeBaseFilesList({
           <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
         )}
       </div>
+
+      <AgentKbPickFromLibraryDialog
+        open={libraryDialogOpen}
+        onOpenChange={setLibraryDialogOpen}
+        sourceType="file"
+        excludeKbIds={knowledgeBaseFiles
+          .map((f) => f.kb_id)
+          .filter((id): id is string => Boolean(id))}
+        onConfirm={handleAttachFromLibrary}
+      />
     </div>
   );
 }

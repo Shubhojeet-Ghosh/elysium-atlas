@@ -19,6 +19,7 @@ import {
   VISITOR_PAGE_SIZE_OPTIONS,
   type VisitorPageSize,
 } from "@/lib/config";
+import { cn } from "@/lib/utils";
 
 export interface TablePaginationControlsProps {
   currentPage: number;
@@ -29,6 +30,15 @@ export interface TablePaginationControlsProps {
   pageSize: number;
   pageSizeOptions?: readonly number[];
   isLoading?: boolean;
+  className?: string;
+  /** Override displayed record count (e.g. include local pending items). Defaults to `total`. */
+  totalRecords?: number;
+  showPageSize?: boolean;
+  showPageJump?: boolean;
+  /** Opens the page-size menu above the trigger (useful inside dialogs). */
+  pageSizeSelectSide?: "top" | "bottom";
+  pageSizeSelectContentClassName?: string;
+  pageSizeControlsClassName?: string;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: VisitorPageSize) => void;
 }
@@ -42,6 +52,13 @@ export default function TablePaginationControls({
   pageSize,
   pageSizeOptions = VISITOR_PAGE_SIZE_OPTIONS,
   isLoading = false,
+  className,
+  totalRecords,
+  showPageSize = true,
+  showPageJump = true,
+  pageSizeSelectSide = "bottom",
+  pageSizeSelectContentClassName,
+  pageSizeControlsClassName = "hidden sm:flex sm:items-center sm:gap-2",
   onPageChange,
   onPageSizeChange,
 }: TablePaginationControlsProps) {
@@ -56,6 +73,7 @@ export default function TablePaginationControls({
 
   const effectiveTotalPages = Math.max(1, totalPages);
   const paginationDisabled = total === 0 || isLoading;
+  const displayedRecordCount = totalRecords ?? total;
 
   const handleFirstPage = () => {
     if (currentPage > 1) onPageChange(1);
@@ -81,7 +99,18 @@ export default function TablePaginationControls({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 mb-3">
+    <div
+      className={cn(
+        "flex flex-row items-center justify-between gap-2 mb-3",
+        className,
+      )}
+    >
+      <span className="text-[12px] text-gray-500 dark:text-gray-400 whitespace-nowrap shrink-0">
+        {displayedRecordCount.toLocaleString()}{" "}
+        {displayedRecordCount === 1 ? "record" : "records"}
+      </span>
+
+      <div className="flex flex-row items-center justify-end gap-2 flex-wrap min-w-0">
       <div className="flex items-center justify-end gap-1.5 flex-wrap">
         <button
           type="button"
@@ -167,53 +196,69 @@ export default function TablePaginationControls({
         </button>
       </div>
 
-      <div className="flex items-center justify-between w-full sm:contents">
-        <div className="flex items-center gap-2 text-[12px] text-gray-500 dark:text-gray-400">
-          <span className="whitespace-nowrap">Rows per page</span>
-          <Select
-            value={String(pageSize)}
-            onValueChange={(value) =>
-              onPageSizeChange(Number(value) as VisitorPageSize)
-            }
-            disabled={isLoading}
-          >
-            <SelectTrigger
-              aria-label="Rows per page"
-              className="h-9 w-[72px] border-[2px] border-gray-300 dark:border-deep-onyx rounded-[10px] bg-white dark:bg-deep-onyx text-[13px] font-[600] text-deep-onyx dark:text-pure-mist shadow-none focus-visible:border-serene-purple focus-visible:ring-serene-purple/30 px-2"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end">
-              {pageSizeOptions.map((option) => (
-                <SelectItem key={option} value={String(option)}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      {(showPageSize || showPageJump) && (
+        <div className={pageSizeControlsClassName}>
+          {showPageSize && (
+            <div className="flex items-center gap-2 text-[12px] text-gray-500 dark:text-gray-400">
+              <span className="whitespace-nowrap">Rows per page</span>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(value) =>
+                  onPageSizeChange(Number(value) as VisitorPageSize)
+                }
+                disabled={isLoading}
+              >
+                <SelectTrigger
+                  aria-label="Rows per page"
+                  className="h-9 w-[72px] cursor-pointer border-[2px] border-gray-300 dark:border-deep-onyx rounded-[10px] bg-white dark:bg-deep-onyx text-[13px] font-[600] text-deep-onyx dark:text-pure-mist shadow-none focus-visible:border-serene-purple focus-visible:ring-serene-purple/30 px-2 disabled:cursor-not-allowed"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent
+                  align="end"
+                  position="popper"
+                  side={pageSizeSelectSide}
+                  className={cn("z-[1100]", pageSizeSelectContentClassName)}
+                >
+                  {pageSizeOptions.map((option) => (
+                    <SelectItem
+                      key={option}
+                      value={String(option)}
+                      className="cursor-pointer"
+                    >
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-        <div className="flex items-center gap-2 text-[12px] text-gray-500 dark:text-gray-400">
-          <span className="whitespace-nowrap">Go to</span>
-          <CustomInput
-            type="number"
-            min={1}
-            max={effectiveTotalPages}
-            value={pageInput}
-            onChange={(e) => setPageInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                commitPageJump();
-              }
-            }}
-            onBlur={commitPageJump}
-            disabled={paginationDisabled}
-            aria-label="Page number"
-            className="w-[52px] h-9 text-center text-[13px] py-2 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-          <span className="whitespace-nowrap">of {effectiveTotalPages}</span>
+          {showPageJump && (
+            <div className="flex items-center gap-2 text-[12px] text-gray-500 dark:text-gray-400">
+              <span className="whitespace-nowrap">Go to</span>
+              <CustomInput
+                type="number"
+                min={1}
+                max={effectiveTotalPages}
+                value={pageInput}
+                onChange={(e) => setPageInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    commitPageJump();
+                  }
+                }}
+                onBlur={commitPageJump}
+                disabled={paginationDisabled}
+                aria-label="Page number"
+                className="w-[52px] h-9 text-center text-[13px] py-2 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <span className="whitespace-nowrap">of {effectiveTotalPages}</span>
+            </div>
+          )}
         </div>
+      )}
       </div>
     </div>
   );

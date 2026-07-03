@@ -7,32 +7,49 @@ import {
   setKnowledgeBaseFiles,
   removeKnowledgeBaseFile,
 } from "@/store/reducers/agentSlice";
-import { FileMetadata } from "@/store/types/AgentBuilderTypes";
+import {
+  LIBRARY_REUSE_TOAST,
+  resolveFileForAgentAdd,
+} from "@/utils/teamKbLookup";
+import type { FileMetadata } from "@/store/types/AgentBuilderTypes";
 import { toast } from "sonner";
-import fastApiAxios from "@/utils/fastapi_axios";
-import Cookies from "js-cookie";
 import { useDropzone } from "react-dropzone";
 import { Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Pill from "@/components/ui/Pill";
 import AgentFilesList from "./AgentFilesList";
 import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
+import { listAttachedFiles } from "@/utils/agentKbApi";
+import {
+  mapAttachedFilesToState,
+  mergeFilesWithPending,
+} from "@/utils/agentKbUtils";
+import { extractApiErrorMessage } from "@/utils/toolsFormUtils";
 import {
   readDatasourcePageSize,
   writeDatasourcePageSize,
-  VISITOR_PAGE_SIZE_OPTIONS,
   type VisitorPageSize,
 } from "@/lib/config";
-
-interface AgentFilesProps {
-  documentFiles: File[];
-  setDocumentFiles: React.Dispatch<React.SetStateAction<File[]>>;
-}
+import { useAgentAttachedListLoad } from "./kb/useAgentAttachedListLoad";
+import { useIsKbBuildFlow } from "./kb/KbDatasourceModeContext";
+import { paginateItems } from "@/utils/agentKbUtils";
+import {
+  useKbFilesState,
+  useKbDatasourceActions,
+} from "./kb/useKbDatasourceState";
 
 export default function AgentFiles({
   documentFiles,
   setDocumentFiles,
-}: AgentFilesProps) {
+}: {
+  documentFiles: File[];
+  setDocumentFiles: React.Dispatch<React.SetStateAction<File[]>>;
+}) {
+  const isBuild = useIsKbBuildFlow();
+  const kbActions = useKbDatasourceActions();
+  const buildFiles = useSelector(
+    (state: RootState) => state.agentBuilder.knowledgeBaseFiles,
+  );
   const dispatch = useDispatch();
   const readOnly = useAgentReadOnly();
   const agentID = useSelector((state: RootState) => state.agent.agentID);
@@ -48,15 +65,19 @@ export default function AgentFiles({
   const [pageSize, setPageSize] = useState<VisitorPageSize>(() =>
     readDatasourcePageSize(),
   );
+  const [buildPage, setBuildPage] = useState(1);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const knowledgeBaseFilesRef = useRef(knowledgeBaseFiles);
   const pageSizeRef = useRef(pageSize);
   const currentPageRef = useRef(currentPage);
-  const knowledgeBaseFilesRef = useRef(knowledgeBaseFiles);
+  knowledgeBaseFilesRef.current = knowledgeBaseFiles;
   pageSizeRef.current = pageSize;
   currentPageRef.current = currentPage;
-  knowledgeBaseFilesRef.current = knowledgeBaseFiles;
   const triggerFetchAgentFiles = useAppSelector(
     (state) => state.agent.triggerFetchAgentFiles,
+  );
+  const triggerGetAgentDetails = useAppSelector(
+    (state) => state.agent.triggerGetAgentDetails,
   );
 
   const stopPolling = () => {
@@ -65,14 +86,6 @@ export default function AgentFiles({
       pollingRef.current = null;
     }
   };
-
-  const mergeWithNewFiles = useCallback((mappedFiles: FileMetadata[]) => {
-    const fetchedNames = new Set(mappedFiles.map((f) => f.name));
-    const newItems = knowledgeBaseFilesRef.current.filter(
-      (item) => item.status === "new" && !fetchedNames.has(item.name),
-    );
-    return [...newItems, ...mappedFiles];
-  }, []);
 
   const applyPagination = useCallback(
     (payload: {
@@ -97,7 +110,7 @@ export default function AgentFiles({
     [],
   );
 
-  const fetchAgentFiles = useCallback(
+  const refreshAttachedFiles = useCallback(
     async (
       page = currentPageRef.current,
       limit = pageSizeRef.current,
@@ -106,72 +119,50 @@ export default function AgentFiles({
       if (!agentID) return false;
 
       if (!isPolling) setIsLoadingFiles(true);
-      const token = Cookies.get("elysium_atlas_session_token");
 
       try {
-        const response = await fastApiAxios.post(
-          "/elysium-agents/elysium-atlas/agent/v1/get-agent-files",
-          {
-            agent_id: agentID,
-            page,
-            limit,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
-
-        if (response.data.success === true) {
-          const files = response.data.files || [];
-
-          const mappedFiles = files.map((fileItem: any) => ({
-            name: fileItem.file_name,
-            size: fileItem.file_size || 0,
-            type: fileItem.file_type || "",
-            checked: false,
-            s3_key: fileItem.file_key,
-            cdn_url: fileItem.cdn_url,
-            status: fileItem.status ?? "indexed",
-            updated_at: fileItem.updated_at ?? null,
-          }));
-
-          dispatch(setKnowledgeBaseFiles(mergeWithNewFiles(mappedFiles)));
+        const response = await listAttachedFiles(agentID, page, limit);
+        if (response.success) {
+          const mappedFiles = mapAttachedFilesToState(response.files ?? []);
+          dispatch(
+            setKnowledgeBaseFiles(
+              mergeFilesWithPending(mappedFiles, knowledgeBaseFilesRef.current),
+            ),
+          );
           applyPagination({
-            total: response.data.total ?? 0,
-            page: response.data.page ?? page,
-            total_pages: response.data.total_pages ?? 0,
-            has_next: response.data.has_next ?? false,
-            has_prev: response.data.has_prev ?? false,
+            total: response.total,
+            page: response.page,
+            total_pages: response.total_pages,
+            has_next: response.has_next,
+            has_prev: response.has_prev,
           });
 
           const hasIndexing = mappedFiles.some(
-            (f: FileMetadata) => f.status !== "indexed",
+            (file) => file.status === "indexing" || file.status === "draft",
           );
           if (!hasIndexing) stopPolling();
           return hasIndexing;
         }
-      } catch (error: any) {
-        const errorMessage =
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to fetch agent files";
-        if (!isPolling) toast.error(errorMessage);
+      } catch (error: unknown) {
+        if (!isPolling) {
+          toast.error(
+            extractApiErrorMessage(error, "Failed to fetch agent files"),
+          );
+        }
         stopPolling();
       } finally {
         if (!isPolling) setIsLoadingFiles(false);
       }
       return false;
     },
-    [agentID, dispatch, mergeWithNewFiles, applyPagination],
+    [agentID, dispatch, applyPagination],
   );
 
   const startPollingIfNeeded = useCallback(
     (hasIndexing: boolean) => {
       if (hasIndexing && !pollingRef.current) {
         pollingRef.current = setInterval(() => {
-          fetchAgentFiles(
+          refreshAttachedFiles(
             currentPageRef.current,
             pageSizeRef.current,
             true,
@@ -179,29 +170,17 @@ export default function AgentFiles({
         }, 5000);
       }
     },
-    [fetchAgentFiles],
+    [refreshAttachedFiles],
   );
-
-  useEffect(() => {
-    if (!agentID) return;
-    setCurrentPage(1);
-    fetchAgentFiles(1, pageSizeRef.current).then(startPollingIfNeeded);
-    return () => stopPolling();
-  }, [agentID, fetchAgentFiles, startPollingIfNeeded]);
-
-  useEffect(() => {
-    if (!agentID || triggerFetchAgentFiles === 0) return;
-    stopPolling();
-    setCurrentPage(1);
-    fetchAgentFiles(1, pageSizeRef.current).then(startPollingIfNeeded);
-  }, [triggerFetchAgentFiles, agentID, fetchAgentFiles, startPollingIfNeeded]);
 
   const handlePageChange = useCallback(
     (page: number) => {
       stopPolling();
-      fetchAgentFiles(page, pageSizeRef.current).then(startPollingIfNeeded);
+      refreshAttachedFiles(page, pageSizeRef.current).then(
+        startPollingIfNeeded,
+      );
     },
-    [fetchAgentFiles, startPollingIfNeeded],
+    [refreshAttachedFiles, startPollingIfNeeded],
   );
 
   const handlePageSizeChange = useCallback(
@@ -210,39 +189,48 @@ export default function AgentFiles({
       writeDatasourcePageSize(size);
       stopPolling();
       setCurrentPage(1);
-      fetchAgentFiles(1, size).then(startPollingIfNeeded);
+      refreshAttachedFiles(1, size).then(startPollingIfNeeded);
     },
-    [fetchAgentFiles, startPollingIfNeeded],
+    [refreshAttachedFiles, startPollingIfNeeded],
   );
 
-  // Sync local files state with Redux store (convert File[] to FileMetadata[])
+  useAgentAttachedListLoad(
+    isBuild ? undefined : agentID,
+    [triggerFetchAgentFiles, triggerGetAgentDetails],
+    () => {
+      setCurrentPage(1);
+      refreshAttachedFiles(1, pageSizeRef.current).then(startPollingIfNeeded);
+    },
+    stopPolling,
+  );
+
   useEffect(() => {
-    if (documentFiles.length > 0) {
-      const fileMetadata: FileMetadata[] = documentFiles.map((file) => ({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        checked: true,
-        status: "new",
-        s3_key: null,
-        cdn_url: null,
-      }));
+    if (isBuild || documentFiles.length === 0) return;
 
-      const existingFileNames = new Set(knowledgeBaseFiles.map((f) => f.name));
+    const fileMetadata = documentFiles.map((file) => ({
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      checked: true,
+      status: "new",
+      s3_key: null,
+      cdn_url: null,
+    }));
 
-      const newUniqueFiles = fileMetadata.filter(
-        (f) => !existingFileNames.has(f.name),
+    const existingFileNames = new Set(knowledgeBaseFiles.map((f) => f.name));
+    const newUniqueFiles = fileMetadata.filter(
+      (f) => !existingFileNames.has(f.name),
+    );
+
+    if (newUniqueFiles.length > 0) {
+      dispatch(
+        setKnowledgeBaseFiles([...newUniqueFiles, ...knowledgeBaseFiles]),
       );
-
-      if (newUniqueFiles.length > 0) {
-        dispatch(
-          setKnowledgeBaseFiles([...newUniqueFiles, ...knowledgeBaseFiles]),
-        );
-      }
     }
-  }, [documentFiles, dispatch]);
+  }, [documentFiles, dispatch, knowledgeBaseFiles, isBuild]);
 
   useEffect(() => {
+    if (isBuild) return;
     setDocumentFiles((prevFiles) => {
       if (prevFiles.length === 0) return prevFiles;
 
@@ -256,7 +244,47 @@ export default function AgentFiles({
       }
       return prevFiles;
     });
-  }, [knowledgeBaseFiles]);
+  }, [knowledgeBaseFiles, setDocumentFiles, isBuild]);
+
+  if (isBuild) {
+    const buildPagination = paginateItems(buildFiles, buildPage, pageSize);
+
+    return (
+      <div className="flex flex-col">
+        {!readOnly && (
+          <SimpleFileUpload
+            documentFiles={documentFiles}
+            setDocumentFiles={setDocumentFiles}
+            isBuild
+          />
+        )}
+        <AgentFilesList
+          isLoadingFiles={false}
+          readOnly={readOnly}
+          currentPage={buildPagination.totalPages > 0 ? buildPage : 1}
+          totalPages={buildPagination.totalPages}
+          hasNext={buildPagination.hasNext}
+          hasPrev={buildPagination.hasPrev}
+          total={buildPagination.total}
+          pageSize={pageSize}
+          onPageChange={setBuildPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            writeDatasourcePageSize(size);
+            setBuildPage(1);
+          }}
+          onRefresh={async () => undefined}
+          localPagination
+          onRemoveFile={(fileName) => {
+            kbActions.removeKnowledgeBaseFile(fileName);
+            setDocumentFiles((prev) =>
+              prev.filter((file) => file.name !== fileName),
+            );
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col">
@@ -266,27 +294,27 @@ export default function AgentFiles({
           setDocumentFiles={setDocumentFiles}
         />
       )}
-      <div className="mt-[2px]">
-        <AgentFilesList
-          isLoadingFiles={isLoadingFiles}
-          readOnly={readOnly}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          hasNext={hasNext}
-          hasPrev={hasPrev}
-          total={total}
-          pageSize={pageSize}
-          pageSizeOptions={VISITOR_PAGE_SIZE_OPTIONS}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          onRemoveFile={(fileName) => {
-            dispatch(removeKnowledgeBaseFile(fileName));
-            setDocumentFiles((prev) =>
-              prev.filter((file) => file.name !== fileName),
-            );
-          }}
-        />
-      </div>
+      <AgentFilesList
+        isLoadingFiles={isLoadingFiles}
+        readOnly={readOnly}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        hasNext={hasNext}
+        hasPrev={hasPrev}
+        total={total}
+        pageSize={pageSize}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
+        onRefresh={() =>
+          refreshAttachedFiles(currentPageRef.current, pageSizeRef.current)
+        }
+        onRemoveFile={(fileName) => {
+          dispatch(removeKnowledgeBaseFile(fileName));
+          setDocumentFiles((prev) =>
+            prev.filter((file) => file.name !== fileName),
+          );
+        }}
+      />
     </div>
   );
 }
@@ -294,36 +322,103 @@ export default function AgentFiles({
 function SimpleFileUpload({
   documentFiles,
   setDocumentFiles,
+  isBuild = false,
 }: {
   documentFiles: File[];
   setDocumentFiles: React.Dispatch<React.SetStateAction<File[]>>;
+  isBuild?: boolean;
 }) {
-  const knowledgeBaseFiles = useSelector(
-    (state: RootState) => state.agent.knowledgeBaseFiles,
-  );
+  const dispatch = useDispatch();
+  const kbActions = useKbDatasourceActions();
+  const knowledgeBaseFiles = useKbFilesState();
+  const [isResolvingFiles, setIsResolvingFiles] = useState(false);
 
   const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
+    async (acceptedFiles: File[]) => {
       const currentFileNames = new Set([
         ...documentFiles.map((f) => f.name),
         ...knowledgeBaseFiles.map((f) => f.name),
       ]);
 
-      const newFiles: File[] = [];
-
+      const candidates: File[] = [];
       acceptedFiles.forEach((file) => {
         if (currentFileNames.has(file.name)) {
-          toast.error(`File "${file.name}" already exists`);
+          toast.error(`File "${file.name}" is already on this agent`);
         } else {
-          newFiles.push(file);
+          candidates.push(file);
         }
       });
 
-      if (newFiles.length > 0) {
-        setDocumentFiles((prev) => [...prev, ...newFiles]);
+      if (candidates.length === 0) return;
+
+      setIsResolvingFiles(true);
+      try {
+        const libraryRows: FileMetadata[] = [];
+        const uploadFiles: File[] = [];
+        let libraryCount = 0;
+
+        for (const file of candidates) {
+          const { row, reusedFromLibrary } = await resolveFileForAgentAdd(file);
+          if (reusedFromLibrary) {
+            libraryRows.push(row);
+            libraryCount += 1;
+          } else {
+            uploadFiles.push(file);
+          }
+        }
+
+        let nextFiles = [...knowledgeBaseFiles];
+
+        if (libraryRows.length > 0) {
+          nextFiles = [...libraryRows, ...nextFiles];
+          if (libraryCount === 1) {
+            toast.info(LIBRARY_REUSE_TOAST.file);
+          } else {
+            toast.info(
+              `${libraryCount} files found in team library- will attach without re-uploading.`,
+            );
+          }
+        }
+
+        if (uploadFiles.length > 0) {
+          const newRows: FileMetadata[] = uploadFiles.map((file) => ({
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            checked: true,
+            status: "new",
+            s3_key: null,
+            cdn_url: null,
+          }));
+          nextFiles = [...newRows, ...nextFiles];
+          setDocumentFiles((prev) => [...prev, ...uploadFiles]);
+          const saveLabel = isBuild ? "build" : "save";
+          if (uploadFiles.length === 1 && libraryCount === 0) {
+            toast.success(
+              `File added- will be uploaded and indexed when you ${saveLabel}.`,
+            );
+          } else {
+            toast.success(
+              `${uploadFiles.length} new file${uploadFiles.length === 1 ? "" : "s"}- will be uploaded and indexed when you ${saveLabel}.`,
+            );
+          }
+        }
+
+        if (libraryRows.length > 0 || uploadFiles.length > 0) {
+          kbActions.setKnowledgeBaseFiles(nextFiles);
+        }
+      } catch (error: unknown) {
+        toast.error(
+          extractApiErrorMessage(
+            error,
+            "Failed to check team library for files",
+          ),
+        );
+      } finally {
+        setIsResolvingFiles(false);
       }
     },
-    [documentFiles, knowledgeBaseFiles, setDocumentFiles],
+    [documentFiles, kbActions, knowledgeBaseFiles, setDocumentFiles, isBuild],
   );
 
   const onDropRejected = useCallback((fileRejections: any[]) => {
@@ -354,10 +449,7 @@ function SimpleFileUpload({
   });
 
   return (
-    <div className="flex flex-col">
-      <div className="lg:text-[14px] text-[12px] font-bold mt-[4px]">
-        Upload Files
-      </div>
+    <div className="flex flex-col mb-4">
       <div className="mt-[4px]">
         <div
           {...getRootProps()}
@@ -368,6 +460,7 @@ function SimpleFileUpload({
             isDragActive &&
               "border-serene-purple dark:border-teal-green bg-serene-purple/5 dark:bg-teal-green/10",
             "bg-white dark:bg-deep-onyx",
+            isResolvingFiles && "pointer-events-none opacity-60",
           )}
         >
           <input {...getInputProps()} />

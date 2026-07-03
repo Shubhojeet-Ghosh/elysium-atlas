@@ -66,30 +66,16 @@ export default function AgentDataSource({
   setDocumentFiles,
 }: AgentDataSourceProps) {
   return (
-    <>
-      {activeTab === "links" && (
-        <div className="mt-6">
-          <AgentLinks />
-        </div>
-      )}
+    <div className="mt-4 pb-4 md:pb-6">
+      {activeTab === "links" && <AgentLinks />}
       {activeTab === "files" && (
-        <div className="mt-6">
-          <AgentFiles
-            documentFiles={documentFiles}
-            setDocumentFiles={setDocumentFiles}
-          />
-        </div>
+        <AgentFiles
+          documentFiles={documentFiles}
+          setDocumentFiles={setDocumentFiles}
+        />
       )}
-      {activeTab === "text" && (
-        <div className="mt-6">
-          <AgentText />
-        </div>
-      )}
-      {activeTab === "qna" && (
-        <div className="mt-6">
-          <AgentQnA />
-        </div>
-      )}
-    </>
+      {activeTab === "text" && <AgentText />}
+      {activeTab === "qna" && <AgentQnA />}
+    </div>
   );
 }

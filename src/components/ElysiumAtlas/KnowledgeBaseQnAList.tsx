@@ -28,12 +28,20 @@ import CancelButton from "@/components/ui/CancelButton";
 import {
   updateKnowledgeBaseQnA,
   removeKnowledgeBaseQnA,
+  setKnowledgeBaseQnA,
 } from "@/store/reducers/agentBuilderSlice";
 import OutlineButton from "@/components/ui/OutlineButton";
-import { Trash2, Search } from "lucide-react";
+import { Trash2, Search, BookOpen } from "lucide-react";
 import TablePaginationControls from "./TablePaginationControls";
 import { useClientSideTablePagination } from "@/hooks/useClientSideTablePagination";
 import { formatDateTime12hr } from "@/utils/formatDate";
+import AgentKbPickFromLibraryDialog, {
+  type AgentKbLibraryPick,
+} from "./kb/AgentKbPickFromLibraryDialog";
+import KbStatusBadge from "./kb/KbStatusBadge";
+import { getQnAAgentKbDisplayStatus } from "@/utils/agentKbUtils";
+import type { QnA } from "@/store/types/AgentBuilderTypes";
+import { toast } from "sonner";
 
 interface KnowledgeBaseQnAListProps {
   items?: never[];
@@ -58,6 +66,7 @@ export default function KnowledgeBaseQnAList({
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
   const [showRightGradient, setShowRightGradient] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -166,13 +175,16 @@ export default function KnowledgeBaseQnAList({
     : "No QnA entries added yet";
 
   const handleRowClick = (aliasName: string) => {
-    // Find the item by alias name in the Redux store
     const itemIndex = knowledgeBaseQnA.findIndex(
       (item) => item.qna_alias.toLowerCase() === aliasName.toLowerCase()
     );
 
     if (itemIndex !== -1) {
       const item = knowledgeBaseQnA[itemIndex];
+      if (item.status === "pending_attach") {
+        toast.info("Library items cannot be edited here");
+        return;
+      }
       setSelectedIndex(itemIndex);
       setAlias(item.qna_alias);
       setQuestion(item.question);
@@ -211,6 +223,40 @@ export default function KnowledgeBaseQnAList({
     }
   };
 
+  const handleAttachFromLibrary = (items: AgentKbLibraryPick[]) => {
+    const existingKbIds = new Set(
+      knowledgeBaseQnA.map((item) => item.kb_id).filter(Boolean),
+    );
+    const existingAliases = new Set(
+      knowledgeBaseQnA.map((item) => item.qna_alias.toLowerCase()),
+    );
+
+    const newRows: QnA[] = items
+      .filter(
+        (item) =>
+          !existingKbIds.has(item.kb_id) &&
+          !existingAliases.has(item.label.toLowerCase()),
+      )
+      .map((item) => ({
+        kb_id: item.kb_id,
+        qna_alias: item.label,
+        question: "",
+        answer: "",
+        lastUpdated: new Date().toISOString(),
+        status: "pending_attach",
+      }));
+
+    if (newRows.length === 0) {
+      toast.info("Selected Q&A entries are already in your list");
+      return;
+    }
+
+    dispatch(setKnowledgeBaseQnA([...newRows, ...knowledgeBaseQnA]));
+    toast.success(
+      `${newRows.length} Q&A entr${newRows.length === 1 ? "y" : "ies"} added from library`,
+    );
+  };
+
   return (
     <>
       <div className="w-full mt-[12px] overflow-hidden">
@@ -225,6 +271,13 @@ export default function KnowledgeBaseQnAList({
             )}
           </div>
           <div className="flex items-center gap-2">
+            <OutlineButton
+              className="text-[12px] font-bold px-3 py-1 h-8"
+              onClick={() => setLibraryDialogOpen(true)}
+            >
+              <BookOpen className="mr-0 md:mr-1" size={14} />
+              <span className="hidden md:inline">From library</span>
+            </OutlineButton>
             {onAddMore && (
               <OutlineButton
                 className="text-[12px] font-bold px-3 py-1 h-8"
@@ -271,6 +324,9 @@ export default function KnowledgeBaseQnAList({
                       <TableHead className="min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] font-[600] py-2 lg:px-4 px-0 whitespace-nowrap">
                         QnA alias
                       </TableHead>
+                      <TableHead className="min-w-[120px] pl-4 md:pl-8 lg:pl-12 font-[600] py-2 lg:px-4 px-0 whitespace-nowrap">
+                        Status
+                      </TableHead>
                       <TableHead className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 font-[600] py-2 lg:px-4 px-0 whitespace-nowrap">
                         Last updated
                       </TableHead>
@@ -281,7 +337,7 @@ export default function KnowledgeBaseQnAList({
                     {currentQnA.length === 0 ? (
                       <TableRow className="hover:bg-transparent">
                         <TableCell
-                          colSpan={3}
+                          colSpan={4}
                           className="py-10 text-center text-[12px] text-gray-500 dark:text-gray-400"
                         >
                           {emptyMessage}
@@ -308,6 +364,11 @@ export default function KnowledgeBaseQnAList({
                                 ? highlightMatch(alias, searchTerm)
                                 : alias}
                             </div>
+                          </TableCell>
+                          <TableCell className="min-w-[120px] pl-4 md:pl-8 lg:pl-12 py-2 lg:px-4 px-0 text-[12px] whitespace-nowrap">
+                            <KbStatusBadge
+                              status={getQnAAgentKbDisplayStatus(item)}
+                            />
                           </TableCell>
                           <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-2 lg:px-4 px-0 text-[12px] whitespace-nowrap">
                             {formatDateTime12hr(item.lastUpdated)}
@@ -414,6 +475,16 @@ export default function KnowledgeBaseQnAList({
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      <AgentKbPickFromLibraryDialog
+        open={libraryDialogOpen}
+        onOpenChange={setLibraryDialogOpen}
+        sourceType="qa_pair"
+        excludeKbIds={knowledgeBaseQnA
+          .map((q) => q.kb_id)
+          .filter((id): id is string => Boolean(id))}
+        onConfirm={handleAttachFromLibrary}
+      />
     </>
   );
 }

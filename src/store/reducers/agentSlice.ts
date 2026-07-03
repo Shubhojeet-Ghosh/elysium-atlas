@@ -19,7 +19,7 @@ export interface ConversationMessage {
   role: "user" | "agent" | "human";
   content: string;
   created_at: string;
-  /** @deprecated Prefer read_at — kept for backwards compatibility */
+  /** @deprecated Prefer read_at- kept for backwards compatibility */
   is_read?: boolean;
   read_at?: string | null;
 }
@@ -154,8 +154,7 @@ function buildConversationLogFromSources(
       new Date().toISOString(),
     ended_at: overrides.ended_at ?? null,
     status:
-      overrides.status ??
-      (visitor?.status === "offline" ? "ended" : "live"),
+      overrides.status ?? (visitor?.status === "offline" ? "ended" : "live"),
     unread_count: overrides.unread_count ?? 0,
     is_unread: overrides.is_unread ?? false,
     color: overrides.color ?? source?.color ?? "",
@@ -452,7 +451,7 @@ const agentSlice = createSlice({
         (s) => s.chat_session_id === action.payload.chat_session_id,
       );
       if (existing) {
-        // Already captured — just re-expand, collapse others, keep original captured_at
+        // Already captured- just re-expand, collapse others, keep original captured_at
         state.captured_sessions.forEach((s) => {
           s.is_expanded = false;
         });
@@ -473,8 +472,8 @@ const agentSlice = createSlice({
           (l) => l.chat_session_id === action.payload.chat_session_id,
         );
 
-        // New session — collapse all existing, add expanded with merged data
-        // New session — collapse all existing, add expanded with full visitor data
+        // New session- collapse all existing, add expanded with merged data
+        // New session- collapse all existing, add expanded with full visitor data
         state.captured_sessions.forEach((s) => {
           s.is_expanded = false;
         });
@@ -502,7 +501,8 @@ const agentSlice = createSlice({
               alias_name: log.alias_name,
               geo_data: log.geo_data,
               color: log.color || baseVisitor.color,
-              last_message_at: log.last_message_at ?? baseVisitor.last_message_at,
+              last_message_at:
+                log.last_message_at ?? baseVisitor.last_message_at,
             }
           : baseVisitor;
 
@@ -651,11 +651,15 @@ const agentSlice = createSlice({
         };
       } else {
         state.team_member_conversation_logs.unshift(
-          buildConversationLogFromSources(state, action.payload.chat_session_id, {
-            ...action.payload,
-            is_unread: action.payload.is_unread ?? false,
-            unread_count: action.payload.unread_count ?? 0,
-          }),
+          buildConversationLogFromSources(
+            state,
+            action.payload.chat_session_id,
+            {
+              ...action.payload,
+              is_unread: action.payload.is_unread ?? false,
+              unread_count: action.payload.unread_count ?? 0,
+            },
+          ),
         );
       }
     },

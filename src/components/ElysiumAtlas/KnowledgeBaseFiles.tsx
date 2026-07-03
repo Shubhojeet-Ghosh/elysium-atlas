@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
 import {
@@ -13,6 +13,10 @@ import { cn } from "@/lib/utils";
 import Pill from "@/components/ui/Pill";
 import { toast } from "sonner";
 import KnowledgeBaseFilesList from "./KnowledgeBaseFilesList";
+import {
+  LIBRARY_REUSE_TOAST,
+  resolveFileForAgentAdd,
+} from "@/utils/teamKbLookup";
 
 interface KnowledgeBaseFilesProps {
   documentFiles: File[];
@@ -27,31 +31,6 @@ export default function KnowledgeBaseFiles({
   const knowledgeBaseFiles = useSelector(
     (state: RootState) => state.agentBuilder.knowledgeBaseFiles,
   );
-
-  useEffect(() => {
-    if (documentFiles.length > 0) {
-      const fileMetadata: FileMetadata[] = documentFiles.map((file) => ({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        checked: true,
-        status: "new",
-        s3_key: null,
-        cdn_url: null,
-      }));
-
-      const existingFileNames = new Set(knowledgeBaseFiles.map((f) => f.name));
-      const newUniqueFiles = fileMetadata.filter(
-        (f) => !existingFileNames.has(f.name),
-      );
-
-      if (newUniqueFiles.length > 0) {
-        dispatch(
-          setKnowledgeBaseFiles([...newUniqueFiles, ...knowledgeBaseFiles]),
-        );
-      }
-    }
-  }, [documentFiles, dispatch]);
 
   useEffect(() => {
     setDocumentFiles((prevFiles) => {
@@ -75,6 +54,7 @@ export default function KnowledgeBaseFiles({
         documentFiles={documentFiles}
         setDocumentFiles={setDocumentFiles}
         knowledgeBaseFiles={knowledgeBaseFiles}
+        dispatch={dispatch}
       />
       <KnowledgeBaseFilesList onRemoveFile={handleRemoveFile} />
     </div>
@@ -85,13 +65,17 @@ function SimpleFileUpload({
   documentFiles,
   setDocumentFiles,
   knowledgeBaseFiles,
+  dispatch,
 }: {
   documentFiles: File[];
   setDocumentFiles: React.Dispatch<React.SetStateAction<File[]>>;
   knowledgeBaseFiles: FileMetadata[];
+  dispatch: ReturnType<typeof useDispatch>;
 }) {
+  const [isResolving, setIsResolving] = useState(false);
+
   const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
+    async (acceptedFiles: File[]) => {
       const currentFileNames = new Set([
         ...documentFiles.map((f) => f.name),
         ...knowledgeBaseFiles.map((f) => f.name),
@@ -106,11 +90,45 @@ function SimpleFileUpload({
         }
       });
 
-      if (newFiles.length > 0) {
-        setDocumentFiles((prev) => [...prev, ...newFiles]);
+      if (newFiles.length === 0) return;
+
+      setIsResolving(true);
+      try {
+        const newRows: FileMetadata[] = [];
+        const filesToStore: File[] = [];
+        let libraryCount = 0;
+
+        for (const file of newFiles) {
+          const { row, reusedFromLibrary } = await resolveFileForAgentAdd(file);
+          newRows.push(row);
+          if (reusedFromLibrary) {
+            libraryCount += 1;
+          } else {
+            filesToStore.push(file);
+          }
+        }
+
+        dispatch(
+          setKnowledgeBaseFiles([...newRows, ...knowledgeBaseFiles]),
+        );
+
+        if (filesToStore.length > 0) {
+          setDocumentFiles((prev) => [...prev, ...filesToStore]);
+        }
+
+        if (libraryCount > 0) {
+          toast.info(LIBRARY_REUSE_TOAST.file);
+        }
+        if (newRows.length - libraryCount > 0) {
+          toast.success(
+            `${newRows.length - libraryCount} file${newRows.length - libraryCount === 1 ? "" : "s"} added`,
+          );
+        }
+      } finally {
+        setIsResolving(false);
       }
     },
-    [documentFiles, knowledgeBaseFiles, setDocumentFiles],
+    [documentFiles, knowledgeBaseFiles, setDocumentFiles, dispatch],
   );
 
   const onDropRejected = useCallback((fileRejections: any[]) => {
@@ -138,6 +156,7 @@ function SimpleFileUpload({
     },
     multiple: true,
     maxSize: 10 * 1024 * 1024,
+    disabled: isResolving,
   });
 
   return (

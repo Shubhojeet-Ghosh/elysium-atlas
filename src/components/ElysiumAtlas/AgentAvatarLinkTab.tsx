@@ -21,7 +21,7 @@ export default function AgentAvatarLinkTab({
   const dispatch = useAppDispatch();
   const readOnly = useAgentReadOnly();
   const agentIcon = useAppSelector((state) => state.agent.agent_icon);
-  // Snapshot the icon value at mount — used to restore when the URL is invalid or cleared
+  // Snapshot the icon value at mount- used to restore when the URL is invalid or cleared
   const originalIconRef = useRef<string | null>(agentIcon);
 
   const [imgValid, setImgValid] = useState(false);
@@ -86,7 +86,7 @@ export default function AgentAvatarLinkTab({
             if (readOnly) return;
             setImgValid(false);
             setImgTried(false);
-            // Don't dispatch here — wait for probe onLoad/onError to confirm validity
+            // Don't dispatch here- wait for probe onLoad/onError to confirm validity
             setImageUrl(e.target.value.trimStart());
           }}
           inputClassName="font-[400] px-[12px] py-[8px]"

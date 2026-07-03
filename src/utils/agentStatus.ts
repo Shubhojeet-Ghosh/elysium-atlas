@@ -1,4 +1,4 @@
-/** Terminal agent statuses — not building/indexing; no status polling needed. */
+/** Terminal agent statuses- not building/indexing; no status polling needed. */
 export const SETTLED_AGENT_STATUSES = [
   "active",
   "inactive",
@@ -22,7 +22,7 @@ export function isAgentDisabled(status: string): boolean {
 }
 
 export const AGENT_OFFLINE_MESSAGE =
-  "We're currently offline and can't respond to messages right now. Please check back later — we'll be happy to help when we're back online.";
+  "We're currently offline and can't respond to messages right now. Please check back later- we'll be happy to help when we're back online.";
 
 export function getAgentStatusTextClass(status: string): string {
   const normalized = status.toLowerCase();

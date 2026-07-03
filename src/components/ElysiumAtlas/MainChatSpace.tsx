@@ -80,7 +80,11 @@ export default function MainChatSpace() {
 
   // Refs read by the socket's onConnect callback so it always sees the
   // freshest values without re-subscribing.
-  const joinPayloadRef = useRef({ agent_id, chat_session_id, geo_data: geoData });
+  const joinPayloadRef = useRef({
+    agent_id,
+    chat_session_id,
+    geo_data: geoData,
+  });
   useEffect(() => {
     joinPayloadRef.current = { agent_id, chat_session_id, geo_data: geoData };
   }, [agent_id, chat_session_id, geoData]);
@@ -182,7 +186,7 @@ export default function MainChatSpace() {
 
   // Connect to the socket and (re)join the visitor session on every connect.
   // This is the ONLY place that emits atlas-visitor-connected, and it runs
-  // again automatically after every reconnect — no manual race handling.
+  // again automatically after every reconnect- no manual race handling.
   const { emit, status } = useAiSocket({
     autoConnect: !isFetching,
     onConnect: (socket) => {
@@ -219,7 +223,7 @@ export default function MainChatSpace() {
       setStreamingMessage("");
       dispatch(setIsTyping(false));
 
-      // Visitor is already in chat — mark read immediately, no "New" separator
+      // Visitor is already in chat- mark read immediately, no "New" separator
       if (isAgentOpenRef.current) {
         requestAnimationFrame(() => {
           markIncomingMessageVisibleRef.current(messageId, null);
@@ -260,10 +264,7 @@ export default function MainChatSpace() {
     );
     dispatch(setInConversationWith(data.in_conversation_with));
 
-    if (
-      (role === "human" || role === "agent") &&
-      isAgentOpenRef.current
-    ) {
+    if ((role === "human" || role === "agent") && isAgentOpenRef.current) {
       const messageId = data.message_id ?? "";
       if (messageId) {
         requestAnimationFrame(() => {
@@ -325,7 +326,8 @@ export default function MainChatSpace() {
     if (separatorSnapshottedRef.current) return;
 
     separatorSnapshottedRef.current = true;
-    const firstUnread = findFirstIncomingUnreadSeparatorIndex(conversation_chain);
+    const firstUnread =
+      findFirstIncomingUnreadSeparatorIndex(conversation_chain);
     if (firstUnread === -1) return;
 
     separatorIndexRef.current = firstUnread;

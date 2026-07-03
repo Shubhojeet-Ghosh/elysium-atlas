@@ -61,27 +61,27 @@ export const deepEqualNormalized = (obj1: any, obj2: any): boolean => {
 };
 
 /**
- * Filter array items to only keep those with status="new" (user-added, unsaved items).
- * Excludes all API-fetched items (status="existing", "indexed", "indexing", "failed", etc.)
- * to prevent them from triggering unsaved-changes detection.
- * For new items with a checked field (files/links), only includes them if checked is true.
- * For new items without checked field (custom texts, QnA), includes all.
+ * Filter array items to only keep unsaved user changes.
+ * Includes status="new" (inline creates) and status="pending_attach" (library picks).
+ * Excludes API-fetched items (existing, ready, indexing, etc.).
  */
 const filterNonExisting = (arr: any[]): any[] => {
   if (!Array.isArray(arr)) return arr;
   return arr.filter((item) => {
     if (typeof item === "object" && item !== null && "status" in item) {
-      // Exclude all API-fetched items (anything that is not "new")
-      // This covers legacy "existing" as well as API statuses like
-      // "indexed", "indexing", "failed", "pending", "error", etc.
+      if (item.status === "pending_attach") {
+        return true;
+      }
+
       if (item.status !== "new") {
         return false;
       }
-      // For new items with a checked field (files/links), only include if checked is true
+
+      // For new items with a checked field (files/links), only include if checked
       if ("checked" in item) {
         return item.checked === true;
       }
-      // For new items without checked field (custom texts, QnA), include all
+
       return true;
     }
     return true;

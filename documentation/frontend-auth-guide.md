@@ -1,4 +1,4 @@
-# Elysium Atlas — Auth API (Frontend Integration Guide)
+# Elysium Atlas- Auth API (Frontend Integration Guide)
 
 This document is for the **frontend team**. It covers all Atlas login methods, the **`teams`** array, and the **team selection** flow when a user belongs to more than one team.
 
@@ -31,7 +31,7 @@ Each team entry and the active session include a **`role`**:
 
 | User has        | What happens                                                                        |
 | --------------- | ----------------------------------------------------------------------------------- |
-| **1 team only** | Direct login — `sessionToken` returned immediately (unchanged UX)                   |
+| **1 team only** | Direct login- `sessionToken` returned immediately (unchanged UX)                    |
 | **2+ teams**    | Phase 1: identity verified, **`selection_token`** returned (no `sessionToken`)      |
 |                 | Phase 2: user picks a team → `POST /select-team` → full login with chosen `team_id` |
 
@@ -89,7 +89,7 @@ sessionToken    │
 
 Used by: **password login**, **magic link verify**, **Google login**.
 
-### A — Single team (`teams.length === 1`) — direct login
+### A- Single team (`teams.length === 1`)- direct login
 
 ```json
 {
@@ -121,7 +121,7 @@ Used by: **password login**, **magic link verify**, **Google login**.
 
 ---
 
-### B — Multiple teams — team selection required
+### B- Multiple teams- team selection required
 
 ```json
 {
@@ -158,7 +158,7 @@ Used by: **password login**, **magic link verify**, **Google login**.
 
 | Field                     | Notes                                  |
 | ------------------------- | -------------------------------------- |
-| `requires_team_selection` | `true` — show team picker              |
+| `requires_team_selection` | `true`- show team picker               |
 | `selection_token`         | Short-lived (~10 min). Use in phase 2. |
 | **No `sessionToken`**     | Do not store a session yet             |
 | `user.team_id`            | `null` until team is selected          |
@@ -166,7 +166,7 @@ Used by: **password login**, **magic link verify**, **Google login**.
 
 ---
 
-## Phase 2 — Select team
+## Phase 2- Select team
 
 **`POST /elysium-atlas/v1/auth/select-team`**
 
@@ -179,7 +179,7 @@ Used by: **password login**, **magic link verify**, **Google login**.
 }
 ```
 
-### Success — `200`
+### Success- `200`
 
 ```json
 {
@@ -247,7 +247,7 @@ If `selection_token` expires → send user back to login.
 
 ---
 
-## API 1 — Password login
+## API 1- Password login
 
 **`POST /elysium-atlas/v1/auth/magic-link`**
 
@@ -260,7 +260,7 @@ If `selection_token` expires → send user back to login.
 
 Returns **phase 1** response (direct login or `requires_team_selection`).
 
-### Failures — `200`
+### Failures- `200`
 
 ```json
 { "success": false, "message": "A valid email is required." }
@@ -276,7 +276,7 @@ Returns **phase 1** response (direct login or `requires_team_selection`).
 
 ---
 
-## API 2 — Magic link send
+## API 2- Magic link send
 
 **`POST /elysium-atlas/v1/auth/magic-link`** (email only, no password)
 
@@ -297,7 +297,7 @@ No session. User opens email link → **API 3**.
 
 ---
 
-## API 3 — Magic link verify
+## API 3- Magic link verify
 
 **`POST /elysium-atlas/v1/auth/verify`**
 
@@ -323,7 +323,7 @@ If `requires_team_selection` → show picker → **API 5**.
 
 ---
 
-## API 4 — Google login
+## API 4- Google login
 
 **`POST /elysium-atlas/v1/auth/verify-google-login`**
 
@@ -337,7 +337,7 @@ Returns **phase 1** response (new users usually have 1 team → direct login).
 
 If `requires_team_selection` → show picker → **API 5**.
 
-### Failures — `200`
+### Failures- `200`
 
 ```json
 { "success": false, "message": "Google access token is missing." }
@@ -360,10 +360,10 @@ If `requires_team_selection` → show picker → **API 5**.
 }
 ```
 
-| Field      | Meaning                                                                                |
-| ---------- | -------------------------------------------------------------------------------------- |
-| `is_owner` | `true` if user **owns** this team; `false` if they **joined** via invitation           |
-| `role`     | `"owner"` \| `"admin"` \| `"member"` — use this for permissions and team picker labels |
+| Field      | Meaning                                                                               |
+| ---------- | ------------------------------------------------------------------------------------- |
+| `is_owner` | `true` if user **owns** this team; `false` if they **joined** via invitation          |
+| `role`     | `"owner"` \| `"admin"` \| `"member"`- use this for permissions and team picker labels |
 
 | `role`     | Typical meaning                           |
 | ---------- | ----------------------------------------- |
@@ -400,14 +400,14 @@ if (!data.success) {
 }
 
 if (data.requires_team_selection) {
-  // Save for phase 2 — NOT a session token
+  // Save for phase 2- NOT a session token
   sessionStorage.setItem("selection_token", data.selection_token);
   sessionStorage.setItem("teams", JSON.stringify(data.teams));
   navigate("/select-team");
   return;
 }
 
-// Single team — full login
+// Single team- full login
 localStorage.setItem("sessionToken", data.sessionToken);
 localStorage.setItem("teams", JSON.stringify(data.teams));
 localStorage.setItem("activeTeamId", data.user.team_id);
@@ -480,7 +480,7 @@ interface AtlasAuthUser {
   profile_image_url: string | null;
 }
 
-/** Phase 1 — direct login (single team) */
+/** Phase 1- direct login (single team) */
 interface AtlasDirectLoginResponse {
   success: true;
   message: string;
@@ -490,7 +490,7 @@ interface AtlasDirectLoginResponse {
   user: AtlasAuthUser & { team_id: string; role: TeamRole };
 }
 
-/** Phase 1 — team selection required */
+/** Phase 1- team selection required */
 interface AtlasTeamSelectionRequiredResponse {
   success: true;
   requires_team_selection: true;
@@ -501,7 +501,7 @@ interface AtlasTeamSelectionRequiredResponse {
   user: AtlasAuthUser & { team_id: null; role: null };
 }
 
-/** Phase 2 — select-team success */
+/** Phase 2- select-team success */
 interface AtlasSelectTeamResponse {
   success: true;
   message: string;
@@ -570,7 +570,7 @@ const googleRes = await fetch(`${BASE}/v1/auth/verify-google-login`, {
 
 ---
 
-## Internal — Decode token (Postman / debugging)
+## Internal- Decode token (Postman / debugging)
 
 **`POST /elysium-atlas/v1/auth/decode-token`**
 
@@ -585,7 +585,7 @@ Protected by `APPLICATION_SECRET_KEY` (same as plan admin routes). **Not for fro
 }
 ```
 
-Set `Authorization` to the **raw secret only** — do **not** use `Bearer`.
+Set `Authorization` to the **raw secret only**- do **not** use `Bearer`.
 
 ### Request body
 
@@ -597,7 +597,7 @@ Set `Authorization` to the **raw secret only** — do **not** use `Bearer`.
 
 Or query param: `?token=...`
 
-### Success — valid token — `200`
+### Success- valid token- `200`
 
 ```json
 {
@@ -618,7 +618,7 @@ Or query param: `?token=...`
 }
 ```
 
-### Success — expired token — `200`
+### Success- expired token- `200`
 
 ```json
 {
@@ -638,7 +638,7 @@ Or query param: `?token=...`
 }
 ```
 
-### Auth failures — `200`
+### Auth failures- `200`
 
 ```json
 { "success": false, "message": "Authorization header is required." }
