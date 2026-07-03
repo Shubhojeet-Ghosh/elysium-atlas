@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
-import { X, Search, ExternalLink, Trash2 } from "lucide-react";
+import { X, Search, ExternalLink, Trash2, BookOpen } from "lucide-react";
 import Link from "next/link";
 import {
   Table,
@@ -40,10 +40,15 @@ import { toast } from "sonner";
 import OutlineButton from "@/components/ui/OutlineButton";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import Spinner from "@/components/ui/Spinner";
-import Badge from "@/components/ui/Badge";
 import fastApiAxios from "@/utils/fastapi_axios";
 import TablePaginationControls from "./TablePaginationControls";
 import { useClientSideTablePagination } from "@/hooks/useClientSideTablePagination";
+import AgentKbPickFromLibraryDialog, {
+  type AgentKbLibraryPick,
+} from "./kb/AgentKbPickFromLibraryDialog";
+import KbStatusBadge from "./kb/KbStatusBadge";
+import { getLinkAgentKbDisplayStatus } from "@/utils/agentKbUtils";
+import { resolveLinkForAgentAdd } from "@/utils/teamKbLookup";
 
 export default function KnowledgeBaseLinksList() {
   const dispatch = useDispatch();
@@ -53,6 +58,7 @@ export default function KnowledgeBaseLinksList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [manualLinkDialogOpen, setManualLinkDialogOpen] = useState(false);
+  const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
   const [manualLink, setManualLink] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showRightGradient, setShowRightGradient] = useState(true);
@@ -155,15 +161,16 @@ export default function KnowledgeBaseLinksList() {
           (item) => item.link === normalizedUrl,
         );
         if (!exists) {
-          const newLink: KnowledgeBaseLink = {
-            link: normalizedUrl,
-            checked: true,
-            status: "new",
-            updated_at: null,
-          };
-          dispatch(setKnowledgeBaseLinks([newLink, ...knowledgeBaseLinks]));
+          const { row, reusedFromLibrary } =
+            await resolveLinkForAgentAdd(normalizedUrl);
+          dispatch(setKnowledgeBaseLinks([row, ...knowledgeBaseLinks]));
           setManualLink("");
-          toast.success("Link added successfully");
+          setManualLinkDialogOpen(false);
+          toast.success(
+            reusedFromLibrary
+              ? "Link added from team library"
+              : "Link added successfully",
+          );
         } else {
           toast.error("Link already exists in the list.");
         }
@@ -181,6 +188,37 @@ export default function KnowledgeBaseLinksList() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleAttachFromLibrary = (items: AgentKbLibraryPick[]) => {
+    const existingKbIds = new Set(
+      knowledgeBaseLinks.map((item) => item.kb_id).filter(Boolean),
+    );
+    const existingUrls = new Set(knowledgeBaseLinks.map((item) => item.link));
+
+    const newRows: KnowledgeBaseLink[] = items
+      .filter(
+        (item) =>
+          !existingKbIds.has(item.kb_id) && !existingUrls.has(item.label),
+      )
+      .map((item) => ({
+        kb_id: item.kb_id,
+        link: item.label,
+        checked: true,
+        status: "pending_attach",
+        updated_at: null,
+        api_status: "ready",
+      }));
+
+    if (newRows.length === 0) {
+      toast.info("Selected links are already in your list");
+      return;
+    }
+
+    dispatch(setKnowledgeBaseLinks([...newRows, ...knowledgeBaseLinks]));
+    toast.success(
+      `${newRows.length} link${newRows.length === 1 ? "" : "s"} added from library`,
+    );
   };
 
   const highlightMatch = (text: string, term: string) => {
@@ -216,6 +254,13 @@ export default function KnowledgeBaseLinksList() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <OutlineButton
+            className="text-[12px] font-bold px-3 py-1 h-8"
+            onClick={() => setLibraryDialogOpen(true)}
+          >
+            <BookOpen className="mr-0 md:mr-1" size={14} />
+            <span className="hidden md:inline">From library</span>
+          </OutlineButton>
           <OutlineButton
             className="text-[12px] font-bold px-3 py-1 h-8"
             onClick={() => setManualLinkDialogOpen(true)}
@@ -410,7 +455,9 @@ export default function KnowledgeBaseLinksList() {
                         </TableCell>
                         <TableCell className="min-w-[120px] py-4 px-[10px] text-center">
                           <div className="flex items-center justify-center">
-                            <Badge>New</Badge>
+                            <KbStatusBadge
+                              status={getLinkAgentKbDisplayStatus(item)}
+                            />
                           </div>
                         </TableCell>
                         <TableCell className="w-[100px] text-right py-4 px-[10px] whitespace-nowrap">
@@ -448,6 +495,16 @@ export default function KnowledgeBaseLinksList() {
           <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
         )}
       </div>
+
+      <AgentKbPickFromLibraryDialog
+        open={libraryDialogOpen}
+        onOpenChange={setLibraryDialogOpen}
+        sourceType="url"
+        excludeKbIds={knowledgeBaseLinks
+          .map((l) => l.kb_id)
+          .filter((id): id is string => Boolean(id))}
+        onConfirm={handleAttachFromLibrary}
+      />
     </div>
   );
 }

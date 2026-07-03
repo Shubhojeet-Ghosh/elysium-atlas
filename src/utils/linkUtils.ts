@@ -3,7 +3,7 @@
  * @param url - The URL to normalize
  * @returns Normalized URL
  */
-function normalizeURL(url: string): string {
+export function normalizeUrlForKbMatch(url: string): string {
   try {
     const urlObj = new URL(url);
 
@@ -95,7 +95,7 @@ export function cleanAndDeduplicateLinks(responseLinks: string[]): string[] {
     }
 
     // Normalize the URL
-    const normalized = normalizeURL(link);
+    const normalized = normalizeUrlForKbMatch(link);
 
     // Skip if already seen in this batch
     if (seen.has(normalized)) {

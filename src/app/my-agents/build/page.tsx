@@ -14,7 +14,7 @@ export default function MyAgentsPage() {
       <LeftNav />
 
       <PageContent>
-        <div className="lg:px-[300px] md:px-8 px-4  h-[calc(100dvh-65px)]">
+        <div className="lg:px-[50px] px-4 h-[calc(100dvh-65px)]">
           <BuildAgentAccessGuard>
             <BuildNewAgent />
           </BuildAgentAccessGuard>

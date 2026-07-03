@@ -31,7 +31,6 @@ const navItems: NavItem[] = [
     name: "Knowledge Base",
     href: "/knowledge-base",
     icon: BookOpen,
-    disabled: true,
   },
   {
     name: "Team",

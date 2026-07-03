@@ -1,5 +1,10 @@
+import { mapKbAttachmentsToState } from "@/utils/agentKbUtils";
+
 export function mapInitialAgentDetails(details: any) {
   if (!details) return null;
+
+  const kbState = mapKbAttachmentsToState(details.kb_attachments);
+
   return {
     agentID: details.agent_id || details.agentID || "",
     agentName: details.agent_name,
@@ -13,10 +18,10 @@ export function mapInitialAgentDetails(details: any) {
     llmModel: details.llm_model,
     retrievalStrategy: details.retrieval_strategy || "simple",
     toolIds: Array.isArray(details.tool_ids) ? details.tool_ids : [],
-    knowledgeBaseLinks: [],
-    knowledgeBaseFiles: [],
-    knowledgeBaseText: [],
-    knowledgeBaseQnA: [],
+    knowledgeBaseLinks: kbState.knowledgeBaseLinks,
+    knowledgeBaseFiles: kbState.knowledgeBaseFiles,
+    knowledgeBaseText: kbState.knowledgeBaseText,
+    knowledgeBaseQnA: kbState.knowledgeBaseQnA,
     agent_icon: details.agent_icon ?? null,
     primary_color: details.primary_color || "#fff",
     secondary_color: details.secondary_color || "#fff",

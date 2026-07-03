@@ -89,7 +89,7 @@ export function useAiSocket(options: UseAiSocketOptions = {}) {
       aiSocket.off("disconnect", handleDisconnect);
       aiSocket.off("connect_error", handleConnectError);
       aiSocket.io.off("reconnect_attempt", handleReconnecting);
-      // Intentionally do NOT disconnect — the socket is shared app-wide.
+      // Intentionally do NOT disconnect- the socket is shared app-wide.
     };
   }, [autoConnect]);
 

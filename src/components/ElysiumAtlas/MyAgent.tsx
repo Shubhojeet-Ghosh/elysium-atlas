@@ -51,6 +51,15 @@ import { toast } from "sonner";
 import { triggerFetchAgents } from "@/store/reducers/userAgentsSlice";
 import { SquareArrowOutUpRight } from "lucide-react";
 import axios from "axios";
+import {
+  applySavedLinksToState,
+  buildAgentKbUpdateFields,
+} from "@/utils/agentKbUtils";
+import {
+  createFile,
+  generatePresignedUrls,
+  parseKbPresignedUrls,
+} from "@/utils/kbItemsApi";
 import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 import {
   getSectionLabel,
@@ -153,9 +162,8 @@ export default function MyAgent({
   useEffect(() => {
     if (mappedInitial && knowledgeBaseFiles.length > 0) {
       // Only update if knowledgeBaseFiles have API-fetched items
-      // (status !== "new" covers "indexed", "indexing", "failed", etc.)
       const existingFiles = knowledgeBaseFiles.filter(
-        (file) => file.status !== "new",
+        (file) => file.status !== "new" && file.status !== "pending_attach",
       );
 
       // Only sync if there are existing files and they differ from mappedInitial
@@ -187,9 +195,8 @@ export default function MyAgent({
   useEffect(() => {
     if (mappedInitial && knowledgeBaseText.length > 0) {
       // Only update if knowledgeBaseText have API-fetched items
-      // (status !== "new" covers "indexed", "indexing", "failed", etc.)
       const existingTexts = knowledgeBaseText.filter(
-        (text) => text.status !== "new",
+        (text) => text.status !== "new" && text.status !== "pending_attach",
       );
 
       // Only sync if there are existing texts and they differ from mappedInitial
@@ -226,9 +233,8 @@ export default function MyAgent({
   useEffect(() => {
     if (mappedInitial && knowledgeBaseQnA.length > 0) {
       // Only update if knowledgeBaseQnA have API-fetched items
-      // (status !== "new" covers "indexed", "indexing", "active", etc.)
       const existingQnA = knowledgeBaseQnA.filter(
-        (qna) => qna.status !== "new",
+        (qna) => qna.status !== "new" && qna.status !== "pending_attach",
       );
 
       // Only sync if there are existing QnA and they differ from mappedInitial
@@ -330,7 +336,7 @@ export default function MyAgent({
       )
     ) {
       // Only send agent_icon for URL values (link tab).
-      // data: URLs from the image tab require an S3 upload first — handled separately.
+      // data: URLs from the image tab require an S3 upload first- handled separately.
       const newIcon = current.agent_icon ?? null;
       if (!newIcon || !newIcon.startsWith("data:")) {
         payload.agent_icon = newIcon;
@@ -369,56 +375,23 @@ export default function MyAgent({
       payload.temperature = current.temperature;
     }
 
-    // Compare arrays for links - check if there are new links to add
-    const newLinksToAdd =
-      current.knowledgeBaseLinks
-        ?.filter((link: any) => link.checked && link.status === "new")
-        ?.map((link: any) => link.link) || [];
+    // Knowledge base attachments and inline creates
+    const kbFields = buildAgentKbUpdateFields(
+      {
+        knowledgeBaseLinks: mappedInitial.knowledgeBaseLinks ?? [],
+        knowledgeBaseFiles: mappedInitial.knowledgeBaseFiles ?? [],
+        knowledgeBaseText: mappedInitial.knowledgeBaseText ?? [],
+        knowledgeBaseQnA: mappedInitial.knowledgeBaseQnA ?? [],
+      },
+      {
+        knowledgeBaseLinks: current.knowledgeBaseLinks ?? [],
+        knowledgeBaseFiles: current.knowledgeBaseFiles ?? [],
+        knowledgeBaseText: current.knowledgeBaseText ?? [],
+        knowledgeBaseQnA: current.knowledgeBaseQnA ?? [],
+      },
+    );
 
-    if (newLinksToAdd.length > 0) {
-      payload.links = newLinksToAdd;
-    }
-
-    // Compare arrays for files
-    if (
-      JSON.stringify(mappedInitial.knowledgeBaseFiles) !==
-      JSON.stringify(current.knowledgeBaseFiles)
-    ) {
-      payload.files =
-        current.knowledgeBaseFiles
-          ?.filter((file: any) => file.checked)
-          ?.map((file: any) => ({
-            file_name: file.name,
-            file_key: file.s3_key,
-            cdn_url: file.cdn_url,
-            file_source: "local",
-          })) || [];
-    }
-
-    // Only send custom texts that are new (not yet saved to the server)
-    const newCustomTextItems =
-      current.knowledgeBaseText?.filter((text: any) => text.status === "new") ||
-      [];
-
-    if (newCustomTextItems.length > 0) {
-      payload.custom_texts = newCustomTextItems.map((text: any) => ({
-        custom_text_alias: text.custom_text_alias,
-        custom_text: text.custom_text,
-      }));
-    }
-
-    // Only send QnA pairs that are new (not yet saved to the server)
-    const newQnAPairs =
-      current.knowledgeBaseQnA?.filter((qna: any) => qna.status === "new") ||
-      [];
-
-    if (newQnAPairs.length > 0) {
-      payload.qa_pairs = newQnAPairs.map((qna: any) => ({
-        qna_alias: qna.qna_alias,
-        question: qna.question,
-        answer: qna.answer,
-      }));
-    }
+    Object.assign(payload, kbFields);
 
     return payload;
   };
@@ -441,89 +414,73 @@ export default function MyAgent({
         initialAgentDetails,
       );
 
-      // Handle file uploads if there are new files
+      // Handle file uploads if there are new files (team kb-items presigned flow)
       if (documentFiles.length > 0 && agentID) {
-        // Generate presigned URLs for new files
-        const filesPayload = documentFiles.map((file) => ({
-          folder_path: `/agents/${agentID}/knowledgebase_files`,
-          filename: file.name,
-          filetype: file.type,
-          visibility: "private",
-        }));
-
         try {
-          const presignedResponse = await fastApiAxios.post(
-            "/elysium-agents/elysium-atlas/agent/v1/generate-presigned-urls",
-            { files: filesPayload },
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            },
-          );
+          const newFiles: Array<{ kb_id: string; file_key: string }> = [];
 
-          if (!presignedResponse.data.success) {
-            toast.error(
-              presignedResponse.data.message ||
-                "Failed to generate presigned URLs",
+          for (const file of documentFiles) {
+            const createResponse = await createFile(file.name);
+            if (!createResponse.success || !createResponse.kb_id) {
+              toast.error(
+                createResponse.message ||
+                  `Failed to prepare upload for ${file.name}`,
+              );
+              return;
+            }
+
+            const presignedResponse = await generatePresignedUrls(
+              createResponse.kb_id,
+              [{ file_name: file.name, filetype: file.type }],
             );
-            return;
+
+            if (!presignedResponse.success) {
+              toast.error(
+                presignedResponse.message ||
+                  `Failed to generate upload URL for ${file.name}`,
+              );
+              return;
+            }
+
+            const presignedFiles = parseKbPresignedUrls(presignedResponse);
+            const presignedFile = presignedFiles.find(
+              (entry) => entry.file_name === file.name,
+            );
+
+            if (!presignedFile?.upload_url || !presignedFile.file_key) {
+              toast.error(`Failed to prepare upload for ${file.name}`);
+              return;
+            }
+
+            await axios.put(presignedFile.upload_url, file, {
+              headers: { "Content-Type": file.type },
+            });
+
+            newFiles.push({
+              kb_id: createResponse.kb_id,
+              file_key: presignedFile.file_key,
+            });
           }
 
-          // Upload files to presigned URLs
-          const uploadPromises =
-            presignedResponse.data.presigned_urls.files.map(
-              async (urlObj: {
-                filename: string;
-                upload_url: string;
-                s3_key: string;
-                cdn_url?: string;
-              }) => {
-                const file = documentFiles.find(
-                  (df) => df.name === urlObj.filename,
-                );
-                if (file) {
-                  await axios.put(urlObj.upload_url, file, {
-                    headers: {
-                      "Content-Type": file.type,
-                    },
-                  });
-                }
-              },
-            );
+          payload.new_files = [...(payload.new_files ?? []), ...newFiles];
 
-          await Promise.all(uploadPromises);
-
-          // Update knowledgeBaseFiles with s3_key and cdn_url
           const updatedFiles = knowledgeBaseFiles.map((file) => {
-            const presignedFile =
-              presignedResponse.data.presigned_urls.files.find(
-                (f: any) => f.filename === file.name,
-              );
-            if (presignedFile) {
+            const uploaded = newFiles.find(
+              (entry) =>
+                documentFiles.some((df) => df.name === file.name) &&
+                file.status === "new",
+            );
+            if (uploaded) {
               return {
                 ...file,
-                s3_key: presignedFile.s3_key,
-                cdn_url: presignedFile.cdn_url || null,
-                status: "indexing", // Mark as indexing after upload (will be updated by polling)
+                kb_id: uploaded.kb_id,
+                s3_key: uploaded.file_key,
+                status: "indexing",
               };
             }
             return file;
           });
           dispatch(setKnowledgeBaseFiles(updatedFiles));
-
-          // Update payload with uploaded file data (including s3_key from presigned API)
-          payload.files =
-            updatedFiles
-              ?.filter((file: any) => file.checked)
-              ?.map((file: any) => ({
-                file_name: file.name,
-                file_key: file.s3_key,
-                cdn_url: file.cdn_url,
-                file_source: "local",
-              })) || [];
-
-          // Clear documentFiles after successful upload
           setDocumentFiles([]);
         } catch (error: any) {
           const uploadErrorMessage =
@@ -593,25 +550,6 @@ export default function MyAgent({
         }
       }
 
-      // Keep track of new links to remove after successful save
-      const newLinksToRemove =
-        current.knowledgeBaseLinks
-          ?.filter((link: any) => link.checked && link.status === "new")
-          ?.map((link: any) => link.link) || [];
-
-      // Add new custom texts to payload if any exist
-      const newCustomTexts =
-        current.knowledgeBaseText?.filter(
-          (text: any) => text.status === "new",
-        ) || [];
-
-      if (newCustomTexts.length > 0) {
-        payload.custom_texts = newCustomTexts.map((text: any) => ({
-          custom_text_alias: text.custom_text_alias,
-          custom_text: text.custom_text,
-        }));
-      }
-
       console.log("Update payload:", payload);
 
       // Make API call
@@ -634,12 +572,18 @@ export default function MyAgent({
         );
         dispatch(setTriggerFetchAgentQnA(triggerFetchAgentQnA + 1));
 
-        // Remove new links from Redux after successful save
-        if (newLinksToRemove.length > 0) {
-          const updatedLinks = current.knowledgeBaseLinks.filter(
-            (link: any) => !newLinksToRemove.includes(link.link),
+        const hadUnsavedLinks = (current.knowledgeBaseLinks ?? []).some(
+          (link) => link.status === "new" || link.status === "pending_attach",
+        );
+        if (hadUnsavedLinks) {
+          dispatch(
+            setKnowledgeBaseLinks(
+              applySavedLinksToState(
+                current.knowledgeBaseLinks ?? [],
+                response.data.kb_attachments,
+              ),
+            ),
           );
-          dispatch(setKnowledgeBaseLinks(updatedLinks));
         }
 
         // Note: newly uploaded files are NOT removed from Redux here.
@@ -748,45 +692,22 @@ export default function MyAgent({
     setAvatarFile(null);
     setAvatarClearSignal((prev) => prev + 1);
 
-    // Reset knowledge base data - filter out new items, keep only existing
-    if (knowledgeBaseLinks !== undefined) {
-      const existingLinks = knowledgeBaseLinks.filter(
-        (link) => link.status === "existing",
-      );
-      dispatch(setKnowledgeBaseLinks(existingLinks));
+    // Reset knowledge base data to saved baseline
+    if (dataToUse.knowledgeBaseLinks !== undefined) {
+      dispatch(setKnowledgeBaseLinks(dataToUse.knowledgeBaseLinks ?? []));
     }
 
-    if (knowledgeBaseFiles !== undefined) {
-      const existingFiles = knowledgeBaseFiles.filter(
-        (file) => file.status !== "new",
-      );
-      dispatch(setKnowledgeBaseFiles(existingFiles));
-
-      // Also update local documentFiles to remove files that were filtered out
-      // The reverse sync in AgentFiles will handle this, but we can clear new files explicitly
-      setDocumentFiles((prevFiles) => {
-        const existingFileNames = new Set(existingFiles.map((f) => f.name));
-        return prevFiles.filter((file) => existingFileNames.has(file.name));
-      });
+    if (dataToUse.knowledgeBaseFiles !== undefined) {
+      dispatch(setKnowledgeBaseFiles(dataToUse.knowledgeBaseFiles ?? []));
+      setDocumentFiles([]);
     }
 
-    if (knowledgeBaseText !== undefined) {
-      const existingTexts = knowledgeBaseText.filter(
-        (text) => text.status !== "new",
-      );
-      dispatch(setKnowledgeBaseText(existingTexts));
+    if (dataToUse.knowledgeBaseText !== undefined) {
+      dispatch(setKnowledgeBaseText(dataToUse.knowledgeBaseText ?? []));
     }
 
-    // For knowledgeBaseQnA, clear ONLY new entries, keep all API-fetched ones
-    if (knowledgeBaseQnA.length > 0) {
-      const existingQnA = knowledgeBaseQnA.filter(
-        (qna) => qna.status !== "new",
-      );
-      dispatch(setKnowledgeBaseQnA(existingQnA));
-
-      // Also ensure documentFiles locally is synced if needed
-    } else if (dataToUse.knowledgeBaseQnA !== undefined) {
-      dispatch(setKnowledgeBaseQnA(dataToUse.knowledgeBaseQnA || []));
+    if (dataToUse.knowledgeBaseQnA !== undefined) {
+      dispatch(setKnowledgeBaseQnA(dataToUse.knowledgeBaseQnA ?? []));
     }
   };
 
@@ -868,7 +789,7 @@ export default function MyAgent({
           <CustomTabs
             value={activeTab}
             onValueChange={handleTabChange}
-            className="w-full mt-2"
+            className="w-full mt-6"
           >
             <AgentDataSourceTabs
               activeTab={activeTab}

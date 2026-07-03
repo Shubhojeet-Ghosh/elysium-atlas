@@ -114,8 +114,7 @@ export default function ConversationsHistoryItem({
   const isCaptured = !!capturedSession;
   const hideUnreadIndicators = capturedSession?.is_expanded ?? false;
   const hasUnread =
-    !hideUnreadIndicators &&
-    (log.is_unread || (log.unread_count ?? 0) > 0);
+    !hideUnreadIndicators && (log.is_unread || (log.unread_count ?? 0) > 0);
   const showUnreadCount = hasUnread && (log.unread_count ?? 0) > 0;
 
   const handleItemClick = () => {
@@ -166,7 +165,7 @@ export default function ConversationsHistoryItem({
       }`}
       onClick={handleItemClick}
     >
-      {/* Avatar — flag if available, else initials */}
+      {/* Avatar- flag if available, else initials */}
       <Tooltip>
         <TooltipTrigger asChild>
           <div className="relative w-9 h-9 shrink-0">
@@ -286,9 +285,7 @@ export default function ConversationsHistoryItem({
           {log.last_message_at && (
             <span
               className={`text-[12px] shrink-0 ${
-                hasUnread
-                  ? "text-white/80"
-                  : "text-gray-400 dark:text-gray-500"
+                hasUnread ? "text-white/80" : "text-gray-400 dark:text-gray-500"
               }`}
             >
               {formatSmartDateUTC(log.last_message_at)}

@@ -1,4 +1,4 @@
-# Elysium Atlas — Auth API (short reference)
+# Elysium Atlas- Auth API (short reference)
 
 > **Frontend integration:** use the full guide → [**frontend-auth-guide.md**](./frontend-auth-guide.md)
 
@@ -10,17 +10,17 @@
 
 ## Login endpoints
 
-| Endpoint                            | Purpose                                                             |
-| ----------------------------------- | ------------------------------------------------------------------- |
-| `POST /v1/auth/magic-link`          | Password login or send magic link email                             |
-| `POST /v1/auth/verify`              | Verify magic link token                                             |
-| `POST /v1/auth/verify-google-login` | Google OAuth login                                                  |
-| `POST /v1/auth/select-team`         | **Phase 2** — pick team when `requires_team_selection: true`        |
-| `POST /v1/auth/decode-token`        | **Internal** — decode JWT (`Authorization: APPLICATION_SECRET_KEY`) |
-| `POST /v1/auth/profile/update`      | Update profile (legacy — no owner/password checks)                  |
-| `POST /v1/account/settings/update`  | **Owner** account settings (name, team name, password)              |
-| `POST /v1/auth/forgot-password`     | Request password reset email                                        |
-| `POST /v1/auth/reset-password`      | Set new password using reset token                                  |
+| Endpoint                            | Purpose                                                            |
+| ----------------------------------- | ------------------------------------------------------------------ |
+| `POST /v1/auth/magic-link`          | Password login or send magic link email                            |
+| `POST /v1/auth/verify`              | Verify magic link token                                            |
+| `POST /v1/auth/verify-google-login` | Google OAuth login                                                 |
+| `POST /v1/auth/select-team`         | **Phase 2**- pick team when `requires_team_selection: true`        |
+| `POST /v1/auth/decode-token`        | **Internal**- decode JWT (`Authorization: APPLICATION_SECRET_KEY`) |
+| `POST /v1/auth/profile/update`      | Update profile (legacy- no owner/password checks)                  |
+| `POST /v1/account/settings/update`  | **Owner** account settings (name, team name, password)             |
+| `POST /v1/auth/forgot-password`     | Request password reset email                                       |
+| `POST /v1/auth/reset-password`      | Set new password using reset token                                 |
 
 ---
 
@@ -74,7 +74,7 @@ Add a **"Forgot password?"** link on the password login form → `/auth/forgot-p
 
 ---
 
-## API — Forgot password
+## API- Forgot password
 
 **`POST /v1/auth/forgot-password`**
 
@@ -88,7 +88,7 @@ No `Authorization` header.
 }
 ```
 
-### Success — `200`
+### Success- `200`
 
 ```json
 {
@@ -97,7 +97,7 @@ No `Authorization` header.
 }
 ```
 
-The API always returns this message when the email format is valid — even if no account exists — so attackers cannot discover registered emails.
+The API always returns this message when the email format is valid- even if no account exists- so attackers cannot discover registered emails.
 
 An email is **only sent** when:
 
@@ -128,7 +128,7 @@ Reset token JWT payload:
 
 **TTL:** 15 minutes.
 
-### Failures — `200`
+### Failures- `200`
 
 ```json
 { "success": false, "message": "A valid email is required." }
@@ -136,7 +136,7 @@ Reset token JWT payload:
 
 ---
 
-## API — Reset password
+## API- Reset password
 
 **`POST /v1/auth/reset-password`**
 
@@ -153,7 +153,7 @@ No `Authorization` header.
 
 `token` may also be passed as a query param when using `GET`-style debugging, but the frontend should **POST** with JSON body.
 
-### Success — `200`
+### Success- `200`
 
 ```json
 {
@@ -205,14 +205,14 @@ If the token is expired, show the error and offer a link back to `/auth/forgot-p
 ```javascript
 const BASE = "http://localhost:3001/elysium-atlas";
 
-// Step 1 — request reset email
+// Step 1- request reset email
 await fetch(`${BASE}/v1/auth/forgot-password`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ email: "user@example.com" }),
 });
 
-// Step 2 — set new password (on reset page)
+// Step 2- set new password (on reset page)
 const token = new URLSearchParams(window.location.search).get("token");
 
 await fetch(`${BASE}/v1/auth/reset-password`, {

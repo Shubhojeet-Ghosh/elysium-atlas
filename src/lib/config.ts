@@ -40,7 +40,7 @@ export function writeDatasourcePageSize(size: VisitorPageSize) {
   localStorage.setItem(DATASOURCE_PAGE_SIZE_STORAGE_KEY, String(size));
 }
 
-/** @deprecated Use readVisitorsPageSize() — kept for any legacy imports */
+/** @deprecated Use readVisitorsPageSize()- kept for any legacy imports */
 export const VISITORS_PER_PAGE = DEFAULT_VISITORS_PER_PAGE;
 // ─────────────────────────────────────────────────────────────────────────────
 

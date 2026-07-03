@@ -41,7 +41,6 @@ import CustomInput from "@/components/inputs/CustomInput";
 import CustomTextareaPrimary from "@/components/inputs/CustomTextareaPrimary";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import CancelButton from "@/components/ui/CancelButton";
-import Badge from "@/components/ui/Badge";
 import Spinner from "@/components/ui/Spinner";
 import {
   updateKnowledgeBaseText,
@@ -50,7 +49,7 @@ import {
 } from "@/store/reducers/agentSlice";
 import { CustomText } from "@/store/types/AgentBuilderTypes";
 import OutlineButton from "@/components/ui/OutlineButton";
-import { Trash2, Search } from "lucide-react";
+import { Trash2, Search, BookOpen } from "lucide-react";
 import fastApiAxios from "@/utils/fastapi_axios";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
@@ -58,6 +57,29 @@ import NProgress from "nprogress";
 import { formatDateTime12hr } from "@/utils/formatDate";
 import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 import { useAppSelector } from "@/store";
+import { listAttachedCustomTexts, updateAgentKb } from "@/utils/agentKbApi";
+import {
+  buildKbAttachmentsFromState,
+  getTextAgentKbDisplayStatus,
+  mapAttachedCustomTextsToState,
+  mergeTextsWithPending,
+  paginateItems,
+} from "@/utils/agentKbUtils";
+import KbStatusBadge from "./kb/KbStatusBadge";
+import { extractApiErrorMessage } from "@/utils/toolsFormUtils";
+import AgentKbPickFromLibraryDialog, {
+  type AgentKbLibraryPick,
+} from "./kb/AgentKbPickFromLibraryDialog";
+import { useAgentAttachedListLoad } from "./kb/useAgentAttachedListLoad";
+import { useIsKbBuildFlow } from "./kb/KbDatasourceModeContext";
+import {
+  useKbTextState,
+  useKbLinksState,
+  useKbFilesState,
+  useKbQnAState,
+  useKbAgentId,
+  useKbDatasourceActions,
+} from "./kb/useKbDatasourceState";
 
 interface AgentTextListProps {
   items?: never[];
@@ -72,15 +94,22 @@ export default function AgentTextList({
   onRemove: _onRemove,
   onAddMore,
 }: AgentTextListProps = {}) {
+  const isBuild = useIsKbBuildFlow();
+  const kbActions = useKbDatasourceActions();
   const dispatch = useDispatch();
   const readOnly = useAgentReadOnly();
-  const knowledgeBaseText = useSelector(
-    (state: RootState) => state.agent.knowledgeBaseText,
-  );
-  const agentID = useSelector((state: RootState) => state.agent.agentID);
+  const knowledgeBaseText = useKbTextState();
+  const knowledgeBaseLinks = useKbLinksState();
+  const knowledgeBaseFiles = useKbFilesState();
+  const knowledgeBaseQnA = useKbQnAState();
+  const agentID = useKbAgentId();
   const triggerFetchAgentCustomTexts = useAppSelector(
     (state) => state.agent.triggerFetchAgentCustomTexts,
   );
+  const triggerGetAgentDetails = useAppSelector(
+    (state) => state.agent.triggerGetAgentDetails,
+  );
+  const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [alias, setAlias] = useState("");
@@ -159,58 +188,47 @@ export default function AgentTextList({
       if (!agentID) return false;
 
       if (!isPolling) setIsLoadingTexts(true);
-      const token = Cookies.get("elysium_atlas_session_token");
 
       try {
-        const response = await fastApiAxios.post(
-          "/elysium-agents/elysium-atlas/agent/v1/get-agent-custom-texts",
-          {
-            agent_id: agentID,
-            page,
-            limit,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
+        const response = await listAttachedCustomTexts(agentID, page, limit);
 
-        if (response.data.success === true) {
-          const texts = response.data.custom_texts || [];
-          const mappedTexts: CustomText[] = texts.map((textItem: any) => ({
-            custom_text_alias: textItem.custom_text_alias,
-            custom_text: "",
-            lastUpdated: textItem.updated_at || textItem.created_at || "",
-            status: textItem.status ?? "indexed",
-          }));
+        if (response.success === true) {
+          const mappedTexts = mapAttachedCustomTextsToState(
+            response.custom_texts ?? [],
+          );
+          dispatch(
+            setKnowledgeBaseText(
+              mergeTextsWithPending(mappedTexts, knowledgeBaseTextRef.current),
+            ),
+          );
 
-          dispatch(setKnowledgeBaseText(mergeWithNewTexts(mappedTexts)));
           applyPagination({
-            total: response.data.total ?? 0,
-            page: response.data.page ?? page,
-            total_pages: response.data.total_pages ?? 0,
-            has_next: response.data.has_next ?? false,
-            has_prev: response.data.has_prev ?? false,
+            total: response.total,
+            page: response.page,
+            total_pages: response.total_pages,
+            has_next: response.has_next,
+            has_prev: response.has_prev,
           });
 
-          const hasIndexing = mappedTexts.some((t) => t.status === "indexing");
+          const hasIndexing = mappedTexts.some(
+            (t) => t.status === "indexing" || t.status === "draft",
+          );
           if (!hasIndexing) stopPolling();
           return hasIndexing;
         }
-      } catch (error: any) {
-        const errorMessage =
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to fetch agent custom texts";
-        if (!isPolling) toast.error(errorMessage);
+      } catch (error: unknown) {
+        if (!isPolling) {
+          toast.error(
+            extractApiErrorMessage(error, "Failed to fetch agent custom texts"),
+          );
+        }
         stopPolling();
       } finally {
         if (!isPolling) setIsLoadingTexts(false);
       }
       return false;
     },
-    [agentID, dispatch, mergeWithNewTexts, applyPagination],
+    [agentID, dispatch, applyPagination],
   );
 
   const startPollingIfNeeded = useCallback(
@@ -228,47 +246,111 @@ export default function AgentTextList({
     [fetchAgentCustomTexts],
   );
 
-  useEffect(() => {
-    if (!agentID) return;
-    setCurrentPage(1);
-    fetchAgentCustomTexts(1, pageSizeRef.current).then(startPollingIfNeeded);
-    return () => stopPolling();
-  }, [agentID, fetchAgentCustomTexts, startPollingIfNeeded]);
+  useAgentAttachedListLoad(
+    isBuild ? undefined : agentID,
+    [triggerFetchAgentCustomTexts, triggerGetAgentDetails],
+    () => {
+      setCurrentPage(1);
+      fetchAgentCustomTexts(1, pageSizeRef.current).then(startPollingIfNeeded);
+    },
+    stopPolling,
+  );
 
-  useEffect(() => {
-    if (!agentID || triggerFetchAgentCustomTexts === 0) return;
-    stopPolling();
-    setCurrentPage(1);
-    fetchAgentCustomTexts(1, pageSizeRef.current).then(startPollingIfNeeded);
-  }, [
-    triggerFetchAgentCustomTexts,
-    agentID,
-    fetchAgentCustomTexts,
-    startPollingIfNeeded,
-  ]);
+  const buildCurrentKbState = () => ({
+    knowledgeBaseLinks,
+    knowledgeBaseFiles,
+    knowledgeBaseText,
+    knowledgeBaseQnA,
+  });
+
+  const detachTextsByKbIds = async (kbIds: string[]) => {
+    if (isBuild) {
+      const remainingTexts = knowledgeBaseText.filter(
+        (item) => !item.kb_id || !kbIds.includes(item.kb_id),
+      );
+      kbActions.setKnowledgeBaseText(remainingTexts);
+      return;
+    }
+
+    if (!agentID) throw new Error("Agent ID not found");
+
+    const remainingTexts = knowledgeBaseText.filter(
+      (item) => !item.kb_id || !kbIds.includes(item.kb_id),
+    );
+    const response = await updateAgentKb(agentID, {
+      kb_attachments: buildKbAttachmentsFromState({
+        ...buildCurrentKbState(),
+        knowledgeBaseText: remainingTexts,
+      }),
+    });
+
+    if (!response.success) {
+      throw new Error(response.message || "Failed to detach text entry");
+    }
+  };
+
+  const handleAttachFromLibrary = (items: AgentKbLibraryPick[]) => {
+    const existingKbIds = new Set(
+      knowledgeBaseText.map((item) => item.kb_id).filter(Boolean),
+    );
+    const existingAliases = new Set(
+      knowledgeBaseText.map((item) => item.custom_text_alias.toLowerCase()),
+    );
+
+    const newRows: CustomText[] = items
+      .filter(
+        (item) =>
+          !existingKbIds.has(item.kb_id) &&
+          !existingAliases.has(item.label.toLowerCase()),
+      )
+      .map((item) => ({
+        kb_id: item.kb_id,
+        custom_text_alias: item.label,
+        custom_text: "",
+        lastUpdated: new Date().toISOString(),
+        status: "pending_attach",
+      }));
+
+    if (newRows.length === 0) {
+      toast.info("Selected text entries are already attached or pending");
+      return;
+    }
+
+    kbActions.setKnowledgeBaseText([...newRows, ...knowledgeBaseText]);
+    toast.success(
+      isBuild
+        ? `${newRows.length} text entr${newRows.length === 1 ? "y" : "ies"} added from library`
+        : `${newRows.length} team text entr${newRows.length === 1 ? "y" : "ies"} added from library- save to attach`,
+    );
+  };
 
   const handlePageChange = useCallback(
     (page: number) => {
+      if (isBuild) {
+        setCurrentPage(page);
+        return;
+      }
       stopPolling();
       fetchAgentCustomTexts(page, pageSizeRef.current).then(
         startPollingIfNeeded,
       );
     },
-    [fetchAgentCustomTexts, startPollingIfNeeded],
+    [fetchAgentCustomTexts, startPollingIfNeeded, isBuild],
   );
 
   const handlePageSizeChange = useCallback(
     (size: VisitorPageSize) => {
       setPageSize(size);
       writeDatasourcePageSize(size);
-      stopPolling();
       setCurrentPage(1);
+      if (isBuild) return;
+      stopPolling();
       fetchAgentCustomTexts(1, size).then(startPollingIfNeeded);
     },
-    [fetchAgentCustomTexts, startPollingIfNeeded],
+    [fetchAgentCustomTexts, startPollingIfNeeded, isBuild],
   );
 
-  // Filter texts based on search term (alias only — content not loaded for API items)
+  // Filter texts based on search term (alias only- content not loaded for API items)
   const filteredTexts = useMemo(() => {
     if (!searchTerm.trim()) {
       return knowledgeBaseText;
@@ -280,13 +362,36 @@ export default function AgentTextList({
   }, [knowledgeBaseText, searchTerm]);
 
   const currentTexts = useMemo(() => {
-    return filteredTexts.map((item, originalIndex) => ({
+    return filteredTexts.map((item) => ({
       item,
       originalIndex: knowledgeBaseText.findIndex(
         (t) => t.custom_text_alias === item.custom_text_alias,
       ),
     }));
   }, [filteredTexts, knowledgeBaseText]);
+
+  const listPagination = useMemo(
+    () => paginateItems(currentTexts, currentPage, pageSize),
+    [currentTexts, currentPage, pageSize],
+  );
+
+  const displayTexts = isBuild ? listPagination.pageItems : currentTexts;
+
+  const displayPagination = isBuild
+    ? {
+        currentPage: listPagination.totalPages > 0 ? currentPage : 1,
+        totalPages: listPagination.totalPages,
+        hasNext: listPagination.hasNext,
+        hasPrev: listPagination.hasPrev,
+        total: listPagination.total,
+      }
+    : {
+        currentPage,
+        totalPages,
+        hasNext,
+        hasPrev,
+        total,
+      };
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
@@ -348,7 +453,9 @@ export default function AgentTextList({
   const textColumnCount = readOnly ? 2 : 3;
   const emptyTextMessage = searchTerm
     ? `No entries found matching "${searchTerm}"`
-    : "No text entries found";
+    : isBuild
+      ? "No text entries added yet"
+      : "No text entries found";
 
   const handleRowClick = async (aliasName: string) => {
     // Find the item by alias name in the Redux store
@@ -383,15 +490,13 @@ export default function AgentTextList({
 
           if (response.data.success && response.data.text_content) {
             // Update Redux with the fetched content
-            dispatch(
-              updateKnowledgeBaseText({
-                index: itemIndex,
-                customText: {
-                  ...item,
-                  custom_text: response.data.text_content,
-                },
-              }),
-            );
+            kbActions.updateKnowledgeBaseText({
+              index: itemIndex,
+              customText: {
+                ...item,
+                custom_text: response.data.text_content,
+              },
+            });
             setText(response.data.text_content);
           } else {
             // If fetch failed, still open but with empty content
@@ -415,35 +520,31 @@ export default function AgentTextList({
 
   const handleUpdate = () => {
     if (selectedIndex !== null && text.trim()) {
-      dispatch(
-        updateKnowledgeBaseText({
-          index: selectedIndex,
-          customText: {
-            custom_text_alias: alias.trim(),
-            custom_text: text.trim(),
-            lastUpdated: new Date().toISOString(),
-            status: "new",
-          },
-        }),
-      );
+      kbActions.updateKnowledgeBaseText({
+        index: selectedIndex,
+        customText: {
+          custom_text_alias: alias.trim(),
+          custom_text: text.trim(),
+          lastUpdated: new Date().toISOString(),
+          status: "new",
+        },
+      });
       setOpen(false);
       setSelectedIndex(null);
     }
   };
 
   const handleRemove = (aliasName: string, isExisting: boolean) => {
-    if (isExisting) {
-      // Show confirmation dialog for existing texts
+    if (!isBuild && isExisting) {
       setTextToDelete(aliasName);
       setDeleteDialogOpen(true);
     } else {
-      // For new texts, remove directly from Redux
       const itemIndex = knowledgeBaseText.findIndex(
         (item) =>
           item.custom_text_alias.toLowerCase() === aliasName.toLowerCase(),
       );
       if (itemIndex !== -1) {
-        dispatch(removeKnowledgeBaseText(itemIndex));
+        kbActions.removeKnowledgeBaseText(itemIndex);
       }
     }
   };
@@ -451,49 +552,35 @@ export default function AgentTextList({
   const handleConfirmDelete = async () => {
     if (!textToDelete) return;
 
-    if (!agentID) {
-      toast.error("Agent ID not found");
-      return;
-    }
-
     setIsDeleting(true);
-    const token = Cookies.get("elysium_atlas_session_token");
-
     try {
-      const response = await fastApiAxios.post(
-        "/elysium-agents/elysium-atlas/agent/v1/delete-agent-custom-data",
-        {
-          agent_id: agentID,
-          custom_texts: [textToDelete],
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
+      const target = knowledgeBaseText.find(
+        (item) =>
+          item.custom_text_alias.toLowerCase() === textToDelete.toLowerCase(),
       );
-
-      if (response.data.success) {
-        toast.success(
-          response.data.message || "Custom text deleted successfully",
-        );
-        // Remove from Redux
-        const itemIndex = knowledgeBaseText.findIndex(
-          (item) =>
-            item.custom_text_alias.toLowerCase() === textToDelete.toLowerCase(),
-        );
-        if (itemIndex !== -1) {
-          dispatch(removeKnowledgeBaseText(itemIndex));
-        }
-        setDeleteDialogOpen(false);
-        setTextToDelete(null);
+      if (
+        !isBuild &&
+        target?.kb_id &&
+        target.status !== "new" &&
+        target.status !== "pending_attach"
+      ) {
+        await detachTextsByKbIds([target.kb_id]);
+        toast.success("Text entry detached from agent");
       }
-    } catch (error: any) {
-      const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to delete custom text";
-      toast.error(errorMessage);
+
+      const itemIndex = knowledgeBaseText.findIndex(
+        (item) =>
+          item.custom_text_alias.toLowerCase() === textToDelete.toLowerCase(),
+      );
+      if (itemIndex !== -1) {
+        kbActions.removeKnowledgeBaseText(itemIndex);
+      }
+      setDeleteDialogOpen(false);
+      setTextToDelete(null);
+    } catch (error: unknown) {
+      toast.error(
+        extractApiErrorMessage(error, "Failed to detach custom text"),
+      );
     } finally {
       setIsDeleting(false);
     }
@@ -501,53 +588,39 @@ export default function AgentTextList({
 
   return (
     <>
-      <div className="w-full mt-[12px] overflow-hidden">
-        {/* Search Bar */}
-        <div className="flex items-center justify-between mb-4 px-0">
-          <div className="lg:text-[14px] text-[12px] font-bold text-deep-onyx dark:text-pure-mist">
-            Text Entries ({displayTotal})
-            {searchTerm && (
-              <span className="text-gray-500 dark:text-gray-400 font-normal ml-1">
-                ({filteredTexts.length} found)
-              </span>
+      <div className="w-full overflow-hidden">
+        <div className="flex items-center justify-end mb-4 px-0 w-full min-w-0">
+          <div className="flex items-center gap-2 w-full min-w-0 md:w-auto">
+            {!readOnly && (
+              <PrimaryButton
+                className="text-[12px] font-semibold flex items-center justify-center gap-2 min-h-[41px] h-[41px] px-[16px] !py-0 shrink-0"
+                onClick={() => setLibraryDialogOpen(true)}
+              >
+                <BookOpen className="mr-0 md:mr-1" size={14} />
+                Library
+              </PrimaryButton>
             )}
-          </div>
-          <div className="flex items-center gap-2">
             {!readOnly && onAddMore && (
               <OutlineButton
-                className="text-[12px] font-bold px-3 py-1 h-8"
+                className="text-[12px] font-semibold flex items-center justify-center gap-2 min-h-[41px] h-[41px] px-[16px] !py-0 border-[2px] shrink-0"
                 onClick={onAddMore}
               >
-                <span className="text-[18px]">+</span>{" "}
+                <span className="text-[16px] leading-none">+</span>
                 <span className="hidden md:inline">Add More</span>
               </OutlineButton>
             )}
-            <div className="relative w-[200px]">
+            <div className="relative flex-1 min-w-0 h-[41px] md:flex-none md:w-[200px]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
               <CustomInput
                 type="text"
                 placeholder="Search entries..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-[11px] h-8"
+                className="w-full h-[41px] min-h-[41px] pl-9 pr-3 text-[12px]"
               />
             </div>
           </div>
         </div>
-
-        {/* Pagination Controls */}
-        <TablePaginationControls
-          currentPage={currentPage}
-          totalPages={totalPages}
-          hasNext={hasNext}
-          hasPrev={hasPrev}
-          total={total}
-          pageSize={pageSize}
-          pageSizeOptions={VISITOR_PAGE_SIZE_OPTIONS}
-          isLoading={isLoadingTexts}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-        />
 
         <div className="relative">
           <div
@@ -570,7 +643,7 @@ export default function AgentTextList({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoadingTexts && currentTexts.length === 0 ? (
+                  {isLoadingTexts && displayTexts.length === 0 ? (
                     <TableRow className="hover:bg-transparent">
                       <TableCell
                         colSpan={textColumnCount}
@@ -579,7 +652,7 @@ export default function AgentTextList({
                         <Spinner className="border-serene-purple dark:border-pure-mist mx-auto" />
                       </TableCell>
                     </TableRow>
-                  ) : currentTexts.length === 0 ? (
+                  ) : displayTexts.length === 0 ? (
                     <TableRow className="hover:bg-transparent">
                       <TableCell
                         colSpan={textColumnCount}
@@ -589,7 +662,7 @@ export default function AgentTextList({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    currentTexts.map(
+                    displayTexts.map(
                       ({ item, originalIndex }, displayIndex) => {
                         const alias =
                           item.custom_text_alias || `Text ${displayIndex + 1}`;
@@ -607,7 +680,7 @@ export default function AgentTextList({
                             onClick={() =>
                               handleRowClick(item.custom_text_alias)
                             }
-                            className="cursor-pointer hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 hover:text-serene-purple dark:hover:text-serene-purple transition-all duration-200"
+                            className="cursor-pointer hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20"
                           >
                             <TableCell className="font-medium min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] py-2 lg:px-4 px-0 text-[12px] whitespace-nowrap">
                               <div className="flex items-center gap-1.5">
@@ -616,47 +689,9 @@ export default function AgentTextList({
                                     ? highlightMatch(alias, searchTerm)
                                     : alias}
                                 </span>
-                                {item.status === "new" ? (
-                                  <Badge>New</Badge>
-                                ) : item.status !== "indexed" &&
-                                  item.status !== "active" ? (
-                                  <span
-                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
-                                      item.status === "indexing"
-                                        ? "bg-serene-purple/10 text-[#6c5f8d] dark:bg-serene-purple/20 dark:text-[#c4bcd6]"
-                                        : item.status === "failed" ||
-                                            item.status === "error"
-                                          ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
-                                          : item.status === "pending"
-                                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
-                                            : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                                    }`}
-                                  >
-                                    {item.status === "indexing" ? (
-                                      <span className="inline-flex items-center gap-[2px]">
-                                        <span>Indexing</span>
-                                        <span className="inline-flex items-end gap-[2px] ml-[2px]">
-                                          {[0, 0.2, 0.4].map((delay, i) => (
-                                            <span
-                                              key={i}
-                                              style={{
-                                                display: "inline-block",
-                                                width: "3px",
-                                                height: "3px",
-                                                borderRadius: "50%",
-                                                background: "currentColor",
-                                                animation: `bounce-dot 1.2s ${delay}s infinite ease-in-out`,
-                                              }}
-                                            />
-                                          ))}
-                                        </span>
-                                      </span>
-                                    ) : (
-                                      item.status.charAt(0).toUpperCase() +
-                                      item.status.slice(1)
-                                    )}
-                                  </span>
-                                ) : null}
+                                <KbStatusBadge
+                                  status={getTextAgentKbDisplayStatus(item)}
+                                />
                               </div>
                             </TableCell>
                             <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-2 lg:px-4 px-0 text-[12px] whitespace-nowrap">
@@ -687,10 +722,33 @@ export default function AgentTextList({
               </Table>
             </div>
           </div>
-          {showRightGradient && currentTexts.length > 0 && (
+          {showRightGradient && displayTexts.length > 0 && (
             <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
           )}
         </div>
+
+        <TablePaginationControls
+          currentPage={
+            isBuild ? displayPagination.currentPage : currentPage
+          }
+          totalPages={
+            isBuild ? displayPagination.totalPages : totalPages
+          }
+          hasNext={isBuild ? displayPagination.hasNext : hasNext}
+          hasPrev={isBuild ? displayPagination.hasPrev : hasPrev}
+          total={isBuild ? displayPagination.total : total}
+          totalRecords={
+            isBuild
+              ? displayPagination.total
+              : total + unsavedNewCount
+          }
+          pageSize={pageSize}
+          pageSizeOptions={VISITOR_PAGE_SIZE_OPTIONS}
+          isLoading={isLoadingTexts}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+          className="mt-3 mb-4"
+        />
       </div>
 
       {/* Delete Confirmation Dialog */}
@@ -798,6 +856,15 @@ export default function AgentTextList({
           </SheetFooter>
         </SheetContent>
       </Sheet>
+      <AgentKbPickFromLibraryDialog
+        open={libraryDialogOpen}
+        onOpenChange={setLibraryDialogOpen}
+        sourceType="custom_text"
+        excludeKbIds={knowledgeBaseText
+          .map((item) => item.kb_id)
+          .filter((kbId): kbId is string => Boolean(kbId))}
+        onConfirm={handleAttachFromLibrary}
+      />
     </>
   );
 }

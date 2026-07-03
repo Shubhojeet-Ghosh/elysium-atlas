@@ -5,7 +5,7 @@ type UseMarkMessagesReadWhenVisibleOptions = {
   enabled: boolean;
   agent_id: string;
   chat_session_id: string;
-  /** MongoDB user id — agent-side read receipts only */
+  /** MongoDB user id- agent-side read receipts only */
   read_by?: string;
   onMessageMarked: (
     messageId: string,

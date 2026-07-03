@@ -1,4 +1,5 @@
 export interface FileMetadata {
+  kb_id?: string;
   name: string;
   size: number;
   type: string;
@@ -10,6 +11,7 @@ export interface FileMetadata {
 }
 
 export interface KnowledgeBaseLink {
+  kb_id?: string;
   link: string;
   checked: boolean;
   status: string;
@@ -18,6 +20,7 @@ export interface KnowledgeBaseLink {
 }
 
 export interface CustomText {
+  kb_id?: string;
   custom_text_alias: string;
   custom_text: string;
   lastUpdated: string;
@@ -25,6 +28,7 @@ export interface CustomText {
 }
 
 export interface QnA {
+  kb_id?: string;
   qna_alias: string;
   question: string;
   answer: string;
