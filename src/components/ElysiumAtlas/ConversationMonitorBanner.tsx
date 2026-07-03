@@ -12,16 +12,16 @@ type ConversationMonitorBannerProps = {
 };
 
 const bannerClassName =
-  "flex px-3 py-2 bg-serene-purple/10 dark:bg-serene-purple/20 shrink-0";
+  "flex px-3 py-3 bg-serene-purple/10 dark:bg-serene-purple/20 shrink-0";
 
 const messageClassName =
   "text-[12px] font-semibold text-deep-onyx dark:text-pure-mist truncate";
 
 const joinAssistClassName =
-  "px-2.5 py-1 text-[11px] font-semibold rounded-md border border-serene-purple/60 bg-white/95 text-serene-purple shadow-sm dark:bg-deep-onyx/80 dark:border-pure-mist/30 dark:text-pure-mist cursor-not-allowed opacity-70";
+  "min-h-10 px-3.5 py-2 text-[11px] font-semibold rounded-md border border-serene-purple/60 bg-white/95 text-serene-purple shadow-sm dark:bg-deep-onyx/80 dark:border-pure-mist/30 dark:text-pure-mist cursor-not-allowed opacity-70";
 
 const takeOverClassName =
-  "px-2.5 py-1 text-[11px] font-semibold rounded-md bg-serene-purple text-pure-mist shadow-sm hover:bg-serene-purple/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors";
+  "min-h-10 px-3.5 py-2 text-[11px] font-semibold rounded-md bg-serene-purple text-pure-mist shadow-sm hover:bg-serene-purple/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors";
 
 export default function ConversationMonitorBanner({
   variant = "self",
@@ -47,7 +47,7 @@ export default function ConversationMonitorBanner({
         You are monitoring this conversation
       </span>
 
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center gap-2 shrink-0">
         <button
           type="button"
           onClick={onJoinAssist}

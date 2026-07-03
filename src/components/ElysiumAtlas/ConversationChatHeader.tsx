@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type MouseEvent } from "react";
 import { SquarePen, Save, MoreHorizontal } from "lucide-react";
 import aiSocket from "@/lib/aiSocket";
 import {
@@ -104,6 +104,16 @@ export default function ConversationChatHeader({
     session.alias_name ?? session.chat_session_id,
   );
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [isTouchLayout, setIsTouchLayout] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 1023px)");
+    setIsTouchLayout(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsTouchLayout(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   useEffect(() => {
     if (!isEditing) {
@@ -163,10 +173,24 @@ export default function ConversationChatHeader({
   const resolveEnabled =
     canMarkResolved && Boolean(onResolve) && !isResolvePending;
 
+  useEffect(() => {
+    if (!isExpanded && isEditing) {
+      setIsEditing(false);
+    }
+  }, [isExpanded, isEditing]);
+
   const handleHeaderClick = () => {
     if (isEditing || isExpanded) return;
     onToggle();
   };
+
+  const startEditing = (e?: MouseEvent) => {
+    if (!isExpanded) return;
+    e?.stopPropagation();
+    setIsEditing(true);
+  };
+
+  const showEditControls = isExpanded;
 
   return (
     <div
@@ -211,7 +235,7 @@ export default function ConversationChatHeader({
 
       <span className="flex-1 flex items-center min-w-0">
         <div className="group flex items-center w-full min-w-0">
-          {!isEditing ? (
+          {!isEditing || !showEditControls ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <span
@@ -245,39 +269,43 @@ export default function ConversationChatHeader({
             />
           )}
 
-          {isEditing ? (
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={(e) => {
-                e.stopPropagation();
-                commitAlias();
-              }}
-              aria-label="Save alias"
-              className={`ml-2 p-1 rounded-full cursor-pointer transition-colors ${
-                hasUnread
-                  ? "text-white hover:text-white/80"
-                  : "text-serene-purple hover:text-serene-purple/80 dark:text-pure-mist"
-              }`}
-            >
-              <Save className="w-4 h-4" />
-            </button>
-          ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsEditing(true);
-              }}
-              onMouseDown={(e) => e.preventDefault()}
-              aria-label="Edit alias"
-              className={`ml-2 p-1 rounded-full cursor-pointer transition-opacity opacity-100 lg:opacity-0 lg:group-hover:opacity-100 ${
-                hasUnread
-                  ? "text-white/80 hover:text-white"
-                  : "text-gray-500 hover:text-gray-700 dark:hover:text-pure-mist"
-              }`}
-            >
-              <SquarePen className="w-4 h-4" />
-            </button>
-          )}
+          {showEditControls &&
+            (isEditing ? (
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  commitAlias();
+                }}
+                aria-label="Save alias"
+                className={`ml-2 rounded-full cursor-pointer transition-colors ${
+                  isTouchLayout ? "p-2" : "p-1"
+                } ${
+                  hasUnread
+                    ? "text-white hover:text-white/80"
+                    : "text-serene-purple hover:text-serene-purple/80 dark:text-pure-mist"
+                }`}
+              >
+                <Save className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                onClick={startEditing}
+                onMouseDown={(e) => e.preventDefault()}
+                aria-label="Edit alias"
+                className={`ml-2 rounded-full cursor-pointer transition-opacity ${
+                  isTouchLayout
+                    ? "p-2 opacity-100"
+                    : "p-1 opacity-0 group-hover:opacity-100"
+                } ${
+                  hasUnread
+                    ? "text-white/80 hover:text-white"
+                    : "text-gray-500 hover:text-gray-700 dark:hover:text-pure-mist"
+                }`}
+              >
+                <SquarePen className="w-4 h-4" />
+              </button>
+            ))}
         </div>
       </span>
 
@@ -295,7 +323,7 @@ export default function ConversationChatHeader({
               <MoreHorizontal className="w-4 h-4" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[160px]">
+          <DropdownMenuContent align="end" className="z-[1100] w-[160px]">
             <DropdownMenuItem
               className="cursor-pointer text-[13px]"
               disabled={!releaseEnabled}

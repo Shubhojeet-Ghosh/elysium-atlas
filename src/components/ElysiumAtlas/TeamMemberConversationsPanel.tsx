@@ -221,6 +221,15 @@ function ChatBox({
         <DialogContent
           showCloseButton={false}
           className="p-0 gap-0 flex flex-col overflow-hidden w-screen max-w-none! h-dvh top-0! left-0! right-0! translate-x-0! translate-y-0! rounded-none border-0"
+          onPointerDownOutside={(event) => {
+            const target = event.target;
+            if (
+              target instanceof Element &&
+              target.closest('[data-slot="dropdown-menu-content"]')
+            ) {
+              event.preventDefault();
+            }
+          }}
         >
           <DialogTitle className="sr-only">
             Chat with {session.chat_session_id}
