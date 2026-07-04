@@ -39,7 +39,10 @@ export default function ConversationsHistoryBody({
   );
 
   const [searchTerm, setSearchTerm] = useState("");
-  const debouncedSearchQuery = useDebouncedValue(searchTerm, SEARCH_DEBOUNCE_MS);
+  const debouncedSearchQuery = useDebouncedValue(
+    searchTerm,
+    SEARCH_DEBOUNCE_MS,
+  );
   const sentinelRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const searchQueryRef = useRef(debouncedSearchQuery);
@@ -91,16 +94,16 @@ export default function ConversationsHistoryBody({
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="px-2 py-3 shrink-0 border-b border-gray-100 dark:border-gray-800">
+      <div className="px-3 py-4 shrink-0">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-gray-500 pointer-events-none z-10" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 pointer-events-none z-10" />
           <CustomInput
             type="text"
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search conversations..."
             maxLength={MAX_SEARCH_QUERY_LENGTH}
-            className="w-full pl-9 pr-3 py-[6px] text-[12px]"
+            className="w-full h-10 pl-9 pr-3 py-2 text-[13px]"
           />
         </div>
       </div>

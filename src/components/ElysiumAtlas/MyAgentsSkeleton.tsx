@@ -50,16 +50,16 @@ export default function MyAgentsSkeleton() {
                 <Table className="min-w-[600px] lg:min-w-full">
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-[200px] lg:w-[300px] font-[600] py-2 px-[10px] text-[14px] whitespace-nowrap">
+                      <TableHead className="w-[200px] lg:w-[300px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
                         Name
                       </TableHead>
-                      <TableHead className="min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] font-[600] py-2 px-[10px] text-[14px] whitespace-nowrap">
+                      <TableHead className="min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
                         Status
                       </TableHead>
-                      <TableHead className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 font-[600] py-2 px-[10px] text-[14px] whitespace-nowrap">
+                      <TableHead className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
                         Last Updated
                       </TableHead>
-                      <TableHead className="w-[40px] md:w-[60px] py-2 px-[10px] text-[14px] whitespace-nowrap" />
+                      <TableHead className="w-[40px] md:w-[60px] py-3 px-[10px] text-[14px] whitespace-nowrap" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -69,16 +69,16 @@ export default function MyAgentsSkeleton() {
                           key={index}
                           className="border-b border-gray-100 dark:border-deep-onyx"
                         >
-                          <TableCell className="font-medium w-[300px] py-2 px-[10px] text-[14px] whitespace-nowrap">
+                          <TableCell className="font-medium w-[300px] py-4 px-[10px] text-[14px] whitespace-nowrap">
                             <SkeletonBar className="h-4 w-[140px] max-w-full" />
                           </TableCell>
-                          <TableCell className="font-medium min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] py-2 px-[10px] text-[14px] whitespace-nowrap">
+                          <TableCell className="font-medium min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] py-4 px-[10px] text-[14px] whitespace-nowrap">
                             <SkeletonBar className="h-5 w-[52px] rounded-full" />
                           </TableCell>
-                          <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-2 px-[10px] text-[14px] whitespace-nowrap">
+                          <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-4 px-[10px] text-[14px] whitespace-nowrap">
                             <SkeletonBar className="h-4 w-[168px] max-w-full" />
                           </TableCell>
-                          <TableCell className="w-[40px] md:w-[60px] py-2 px-[10px] text-right">
+                          <TableCell className="w-[40px] md:w-[60px] py-4 px-[10px] text-right">
                             <div className="mx-auto flex h-[30px] w-[30px] items-center justify-center">
                               <SkeletonBar className="h-[18px] w-[18px] rounded-sm" />
                             </div>

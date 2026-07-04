@@ -46,21 +46,6 @@ const userAgentsSlice = createSlice({
     setInitialAgentsFetchComplete: (state) => {
       state.hasCompletedInitialAgentsFetch = true;
     },
-    updateVisitorCounts: (
-      state,
-      action: PayloadAction<Record<string, number>>,
-    ) => {
-      state.myAgents = state.myAgents.map((agent: any) => {
-        const agentId = agent.agent_id;
-        if (
-          agentId &&
-          Object.prototype.hasOwnProperty.call(action.payload, agentId)
-        ) {
-          return { ...agent, live_visitors: action.payload[agentId] };
-        }
-        return agent;
-      });
-    },
     triggerFetchAgents: (state) => {
       state.trigger_fetch_agents += 1;
     },
@@ -75,7 +60,6 @@ export const {
   updateAgent,
   resetMyAgents,
   setInitialAgentsFetchComplete,
-  updateVisitorCounts,
   triggerFetchAgents,
 } = userAgentsSlice.actions;
 

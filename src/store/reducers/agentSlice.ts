@@ -480,6 +480,85 @@ const agentSlice = createSlice({
       }
       applyDerivedStatus(state, existing);
     },
+    mergeRefreshedActiveVisitors: (
+      state,
+      action: PayloadAction<ChatSessionListRow[]>,
+    ) => {
+      for (const row of action.payload) {
+        const existing = state.active_visitors.find(
+          (v) => v.chat_session_id === row.chat_session_id,
+        );
+        if (!existing) continue;
+
+        let changed = false;
+
+        if (
+          row.visitor_online !== undefined &&
+          row.visitor_online !== existing.visitor_online
+        ) {
+          existing.visitor_online = row.visitor_online;
+          changed = true;
+        }
+        if (row.sid !== undefined && row.sid !== existing.sid) {
+          existing.sid = row.sid;
+          changed = true;
+        }
+        if (
+          row.in_conversation_with !== undefined &&
+          row.in_conversation_with !== existing.in_conversation_with
+        ) {
+          existing.in_conversation_with = row.in_conversation_with;
+          if (row.in_conversation_with === null) {
+            existing.in_conversation_with_name = null;
+          }
+          changed = true;
+        }
+        if (
+          row.in_conversation_with_name !== undefined &&
+          row.in_conversation_with_name !== existing.in_conversation_with_name
+        ) {
+          existing.in_conversation_with_name = row.in_conversation_with_name;
+          changed = true;
+        }
+        if (
+          row.last_connected_at !== undefined &&
+          row.last_connected_at !== existing.last_connected_at
+        ) {
+          existing.last_connected_at =
+            row.last_connected_at ?? existing.last_connected_at;
+          changed = true;
+        }
+        if (
+          row.last_message_at !== undefined &&
+          row.last_message_at !== existing.last_message_at
+        ) {
+          existing.last_message_at = row.last_message_at;
+          changed = true;
+        }
+        if (
+          row.alias_name !== undefined &&
+          row.alias_name !== existing.alias_name
+        ) {
+          existing.alias_name = row.alias_name;
+          changed = true;
+        }
+        if (row.geo_data !== undefined && row.geo_data !== existing.geo_data) {
+          existing.geo_data = row.geo_data;
+          changed = true;
+        }
+        if (
+          row.visitor_at !== undefined &&
+          row.visitor_at !== existing.visitor_at
+        ) {
+          existing.visitor_at = row.visitor_at;
+          changed = true;
+        }
+
+        if (changed) {
+          applyDerivedStatus(state, existing);
+        }
+      }
+    },
     setActiveVisitors: (state, action: PayloadAction<ChatSessionListRow[]>) => {
       const seen = new Set<string>();
       state.active_visitors = action.payload
@@ -536,6 +615,91 @@ const agentSlice = createSlice({
         visitor.in_conversation_with_name = action.payload.in_conversation_with_name;
       }
       applyDerivedStatus(state, visitor);
+    },
+    applyChatSessionTakeoverUpdated: (
+      state,
+      action: PayloadAction<{
+        chat_session_id: string;
+        in_conversation_with: string | null;
+        in_conversation_with_name?: string | null;
+        visitor_online?: boolean;
+        sid?: string | null;
+        visitor?: ChatSessionListRow | null;
+      }>,
+    ) => {
+      const {
+        chat_session_id,
+        in_conversation_with,
+        in_conversation_with_name,
+        visitor_online,
+        sid,
+        visitor: visitorRow,
+      } = action.payload;
+
+      const patchTakeoverFields = (
+        target: ActiveVisitor,
+        handlerId: string | null,
+        handlerName?: string | null,
+      ) => {
+        target.in_conversation_with = handlerId;
+        if (handlerId === null) {
+          target.in_conversation_with_name = null;
+        } else if (handlerName !== undefined) {
+          target.in_conversation_with_name = handlerName;
+        }
+      };
+
+      const activeVisitor = state.active_visitors.find(
+        (v) => v.chat_session_id === chat_session_id,
+      );
+
+      if (activeVisitor) {
+        if (visitorRow) {
+          const normalized = normalizeSessionForState(state, {
+            ...visitorRow,
+            chat_session_id,
+            in_conversation_with:
+              visitorRow.in_conversation_with ?? in_conversation_with,
+            in_conversation_with_name:
+              visitorRow.in_conversation_with_name ??
+              in_conversation_with_name ??
+              null,
+            visitor_online:
+              visitorRow.visitor_online ?? visitor_online ?? activeVisitor.visitor_online,
+          });
+          Object.assign(activeVisitor, normalized, { newly_joined: false });
+        } else {
+          patchTakeoverFields(
+            activeVisitor,
+            in_conversation_with,
+            in_conversation_with_name,
+          );
+          if (visitor_online !== undefined) {
+            activeVisitor.visitor_online = visitor_online;
+          }
+          if (sid !== undefined) {
+            activeVisitor.sid = sid;
+          }
+        }
+        applyDerivedStatus(state, activeVisitor);
+      }
+
+      const captured = state.captured_sessions.find(
+        (s) => s.chat_session_id === chat_session_id,
+      );
+      if (captured) {
+        patchTakeoverFields(
+          captured,
+          in_conversation_with,
+          in_conversation_with_name,
+        );
+        if (visitor_online !== undefined) {
+          captured.visitor_online = visitor_online;
+        }
+        if (sid !== undefined) {
+          captured.sid = sid;
+        }
+      }
     },
     removeActiveVisitor: (state, action: PayloadAction<string>) => {
       state.active_visitors = state.active_visitors.filter(
@@ -954,9 +1118,11 @@ export const {
   addActiveVisitor,
   upsertActiveVisitor,
   reconnectActiveVisitorIfPresent,
+  mergeRefreshedActiveVisitors,
   setActiveVisitors,
   updateActiveVisitorStatus,
   updateChatSessionPresence,
+  applyChatSessionTakeoverUpdated,
   removeActiveVisitor,
   addCapturedSession,
   removeCapturedSession,

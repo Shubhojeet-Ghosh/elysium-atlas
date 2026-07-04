@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo, useCallback } from "react";
 import { SquarePen, Save } from "lucide-react";
 import type { TeamMemberConversationLog } from "@/store/reducers/agentSlice";
 import {
@@ -80,7 +80,7 @@ function stripMarkdown(text: string): string {
   );
 }
 
-export default function ConversationsHistoryItem({
+function ConversationsHistoryItem({
   log,
   highlightQuery,
 }: ConversationsHistoryItemProps) {
@@ -126,34 +126,52 @@ export default function ConversationsHistoryItem({
     }
   }, [isEditing]);
 
-  // Derive unread from the log (API + live chat updates)
-  const capturedSessions = useAppSelector(
-    (state) => state.agent.captured_sessions,
+  // Unread badge: only re-render when this session's capture state changes.
+  const capturedSession = useAppSelector((state) =>
+    state.agent.captured_sessions.find(
+      (session) => session.chat_session_id === log.chat_session_id,
+    ),
   );
-  const activeVisitors = useAppSelector((state) => state.agent.active_visitors);
-  const userID = useAppSelector((state) => state.userProfile.userID);
-  const teamRole = useActiveTeamRole();
-  const hasUnread = isConversationLogUnreadForDisplay(log, capturedSessions);
-  const showUnreadCount = hasUnread && (log.unread_count ?? 0) > 0;
-
-  const handleItemClick = () => {
-    if (isEditing) return;
-    if (!userID) return;
-
-    const visitor = activeVisitors.find(
+  const visitorPresence = useAppSelector((state) => {
+    const visitor = state.agent.active_visitors.find(
       (v) => v.chat_session_id === log.chat_session_id,
     );
+    if (!visitor) return null;
+    return {
+      in_conversation_with: visitor.in_conversation_with,
+      in_conversation_with_name: visitor.in_conversation_with_name,
+    };
+  });
+  const userID = useAppSelector((state) => state.userProfile.userID);
+  const teamRole = useActiveTeamRole();
+  const hasUnread = isConversationLogUnreadForDisplay(
+    log,
+    capturedSession ? [capturedSession] : [],
+  );
+  const showUnreadCount = hasUnread && (log.unread_count ?? 0) > 0;
+
+  const handleItemClick = useCallback(() => {
+    if (isEditing) return;
+    if (!userID) return;
 
     captureChatSession(dispatch, {
       agent_id: log.agent_id,
       user_id: userID,
       chat_session_id: log.chat_session_id,
-      in_conversation_with: visitor?.in_conversation_with,
-      in_conversation_with_name: visitor?.in_conversation_with_name,
+      in_conversation_with: visitorPresence?.in_conversation_with,
+      in_conversation_with_name: visitorPresence?.in_conversation_with_name,
       team_role: teamRole,
       openAs: "takeover",
     });
-  };
+  }, [
+    isEditing,
+    userID,
+    dispatch,
+    log.agent_id,
+    log.chat_session_id,
+    visitorPresence,
+    teamRole,
+  ]);
 
   const commitAlias = () => {
     const newAlias = inputValue.trim() || null;
@@ -348,3 +366,5 @@ export default function ConversationsHistoryItem({
     </div>
   );
 }
+
+export default memo(ConversationsHistoryItem);

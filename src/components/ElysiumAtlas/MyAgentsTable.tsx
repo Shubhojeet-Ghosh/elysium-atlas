@@ -232,16 +232,16 @@ export default function MyAgentsTable({
             <Table className="min-w-[600px] lg:min-w-full ">
               <TableHeader>
                 <TableRow className="hover:bg-transparent ">
-                  <TableHead className="w-[200px] lg:w-[300px] font-[600] py-2 px-[10px] text-[14px] whitespace-nowrap">
+                  <TableHead className="w-[200px] lg:w-[300px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
                     Name
                   </TableHead>
-                  <TableHead className="min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] font-[600] py-2 px-[10px] text-[14px] whitespace-nowrap">
+                  <TableHead className="min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
                     Status
                   </TableHead>
-                  <TableHead className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 font-[600] py-2 px-[10px] text-[14px] whitespace-nowrap">
+                  <TableHead className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 font-[600] py-3 px-[10px] text-[14px] whitespace-nowrap">
                     Last Updated
                   </TableHead>
-                  <TableHead className="w-[40px] md:w-[60px] py-2 px-[10px] text-[14px] whitespace-nowrap"></TableHead>
+                  <TableHead className="w-[40px] md:w-[60px] py-3 px-[10px] text-[14px] whitespace-nowrap"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -258,7 +258,7 @@ export default function MyAgentsTable({
                       className="cursor-pointer border-b border-gray-100 dark:border-deep-onyx hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 hover:text-serene-purple dark:hover:text-serene-purple transition-all duration-200"
                       onClick={() => handleAgentClick(agent.agent_id)}
                     >
-                      <TableCell className="font-medium w-[300px] py-2 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist">
+                      <TableCell className="font-medium w-[300px] py-4 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist">
                         <div className="flex items-center gap-2">
                           {agent.agent_name.length > 20 ? (
                             <Tooltip>
@@ -274,22 +274,17 @@ export default function MyAgentsTable({
                           ) : (
                             <div className="truncate">{agent.agent_name}</div>
                           )}
-                          {agent.live_visitors > 0 && (
-                            <span className="inline-flex items-center shrink-0 rounded-full bg-serene-purple/15 text-serene-purple px-2 py-0.5 text-[10px] font-semibold">
-                              {agent.live_visitors} online
-                            </span>
-                          )}
                         </div>
                       </TableCell>
                       <TableCell
-                        className={`font-medium min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] py-2 px-[10px] text-[14px] whitespace-nowrap ${getAgentStatusTextClass(agent.agent_status)}`}
+                        className={`font-medium min-w-[120px] lg:min-w-[100px] lg:max-w-[200px] py-4 px-[10px] text-[14px] whitespace-nowrap ${getAgentStatusTextClass(agent.agent_status)}`}
                       >
                         {agent.agent_status}
                       </TableCell>
-                      <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-2 px-[10px] text-[14px] whitespace-nowrap text-gray-500 dark:text-gray-400">
+                      <TableCell className="min-w-[200px] pl-4 md:pl-8 lg:pl-12 py-4 px-[10px] text-[14px] whitespace-nowrap text-gray-500 dark:text-gray-400">
                         {formatDateTime12hr(agent.updated_at)}
                       </TableCell>
-                      <TableCell className="w-[40px] md:w-[60px] py-2 px-[10px] text-right">
+                      <TableCell className="w-[40px] md:w-[60px] py-4 px-[10px] text-right">
                         {canManageAgents ? (
                           <div className="mx-auto flex items-center justify-center h-[30px] w-[30px]">
                             {isSettledAgentStatus(agent.agent_status) ? (

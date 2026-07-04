@@ -6,7 +6,7 @@ import aiSocket from "@/lib/aiSocket";
 import { useAppDispatch, store } from "@/store";
 import {
   setCapturedSessionMode,
-  updateChatSessionPresence,
+  applyChatSessionTakeoverUpdated,
   type CapturedSessionMode,
 } from "@/store/reducers/agentSlice";
 import {
@@ -96,21 +96,13 @@ export function useCapturedSessionTakeover({
     setIsReleasePending(true);
     emitEndTakeoverConversation(agent_id, chat_session_id);
 
-    const visitor = store
-      .getState()
-      .agent.active_visitors.find((v) => v.chat_session_id === chat_session_id);
-
-    if (visitor) {
-      dispatch(
-        updateChatSessionPresence({
-          chat_session_id,
-          visitor_online: visitor.visitor_online,
-          sid: visitor.sid,
-          in_conversation_with: null,
-          in_conversation_with_name: null,
-        }),
-      );
-    }
+    dispatch(
+      applyChatSessionTakeoverUpdated({
+        chat_session_id,
+        in_conversation_with: null,
+        in_conversation_with_name: null,
+      }),
+    );
 
     setIsReleasePending(false);
     onReleased?.();
@@ -207,21 +199,12 @@ export function useCapturedSessionTakeover({
         }
 
         if (data.in_conversation_with) {
-          const visitor = store
-            .getState()
-            .agent.active_visitors.find(
-              (v) => v.chat_session_id === chat_session_id,
-            );
-          if (visitor) {
-            dispatch(
-              updateChatSessionPresence({
-                chat_session_id,
-                visitor_online: visitor.visitor_online,
-                sid: visitor.sid,
-                in_conversation_with: data.in_conversation_with,
-              }),
-            );
-          }
+          dispatch(
+            applyChatSessionTakeoverUpdated({
+              chat_session_id,
+              in_conversation_with: data.in_conversation_with,
+            }),
+          );
         }
         return;
       }
@@ -237,25 +220,15 @@ export function useCapturedSessionTakeover({
         }),
       );
 
-      const visitor = store
-        .getState()
-        .agent.active_visitors.find(
-          (v) => v.chat_session_id === chat_session_id,
-        );
-
-      if (visitor) {
-        dispatch(
-          updateChatSessionPresence({
-            chat_session_id,
-            visitor_online: visitor.visitor_online,
-            sid: visitor.sid,
-            in_conversation_with: data.in_conversation_with ?? user_id,
-            in_conversation_with_name: getTeamMemberDisplayName(
-              store.getState().userProfile,
-            ),
-          }),
-        );
-      }
+      dispatch(
+        applyChatSessionTakeoverUpdated({
+          chat_session_id,
+          in_conversation_with: data.in_conversation_with ?? user_id,
+          in_conversation_with_name: getTeamMemberDisplayName(
+            store.getState().userProfile,
+          ),
+        }),
+      );
 
       setIsTakeoverPending(false);
     };
@@ -281,23 +254,13 @@ export function useCapturedSessionTakeover({
         return;
       }
 
-      const visitor = store
-        .getState()
-        .agent.active_visitors.find(
-          (v) => v.chat_session_id === chat_session_id,
-        );
-
-      if (visitor) {
-        dispatch(
-          updateChatSessionPresence({
-            chat_session_id,
-            visitor_online: visitor.visitor_online,
-            sid: visitor.sid,
-            in_conversation_with: null,
-            in_conversation_with_name: null,
-          }),
-        );
-      }
+      dispatch(
+        applyChatSessionTakeoverUpdated({
+          chat_session_id,
+          in_conversation_with: null,
+          in_conversation_with_name: null,
+        }),
+      );
 
       if (!data.already_resolved) {
         toast.success("Conversation marked as resolved");

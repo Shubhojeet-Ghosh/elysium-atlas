@@ -78,6 +78,91 @@ export function normalizeChatSessionRow(
   };
 }
 
+function geoDataEqual(a: GeoData | null, b: GeoData | null | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.country_flag === b.country_flag &&
+    a.country_name === b.country_name &&
+    a.district === b.district &&
+    a.ip === b.ip &&
+    a.time_zone === b.time_zone
+  );
+}
+
+/** True when a refresh payload would change visible row fields. */
+export function hasRefreshRowChanges(
+  existing: ActiveVisitor,
+  incoming: ChatSessionListRow,
+): boolean {
+  if (
+    incoming.visitor_online !== undefined &&
+    incoming.visitor_online !== existing.visitor_online
+  ) {
+    return true;
+  }
+  if (incoming.sid !== undefined && incoming.sid !== existing.sid) {
+    return true;
+  }
+  if (
+    incoming.in_conversation_with !== undefined &&
+    incoming.in_conversation_with !== existing.in_conversation_with
+  ) {
+    return true;
+  }
+  if (
+    incoming.in_conversation_with_name !== undefined &&
+    incoming.in_conversation_with_name !== existing.in_conversation_with_name
+  ) {
+    return true;
+  }
+  if (
+    incoming.last_connected_at !== undefined &&
+    incoming.last_connected_at !== existing.last_connected_at
+  ) {
+    return true;
+  }
+  if (
+    incoming.last_message_at !== undefined &&
+    incoming.last_message_at !== existing.last_message_at
+  ) {
+    return true;
+  }
+  if (
+    incoming.alias_name !== undefined &&
+    incoming.alias_name !== existing.alias_name
+  ) {
+    return true;
+  }
+  if (
+    incoming.visitor_at !== undefined &&
+    incoming.visitor_at !== existing.visitor_at
+  ) {
+    return true;
+  }
+  if (
+    incoming.geo_data !== undefined &&
+    !geoDataEqual(existing.geo_data, incoming.geo_data)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function pickChangedRefreshRows(
+  existingVisitors: ActiveVisitor[],
+  incomingRows: ChatSessionListRow[],
+): ChatSessionListRow[] {
+  const byId = new Map(
+    existingVisitors.map((visitor) => [visitor.chat_session_id, visitor]),
+  );
+
+  return incomingRows.filter((row) => {
+    const existing = byId.get(row.chat_session_id);
+    return existing && hasRefreshRowChanges(existing, row);
+  });
+}
+
 /** Tooltip label for who holds an active human takeover. */
 export function formatInConversationHandlerLabel(
   handlerUserId: string | null | undefined,

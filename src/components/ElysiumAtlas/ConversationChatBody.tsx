@@ -14,28 +14,18 @@ import {
   type ConversationMessage,
   type CapturedSessionMode,
 } from "@/store/reducers/agentSlice";
-import { formatChatTimestamp } from "@/utils/formatDate";
 import {
   isVisitorMessageUnread,
   isMonitorMessageUnread,
   findFirstUnreadSeparatorIndex,
   resolveMarkReadMessageId,
 } from "@/utils/conversationMessageUtils";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeHighlight from "rehype-highlight";
-import { createMarkdownComponents } from "@/utils/markdownComponents";
 import { useMarkMessagesReadWhenVisible } from "@/hooks/useMarkMessagesReadWhenVisible";
-import ReadReceiptMarker from "@/components/ElysiumAtlas/ReadReceiptMarker";
+import ConversationMessageBubble from "@/components/ElysiumAtlas/ConversationMessageBubble";
 import {
   useChatScrollToUnreadOrBottom,
   AGENT_UNREAD_SEPARATOR_VIEWPORT_RATIO,
 } from "@/hooks/useChatScrollToUnreadOrBottom";
-
-const conversationMarkdownComponents = createMarkdownComponents({
-  codeTextColor: "#1e2939",
-});
-
 // ─── Chat body ────────────────────────────────────────────────────────────────
 
 export default function ConversationChatBody({
@@ -351,11 +341,53 @@ export default function ConversationChatBody({
       }
     };
 
+    const handleMessageFromTeamMember = (data: {
+      agent_id: string;
+      chat_session_id: string;
+      message: string;
+      sender: string;
+      conversation_mode?: string;
+      message_id?: string;
+      _id?: string;
+      role?: string;
+      team_member_id?: string;
+      created_at?: string;
+    }) => {
+      if (data.chat_session_id !== chat_session_id) return;
+      if (!isMonitorMode) return;
+
+      const teamMsgAt = data.created_at ?? new Date().toISOString();
+      const content = data.message ?? "";
+
+      appendMessage(
+        {
+          message_id: data.message_id ?? data._id ?? uuidv4(),
+          _id: data._id,
+          role: (data.role as "user" | "agent" | "human") ?? "human",
+          content,
+          created_at: teamMsgAt,
+        },
+        content,
+        teamMsgAt,
+      );
+
+      if (isVisibleRef.current && data._id) {
+        requestAnimationFrame(() => {
+          markMessageVisibleRef.current(
+            data.message_id ?? data._id!,
+            data._id ?? null,
+          );
+        });
+      }
+    };
+
     aiSocket.on("message_from_visitor", handleMessageFromVisitor);
     aiSocket.on("message_from_agent", handleMessageFromAgent);
+    aiSocket.on("message_from_team_member", handleMessageFromTeamMember);
     return () => {
       aiSocket.off("message_from_visitor", handleMessageFromVisitor);
       aiSocket.off("message_from_agent", handleMessageFromAgent);
+      aiSocket.off("message_from_team_member", handleMessageFromTeamMember);
     };
   }, [chat_session_id, dispatch, isMonitorMode, pauseAgentMirror]);
 
@@ -458,37 +490,11 @@ export default function ConversationChatBody({
                   ? isMonitorMessageUnread(msg)
                   : isVisitorMessageUnread(msg);
 
-                const messageBubble = (
-                  <>
-                    <div
-                      className={`max-w-[80%] px-3 py-2 text-[13px] leading-relaxed font-[500] break-words ${
-                        isTeamMember
-                          ? "bg-serene-purple text-white rounded-2xl rounded-br-sm"
-                          : "bg-pure-mist text-gray-800 dark:text-gray-900 rounded-2xl rounded-bl-sm"
-                      }`}
-                    >
-                      <div className="prose prose-sm max-w-none [&_*]:text-inherit [&_a]:underline [&_a]:cursor-pointer">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          rehypePlugins={[rehypeHighlight]}
-                          components={conversationMarkdownComponents}
-                        >
-                          {msg.content}
-                        </ReactMarkdown>
-                      </div>
-                    </div>
-                    <span className="text-[10px] text-gray-400 dark:text-pure-mist px-1">
-                      {formatChatTimestamp(msg.created_at)}
-                    </span>
-                  </>
-                );
-
                 return (
                   <Fragment key={msg._id ?? msg.message_id}>
                     {index === separatorIndex && (
                       <div
                         ref={separatorElRef}
-                        key={`sep-${msg.message_id}`}
                         className="flex items-center gap-2 my-1 px-1"
                       >
                         <div className="flex-1 h-px bg-serene-purple/40" />
@@ -498,34 +504,19 @@ export default function ConversationChatBody({
                         <div className="flex-1 h-px bg-serene-purple/40" />
                       </div>
                     )}
-                    {needsReadReceipt ? (
-                      <ReadReceiptMarker
-                        messageId={msg.message_id}
-                        mongoId={msg._id ?? null}
-                        enabled={isVisible}
-                        scrollRootRef={scrollContainerRef}
-                        onVisible={markMessageVisible}
-                        className={`flex flex-col gap-0.5 ${
-                          isTeamMember ? "items-end" : "items-start"
-                        }`}
-                      >
-                        {messageBubble}
-                      </ReadReceiptMarker>
-                    ) : (
-                      <div
-                        className={`flex flex-col gap-0.5 ${
-                          isTeamMember ? "items-end" : "items-start"
-                        }`}
-                      >
-                        {messageBubble}
-                      </div>
-                    )}
+                    <ConversationMessageBubble
+                      message={msg}
+                      isTeamMember={isTeamMember}
+                      needsReadReceipt={needsReadReceipt}
+                      isVisible={isVisible}
+                      scrollContainerRef={scrollContainerRef}
+                      onMarkVisible={markMessageVisible}
+                    />
                   </Fragment>
                 );
               })}
               <div ref={messagesEndRef} />
-            </div>
-          )}
+            </div>          )}
         </div>
       </div>
 

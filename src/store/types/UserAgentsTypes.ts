@@ -3,7 +3,6 @@ export interface Agent {
   name: string;
   status: string;
   created: string;
-  live_visitors?: number;
 }
 
 export interface UserAgentsState {

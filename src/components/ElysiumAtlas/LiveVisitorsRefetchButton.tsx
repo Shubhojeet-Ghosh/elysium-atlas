@@ -1,10 +1,11 @@
 "use client";
 
+import { memo } from "react";
 import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Spinner from "@/components/ui/Spinner";
 
-export default function LiveVisitorsRefetchButton({
+export default memo(function LiveVisitorsRefetchButton({
   className,
   disabled,
   isLoading = false,
@@ -23,7 +24,7 @@ export default function LiveVisitorsRefetchButton({
       aria-label="Refresh chat sessions"
       aria-busy={isLoading}
       className={cn(
-        "flex items-center justify-center px-[10px] py-[8px] rounded-[10px] border border-serene-purple text-serene-purple transition-all duration-200 cursor-pointer hover:bg-serene-purple/10 disabled:opacity-50 disabled:cursor-not-allowed",
+        "flex shrink-0 items-center justify-center size-[41px] min-w-[41px] min-h-[41px] p-0 box-border rounded-[10px] border-2 border-serene-purple text-serene-purple transition-all duration-200 cursor-pointer hover:bg-serene-purple/10 disabled:opacity-50 disabled:cursor-not-allowed",
         className,
       )}
     >
@@ -34,4 +35,4 @@ export default function LiveVisitorsRefetchButton({
       )}
     </button>
   );
-}
+});

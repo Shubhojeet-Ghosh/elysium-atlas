@@ -6,7 +6,6 @@ import { useAppDispatch, useAppSelector } from "@/store";
 import {
   setAgentsList,
   setInitialAgentsFetchComplete,
-  updateVisitorCounts,
 } from "@/store/reducers/userAgentsSlice";
 import Cookies from "js-cookie";
 import aiSocket from "@/lib/aiSocket";
@@ -166,33 +165,10 @@ export default function MyAgents() {
       aiSocket.once("connect", emitConnected);
     }
 
-    const handleVisitorCounts = (data: {
-      success: boolean;
-      visitor_counts: Record<string, number>;
-    }) => {
-      if (data.success && data.visitor_counts) {
-        dispatch(updateVisitorCounts(data.visitor_counts));
-      }
-    };
-
-    const handleVisitorCountUpdated = (data: {
-      agent_id: string;
-      visitor_count: number;
-    }) => {
-      if (data.agent_id !== undefined && data.visitor_count !== undefined) {
-        dispatch(updateVisitorCounts({ [data.agent_id]: data.visitor_count }));
-      }
-    };
-
-    aiSocket.on("agents_visitor_counts", handleVisitorCounts);
-    aiSocket.on("agent_visitor_count_updated", handleVisitorCountUpdated);
-
     return () => {
       aiSocket.off("connect", emitConnected);
-      aiSocket.off("agents_visitor_counts", handleVisitorCounts);
-      aiSocket.off("agent_visitor_count_updated", handleVisitorCountUpdated);
     };
-  }, [teamID, userID, dispatch]);
+  }, [teamID, userID]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);

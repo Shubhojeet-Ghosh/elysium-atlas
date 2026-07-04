@@ -8,7 +8,7 @@ import { useAppDispatch, useAppSelector, store } from "../../store";
 import {
   setActiveVisitors,
   triggerFetchTeamMemberChatSessions,
-  updateChatSessionPresence,
+  applyChatSessionTakeoverUpdated,
   removeCapturedSession,
   clearCapturedSessions,
 } from "@/store/reducers/agentSlice";
@@ -22,6 +22,7 @@ import {
 import { reackOwnedTakeoverSessions } from "@/utils/chatTakeoverUtils";
 import type { ChatSessionListRow } from "@/utils/chatSessionListUtils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useVisibleVisitorsRefresh } from "@/hooks/useVisibleVisitorsRefresh";
 import {
   VISITOR_PAGE_SIZE_OPTIONS,
   readVisitorsPageSize,
@@ -82,6 +83,16 @@ export default function LiveVisitors() {
   const [pageSize, setPageSize] = useState<VisitorPageSize>(() =>
     readVisitorsPageSize(),
   );
+  const [messagingExpanded, setMessagingExpanded] = useState(false);
+  const [listSnapshotKey, setListSnapshotKey] = useState(0);
+
+  const isSearchActive = Boolean(debouncedSearchQuery.trim());
+
+  useVisibleVisitorsRefresh({
+    agentId: agentID,
+    listSnapshotKey: String(listSnapshotKey),
+    enabled: Boolean(agentID) && !isLoadingSessions,
+  });
 
   const currentPageRef = useRef(currentPage);
   currentPageRef.current = currentPage;
@@ -162,13 +173,15 @@ export default function LiveVisitors() {
   );
 
   const handleRefresh = useCallback(() => {
-    fetchSessions(currentPageRef.current, pageSizeRef.current);
+    setCurrentPage(1);
+    fetchSessions(1, pageSizeRef.current);
     dispatch(triggerFetchTeamMemberChatSessions());
   }, [dispatch, fetchSessions]);
 
   useEffect(() => {
     setSearchTerm("");
     setCurrentPage(1);
+    setListSnapshotKey(0);
     setIsLoadingSessions(true);
     dispatch(setActiveVisitors([]));
   }, [agentID, dispatch]);
@@ -252,6 +265,7 @@ export default function LiveVisitors() {
       setIsLoadingSessions(false);
       const visitors = data.visitors ?? [];
       dispatch(setActiveVisitors(visitors));
+      setListSnapshotKey((key) => key + 1);
       applyPagination({
         total: data.total,
         page: data.page,
@@ -292,6 +306,7 @@ export default function LiveVisitors() {
       }
 
       dispatch(setActiveVisitors(data.visitors ?? []));
+      setListSnapshotKey((key) => key + 1);
       applyPagination({
         total: data.total,
         page: data.page,
@@ -302,56 +317,8 @@ export default function LiveVisitors() {
       });
     };
 
-    const handleVisitorDisconnected = (data: {
-      agent_id: string;
-      chat_session_id: string;
-      sid: string;
-      pagination?: PaginationPayload;
-    }) => {
-      if (data.agent_id !== agentID) return;
-
-      dispatch(
-        updateChatSessionPresence({
-          chat_session_id: data.chat_session_id,
-          visitor_online: false,
-          sid: null,
-        }),
-      );
-
-      if (data.pagination && !searchQueryRef.current) {
-        applyPagination({
-          total: data.pagination.total,
-          page: data.pagination.page ?? currentPageRef.current,
-          has_next: data.pagination.has_next ?? false,
-          has_prev: data.pagination.has_prev ?? false,
-          total_pages: data.pagination.total_pages,
-        });
-      }
-    };
-
-    const handlePaginationUpdated = (data: {
-      agent_id: string;
-      total: number;
-    }) => {
-      if (data.agent_id !== agentID) return;
-      if (searchQueryRef.current) return;
-
-      const page = currentPageRef.current;
-      const limit = pageSizeRef.current;
-
-      applyPagination({
-        total: data.total,
-        page,
-        has_next: page * limit < data.total,
-        has_prev: page > 1,
-        size: limit,
-      });
-    };
-
     aiSocket.on("agent_visitors_list", handleVisitorsList);
     aiSocket.on("agent_visitors_search_results", handleSearchResults);
-    aiSocket.on("agent_visitor_disconnected", handleVisitorDisconnected);
-    aiSocket.on("agent_visitors_pagination_updated", handlePaginationUpdated);
 
     const handleMonitorStarted = (data: {
       success: boolean;
@@ -374,24 +341,52 @@ export default function LiveVisitors() {
       }
 
       if (data.takeover_active && data.in_conversation_with) {
-        const visitor = store
-          .getState()
-          .agent.active_visitors.find(
-            (v) => v.chat_session_id === data.chat_session_id,
-          );
-        if (visitor) {
-          dispatch(
-            updateChatSessionPresence({
-              chat_session_id: data.chat_session_id,
-              visitor_online: visitor.visitor_online,
-              sid: visitor.sid,
-              in_conversation_with: data.in_conversation_with,
-              in_conversation_with_name:
-                data.in_conversation_with_name ?? visitor.in_conversation_with_name,
-            }),
-          );
-        }
+        applyTakeoverUpdate({
+          chat_session_id: data.chat_session_id,
+          in_conversation_with: data.in_conversation_with,
+          in_conversation_with_name: data.in_conversation_with_name ?? null,
+        });
       }
+    };
+
+    const applyTakeoverUpdate = (data: {
+      chat_session_id: string;
+      in_conversation_with: string | null;
+      in_conversation_with_name?: string | null;
+      visitor_online?: boolean;
+      sid?: string | null;
+      visitor?: ChatSessionListRow | null;
+    }) => {
+      dispatch(
+        applyChatSessionTakeoverUpdated({
+          chat_session_id: data.chat_session_id,
+          in_conversation_with: data.in_conversation_with,
+          in_conversation_with_name: data.in_conversation_with_name,
+          visitor_online: data.visitor_online ?? data.visitor?.visitor_online,
+          sid: data.sid ?? data.visitor?.sid,
+          visitor: data.visitor ?? null,
+        }),
+      );
+    };
+
+    const handleChatSessionTakeoverUpdated = (data: {
+      agent_id: string;
+      chat_session_id: string;
+      in_conversation_with: string | null;
+      in_conversation_with_name?: string | null;
+      visitor_online?: boolean;
+      status?: string;
+      visitor?: ChatSessionListRow;
+    }) => {
+      if (data.agent_id !== agentID) return;
+
+      applyTakeoverUpdate({
+        chat_session_id: data.chat_session_id,
+        in_conversation_with: data.in_conversation_with,
+        in_conversation_with_name: data.in_conversation_with_name,
+        visitor_online: data.visitor_online,
+        visitor: data.visitor ?? null,
+      });
     };
 
     const syncTakeoverPresence = (
@@ -399,22 +394,11 @@ export default function LiveVisitors() {
       in_conversation_with: string | null,
       in_conversation_with_name?: string | null,
     ) => {
-      const visitor = store
-        .getState()
-        .agent.active_visitors.find((v) => v.chat_session_id === chat_session_id);
-      if (!visitor) return;
-
-      dispatch(
-        updateChatSessionPresence({
-          chat_session_id,
-          visitor_online: visitor.visitor_online,
-          sid: visitor.sid,
-          in_conversation_with,
-          ...(in_conversation_with_name !== undefined
-            ? { in_conversation_with_name }
-            : {}),
-        }),
-      );
+      applyTakeoverUpdate({
+        chat_session_id,
+        in_conversation_with,
+        in_conversation_with_name,
+      });
     };
 
     const handleSessionTakeoverStarted = (data: {
@@ -436,7 +420,7 @@ export default function LiveVisitors() {
       chat_session_id: string;
     }) => {
       if (data.agent_id && data.agent_id !== agentID) return;
-      syncTakeoverPresence(data.chat_session_id, null);
+      syncTakeoverPresence(data.chat_session_id, null, null);
     };
 
     aiSocket.on("monitor_conversation_started", handleMonitorStarted);
@@ -463,6 +447,7 @@ export default function LiveVisitors() {
     aiSocket.on("monitor_conversation_ended", handleMonitorEnded);
     aiSocket.on("session_takeover_started", handleSessionTakeoverStarted);
     aiSocket.on("session_takeover_ended", handleSessionTakeoverEnded);
+    aiSocket.on("chat_session_takeover_updated", handleChatSessionTakeoverUpdated);
 
     const handleBeforeUnload = () => {
       stopAllMonitorConversations();
@@ -480,12 +465,11 @@ export default function LiveVisitors() {
       aiSocket.off("connect", emitConnected);
       aiSocket.off("agent_visitors_list", handleVisitorsList);
       aiSocket.off("agent_visitors_search_results", handleSearchResults);
-      aiSocket.off("agent_visitor_disconnected", handleVisitorDisconnected);
-      aiSocket.off("agent_visitors_pagination_updated", handlePaginationUpdated);
       aiSocket.off("monitor_conversation_started", handleMonitorStarted);
       aiSocket.off("monitor_conversation_ended", handleMonitorEnded);
       aiSocket.off("session_takeover_started", handleSessionTakeoverStarted);
       aiSocket.off("session_takeover_ended", handleSessionTakeoverEnded);
+      aiSocket.off("chat_session_takeover_updated", handleChatSessionTakeoverUpdated);
       dispatch(setActiveVisitors([]));
       setSocket(null);
     };
@@ -497,6 +481,10 @@ export default function LiveVisitors() {
     applyPagination,
     fetchSessions,
   ]);
+
+  const handleMessagingExpandedChange = useCallback((expanded: boolean) => {
+    setMessagingExpanded(expanded);
+  }, []);
 
   const handlePageChange = useCallback(
     (page: number) => {
@@ -518,7 +506,7 @@ export default function LiveVisitors() {
           pageSizeOptions={VISITOR_PAGE_SIZE_OPTIONS}
           searchQuery={searchTerm}
           debouncedSearchQuery={debouncedSearchQuery}
-          isSearchActive={Boolean(debouncedSearchQuery.trim())}
+          isSearchActive={isSearchActive}
           isLoadingSessions={isLoadingSessions}
           onSearchChange={handleSearchChange}
           onRefresh={handleRefresh}
@@ -527,8 +515,19 @@ export default function LiveVisitors() {
         />
       </div>
 
-      <div className="fixed bottom-0 right-0.5 lg:right-6 z-50 flex flex-row-reverse items-end gap-3 pointer-events-none">
-        <ConversationsHistoryPanel />
+      <div className="fixed bottom-0 right-0.5 lg:right-6 z-50 pointer-events-none">
+        <ConversationsHistoryPanel
+          onExpandedChange={handleMessagingExpandedChange}
+        />
+      </div>
+
+      <div
+        className={`fixed bottom-0 z-[110] flex flex-row-reverse items-end gap-3 pointer-events-none transition-[right] duration-300 ease-in-out ${
+          messagingExpanded
+            ? "right-[calc(0.125rem+20rem+0.75rem)] lg:right-[calc(1.5rem+28rem+0.75rem)]"
+            : "right-[calc(0.125rem+16rem+0.75rem)] lg:right-[calc(1.5rem+20rem+0.75rem)]"
+        }`}
+      >
         <TeamMemberConversationsPanel inline />
       </div>
     </div>

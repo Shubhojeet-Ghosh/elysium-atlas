@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, type MouseEvent } from "react";
+import { useState, useRef, useEffect, memo, type MouseEvent } from "react";
 import { SquarePen, Save, MoreHorizontal } from "lucide-react";
 import aiSocket from "@/lib/aiSocket";
 import {
@@ -32,10 +32,16 @@ export type CapturedSession = ActiveVisitor & {
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
-function ChevronIcon({ isExpanded }: { isExpanded: boolean }) {
+function ChevronIcon({
+  isExpanded,
+  className = "w-4 h-4",
+}: {
+  isExpanded: boolean;
+  className?: string;
+}) {
   return (
     <svg
-      className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? "" : "rotate-180"}`}
+      className={`${className} transition-transform duration-200 ${isExpanded ? "" : "rotate-180"}`}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -46,10 +52,10 @@ function ChevronIcon({ isExpanded }: { isExpanded: boolean }) {
   );
 }
 
-function XIcon() {
+function XIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
     <svg
-      className="w-4 h-4"
+      className={className}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -66,7 +72,7 @@ function XIcon() {
 
 // ─── Chat header ──────────────────────────────────────────────────────────────
 
-export default function ConversationChatHeader({
+function ConversationChatHeader({
   session,
   isExpanded,
   onToggle,
@@ -168,6 +174,19 @@ export default function ConversationChatHeader({
     return s?.conversation_chain.some(isVisitorMessageUnread) ?? false;
   });
 
+  const isOnline = useAppSelector((state) => {
+    const active = state.agent.active_visitors.find(
+      (v) => v.chat_session_id === session.chat_session_id,
+    );
+    if (active) return active.visitor_online;
+    const captured = state.agent.captured_sessions.find(
+      (cs) => cs.chat_session_id === session.chat_session_id,
+    );
+    return captured?.visitor_online ?? session.visitor_online;
+  });
+
+  const presenceLabel = isOnline ? "online" : "offline";
+
   const releaseEnabled =
     canRelease && Boolean(onRelease) && !isReleasePending;
   const resolveEnabled =
@@ -192,9 +211,16 @@ export default function ConversationChatHeader({
 
   const showEditControls = isExpanded;
 
+  const headerActionGap = isTouchLayout ? "gap-2" : "gap-1";
+  const headerActionBtnClass = isTouchLayout
+    ? "flex items-center justify-center shrink-0 w-10 h-10 rounded-full cursor-pointer transition-colors hover:ring-2 hover:ring-serene-purple/60 hover:ring-offset-0 dark:hover:ring-pure-mist/60"
+    : "flex items-center justify-center shrink-0 w-8 h-8 p-1 rounded-full cursor-pointer transition-colors hover:ring-2 hover:ring-serene-purple/60 hover:ring-offset-0 dark:hover:ring-pure-mist/60";
+  const headerActionIconClass = isTouchLayout ? "w-5 h-5" : "w-4 h-4";
+  const headerMinimizeIconClass = isTouchLayout ? "w-6 h-6" : "w-4 h-4";
+
   return (
     <div
-      className={`flex items-center gap-4 px-3 py-3.5 shrink-0 select-none transition-colors border-b ${
+      className={`flex items-center gap-3 px-4 py-3.5 min-h-16 shrink-0 select-none transition-colors border-b ${
         hasUnread
           ? "bg-serene-purple border-serene-purple/30"
           : "border-gray-100 dark:border-pure-mist"
@@ -234,93 +260,102 @@ export default function ConversationChatHeader({
       </Tooltip>
 
       <span className="flex-1 flex items-center min-w-0">
-        <div className="group flex items-center w-full min-w-0">
-          {!isEditing || !showEditControls ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span
-                  className={`inline-block text-sm font-semibold truncate max-w-[200px] ${
+        <div className="flex flex-col min-w-0 flex-1 gap-0.5">
+          <div className="group flex items-center w-full min-w-0">
+            {!isEditing || !showEditControls ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    className={`inline-block text-sm font-semibold truncate max-w-[200px] ${
+                      hasUnread
+                        ? "text-white"
+                        : "text-gray-800 dark:text-gray-100"
+                    }`}
+                  >
+                    {truncateMiddle(displayName)}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">{displayName}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <input
+                ref={inputRef}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="text-sm font-semibold truncate max-w-[200px] bg-transparent border-b border-gray-300 dark:border-gray-700 outline-none px-1 py-0"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    commitAlias();
+                  } else if (e.key === "Escape") {
+                    setIsEditing(false);
+                  }
+                }}
+                onBlur={commitAlias}
+              />
+            )}
+
+            {showEditControls &&
+              (isEditing ? (
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    commitAlias();
+                  }}
+                  aria-label="Save alias"
+                  className={`ml-2 rounded-full cursor-pointer transition-colors ${
+                    isTouchLayout ? "p-2" : "p-1"
+                  } ${
                     hasUnread
-                      ? "text-white"
-                      : "text-gray-800 dark:text-gray-100"
+                      ? "text-white hover:text-white/80"
+                      : "text-serene-purple hover:text-serene-purple/80 dark:text-pure-mist"
                   }`}
                 >
-                  {truncateMiddle(displayName)}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top">{displayName}</TooltipContent>
-            </Tooltip>
-          ) : (
-            <input
-              ref={inputRef}
-              onMouseDown={(e) => e.stopPropagation()}
-              className="text-sm font-semibold truncate max-w-[200px] bg-transparent border-b border-gray-300 dark:border-gray-700 outline-none px-1 py-0"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  commitAlias();
-                } else if (e.key === "Escape") {
-                  setIsEditing(false);
-                }
-              }}
-              onBlur={commitAlias}
-            />
-          )}
-
-          {showEditControls &&
-            (isEditing ? (
-              <button
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  commitAlias();
-                }}
-                aria-label="Save alias"
-                className={`ml-2 rounded-full cursor-pointer transition-colors ${
-                  isTouchLayout ? "p-2" : "p-1"
-                } ${
-                  hasUnread
-                    ? "text-white hover:text-white/80"
-                    : "text-serene-purple hover:text-serene-purple/80 dark:text-pure-mist"
-                }`}
-              >
-                <Save className="w-4 h-4" />
-              </button>
-            ) : (
-              <button
-                onClick={startEditing}
-                onMouseDown={(e) => e.preventDefault()}
-                aria-label="Edit alias"
-                className={`ml-2 rounded-full cursor-pointer transition-opacity ${
-                  isTouchLayout
-                    ? "p-2 opacity-100"
-                    : "p-1 opacity-0 group-hover:opacity-100"
-                } ${
-                  hasUnread
-                    ? "text-white/80 hover:text-white"
-                    : "text-gray-500 hover:text-gray-700 dark:hover:text-pure-mist"
-                }`}
-              >
-                <SquarePen className="w-4 h-4" />
-              </button>
-            ))}
+                  <Save className="w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  onClick={startEditing}
+                  onMouseDown={(e) => e.preventDefault()}
+                  aria-label="Edit alias"
+                  className={`ml-2 rounded-full cursor-pointer transition-opacity ${
+                    isTouchLayout
+                      ? "p-2 opacity-100"
+                      : "p-1 opacity-0 group-hover:opacity-100"
+                  } ${
+                    hasUnread
+                      ? "text-white/80 hover:text-white"
+                      : "text-gray-500 hover:text-gray-700 dark:hover:text-pure-mist"
+                  }`}
+                >
+                  <SquarePen className="w-4 h-4" />
+                </button>
+              ))}
+          </div>
+          <span
+            className={`text-[11px] font-medium leading-tight ${
+              hasUnread ? "text-white/70" : "text-serene-purple"
+            }`}
+          >
+            {presenceLabel}
+          </span>
         </div>
       </span>
 
-      <div className="flex items-center gap-1">
+      <div className={`flex items-center shrink-0 ${headerActionGap}`}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
               onClick={(e) => e.stopPropagation()}
-              className={`p-1 rounded-full cursor-pointer transition-colors hover:ring-2 hover:ring-serene-purple/60 hover:ring-offset-0 dark:hover:ring-pure-mist/60 ${
+              className={`${headerActionBtnClass} ${
                 hasUnread ? "text-white" : "text-gray-500"
               }`}
               aria-label="Chat options"
             >
-              <MoreHorizontal className="w-4 h-4" />
+              <MoreHorizontal className={headerActionIconClass} />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="z-[1100] w-[160px]">
@@ -355,12 +390,15 @@ export default function ConversationChatHeader({
             e.stopPropagation();
             onToggle();
           }}
-          className={`p-1 rounded-full cursor-pointer transition-colors hover:ring-2 hover:ring-serene-purple/60 hover:ring-offset-0 dark:hover:ring-pure-mist/60 ${
+          className={`${headerActionBtnClass} ${
             hasUnread ? "text-white" : "text-gray-500"
           }`}
           aria-label={isExpanded ? "Minimise chat" : "Expand chat"}
         >
-          <ChevronIcon isExpanded={isExpanded} />
+          <ChevronIcon
+            isExpanded={isExpanded}
+            className={headerMinimizeIconClass}
+          />
         </button>
 
         <button
@@ -369,14 +407,16 @@ export default function ConversationChatHeader({
             e.stopPropagation();
             onClose();
           }}
-          className={`p-1 rounded-full cursor-pointer transition-colors hover:ring-2 hover:ring-serene-purple/60 hover:ring-offset-0 dark:hover:ring-pure-mist/60 ${
+          className={`${headerActionBtnClass} ${
             hasUnread ? "text-white" : "text-gray-500"
           }`}
           aria-label="Close chat"
         >
-          <XIcon />
+          <XIcon className={headerActionIconClass} />
         </button>
       </div>
     </div>
   );
 }
+
+export default memo(ConversationChatHeader);
