@@ -384,6 +384,8 @@ export default function MyAgentsTable({
         isLoading={isLoading}
         onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}
+        recordLabel="agent"
+        recordLabelPlural="agents"
         className="mt-3 mb-0"
       />
 

@@ -11,7 +11,13 @@ const publicRoutes = [
   "/team/invite/respond",
 ];
 
-const privateRoutes = ["/my-agents", "/team", "/tools", "/account-settings"];
+const privateRoutes = [
+  "/my-agents",
+  "/leads",
+  "/team",
+  "/tools",
+  "/account-settings",
+];
 
 // Logged-in users may still visit these public routes (no redirect to /my-agents)
 const authenticatedPublicExceptions = [
@@ -36,7 +42,7 @@ function isPrivateRoute(pathname: string): boolean {
   if (isPublicRoute(pathname)) return false;
 
   return privateRoutes.some((route) => {
-    if (route === "/team" || route === "/tools") {
+    if (route === "/team" || route === "/tools" || route === "/leads") {
       return pathname === route;
     }
     return pathname === route || pathname.startsWith(route + "/");

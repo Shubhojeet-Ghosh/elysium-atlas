@@ -264,6 +264,10 @@ export default function MainChatSpace() {
     );
     dispatch(setInConversationWith(data.in_conversation_with));
 
+    if (role === "human" && !isAgentOpenRef.current && window.parent !== window) {
+      window.parent.postMessage({ type: "request_open_chat" }, "*");
+    }
+
     if ((role === "human" || role === "agent") && isAgentOpenRef.current) {
       const messageId = data.message_id ?? "";
       if (messageId) {

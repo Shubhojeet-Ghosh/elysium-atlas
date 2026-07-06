@@ -33,6 +33,10 @@ export interface TablePaginationControlsProps {
   className?: string;
   /** Override displayed record count (e.g. include local pending items). Defaults to `total`. */
   totalRecords?: number;
+  /** Singular label for the total count (default: "record"). */
+  recordLabel?: string;
+  /** Plural label for the total count (default: "records"). */
+  recordLabelPlural?: string;
   showPageSize?: boolean;
   showPageJump?: boolean;
   /** Opens the page-size menu above the trigger (useful inside dialogs). */
@@ -54,6 +58,8 @@ export default function TablePaginationControls({
   isLoading = false,
   className,
   totalRecords,
+  recordLabel = "record",
+  recordLabelPlural = "records",
   showPageSize = true,
   showPageJump = true,
   pageSizeSelectSide = "bottom",
@@ -107,7 +113,7 @@ export default function TablePaginationControls({
     >
       <span className="text-[12px] text-gray-500 dark:text-gray-400 whitespace-nowrap shrink-0">
         {displayedRecordCount.toLocaleString()}{" "}
-        {displayedRecordCount === 1 ? "record" : "records"}
+        {displayedRecordCount === 1 ? recordLabel : recordLabelPlural}
       </span>
 
       <div className="flex flex-row items-center justify-end gap-2 flex-wrap min-w-0">

@@ -112,28 +112,7 @@
     });
 
     button.addEventListener("click", () => {
-      // Animate button hide
-      button.style.transition = "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)";
-      button.style.opacity = "0";
-      button.style.transform = "translateY(20px)";
-      button.style.filter = "blur(4px)";
-      button.style.pointerEvents = "none";
-
-      const iframe = d.getElementById("chat-widget-iframe");
-      if (iframe && iframe.isLoaded) {
-        showChatIframe();
-        iframe.contentWindow.postMessage({ type: "open_chat" }, ATLAS_BASE_URL);
-      } else if (iframe) {
-        // If not loaded yet, wait for load
-        iframe.onload = () => {
-          iframe.isLoaded = true;
-          showChatIframe();
-          iframe.contentWindow.postMessage(
-            { type: "open_chat" },
-            ATLAS_BASE_URL
-          );
-        };
-      }
+      openChatWidget();
     });
 
     // console.log("Chat button created");
@@ -143,7 +122,7 @@
     const iframe = d.createElement("iframe");
     iframe.id = "chat-widget-iframe";
     const iframeSrc = `${ATLAS_BASE_URL}/chat-with-agent?agent_id=${agentIdGlobal}&chat_session_id=${chatSessionIdGlobal}&source=${encodeURIComponent(
-      pageUrlGlobal
+      pageUrlGlobal,
     )}`;
     iframe.src = iframeSrc;
     iframe.style.position = "fixed";
@@ -184,6 +163,30 @@
     };
 
     return iframe;
+  }
+
+  function openChatWidget() {
+    const button = d.getElementById("chat-widget-button");
+    const iframe = d.getElementById("chat-widget-iframe");
+
+    if (button) {
+      button.style.transition = "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)";
+      button.style.opacity = "0";
+      button.style.transform = "translateY(20px)";
+      button.style.filter = "blur(4px)";
+      button.style.pointerEvents = "none";
+    }
+
+    if (iframe && iframe.isLoaded) {
+      showChatIframe();
+      iframe.contentWindow.postMessage({ type: "open_chat" }, ATLAS_BASE_URL);
+    } else if (iframe) {
+      iframe.onload = () => {
+        iframe.isLoaded = true;
+        showChatIframe();
+        iframe.contentWindow.postMessage({ type: "open_chat" }, ATLAS_BASE_URL);
+      };
+    }
   }
 
   function showChatIframe() {
@@ -243,7 +246,7 @@
             fields: ["agent_icon", "agent_name", "primary_color", "text_color"],
             visitor_at: pageUrl,
           }),
-        }
+        },
       );
 
       const data = await response.json();
@@ -285,7 +288,7 @@
         data.agent_fields?.agent_icon,
         data.agent_fields?.agent_name,
         data.agent_fields?.primary_color,
-        data.agent_fields?.text_color
+        data.agent_fields?.text_color,
       );
       // Preload the iframe
       createChatIframe();
@@ -293,14 +296,17 @@
 
     // Listen for messages from the iframe
     w.addEventListener("message", (e) => {
-      if (e.origin === ATLAS_BASE_URL) {
-        if (e.data.type === "close_chat") {
-          hideChatIframe();
-        } else if (e.data.type === "navigate_link") {
-          // Open link in parent window
-          if (e.data.url) {
-            w.open(e.data.url, "_blank");
-          }
+      const iframe = d.getElementById("chat-widget-iframe");
+      if (!iframe || e.source !== iframe.contentWindow) return;
+
+      if (e.data.type === "close_chat") {
+        hideChatIframe();
+      } else if (e.data.type === "request_open_chat") {
+        openChatWidget();
+      } else if (e.data.type === "navigate_link") {
+        // Open link in parent window
+        if (e.data.url) {
+          w.open(e.data.url, "_blank");
         }
       }
     });

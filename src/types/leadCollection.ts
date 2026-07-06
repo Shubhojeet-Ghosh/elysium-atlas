@@ -115,3 +115,34 @@ export interface UpdateSessionLeadResponse {
   lead_name?: string | null;
   lead_collection: SessionLeadCollection;
 }
+
+export type LeadDocumentStatus = "partial" | "complete";
+
+export interface TeamLeadListItem {
+  lead_id: string;
+  agent_id: string;
+  chat_session_id: string;
+  alias_name?: string | null;
+  fields: Partial<Record<LeadFieldKey, string>>;
+  status: LeadDocumentStatus;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ListTeamLeadsRequest {
+  agent_id?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ListTeamLeadsResponse {
+  success: boolean;
+  message?: string;
+  leads: TeamLeadListItem[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}

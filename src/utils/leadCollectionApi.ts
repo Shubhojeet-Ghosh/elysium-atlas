@@ -3,6 +3,8 @@ import fastApiAxios from "@/utils/fastapi_axios";
 import type {
   GetFieldCatalogResponse,
   GetLeadCollectionConfigResponse,
+  ListTeamLeadsRequest,
+  ListTeamLeadsResponse,
   ResetLeadCollectionConfigRequest,
   ResetLeadCollectionConfigResponse,
   UpdateLeadCollectionConfigRequest,
@@ -66,6 +68,17 @@ export async function updateSessionLead(
 ): Promise<UpdateSessionLeadResponse> {
   const response = await fastApiAxios.post(
     `${LEAD_COLLECTION_BASE}/update-session-lead`,
+    payload,
+    { headers: getAuthHeaders() },
+  );
+  return response.data;
+}
+
+export async function listTeamLeads(
+  payload: ListTeamLeadsRequest = {},
+): Promise<ListTeamLeadsResponse> {
+  const response = await fastApiAxios.post(
+    `${LEAD_COLLECTION_BASE}/list-team-leads`,
     payload,
     { headers: getAuthHeaders() },
   );

@@ -182,6 +182,56 @@
   background-color: #94a3b8;
 }
 
+/* Leads table: light scrollbar, visible only while hovering the table */
+.leads-table-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.leads-table-scroll-wrap.is-active .leads-table-scroll {
+  scrollbar-color: #eef1f5 transparent;
+}
+
+.dark .leads-table-scroll-wrap.is-active .leads-table-scroll {
+  scrollbar-color: #9ca3af transparent;
+}
+
+.leads-table-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.leads-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.leads-table-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+  transition: background-color 0.15s ease;
+}
+
+.leads-table-scroll-wrap.is-active .leads-table-scroll::-webkit-scrollbar-thumb {
+  background-color: #eef1f5;
+}
+
+.leads-table-scroll-wrap.is-active
+  .leads-table-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: #e2e8f0;
+}
+
+.dark
+  .leads-table-scroll-wrap.is-active
+  .leads-table-scroll::-webkit-scrollbar-thumb {
+  background-color: #9ca3af;
+}
+
+.dark
+  .leads-table-scroll-wrap.is-active
+  .leads-table-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: #d1d5db;
+}
+
 @keyframes bounce-dot {
   0%,
   80%,

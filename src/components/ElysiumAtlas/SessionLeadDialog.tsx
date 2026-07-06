@@ -143,7 +143,7 @@ export default function SessionLeadDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[560px] max-h-[85vh]">
         <DialogHeader>
           <DialogTitle>Lead details</DialogTitle>
           <DialogDescription>
@@ -158,7 +158,7 @@ export default function SessionLeadDialog({
             No lead fields are configured for this agent yet.
           </p>
         ) : (
-          <div className="grid gap-4 py-2 max-h-[50vh] overflow-y-auto">
+          <div className="grid gap-4 py-2 max-h-[70vh] overflow-y-auto">
             {sortedFields.map((field) => (
               <div key={field.key} className="grid gap-1.5">
                 <label

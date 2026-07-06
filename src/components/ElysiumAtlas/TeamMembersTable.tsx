@@ -343,7 +343,7 @@ export default function TeamMembersTable({
   const columnCount = canManageMembers ? 4 : 3;
 
   const paginationControls = (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 mb-3">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 mt-3 mb-0">
       <div className="flex items-center justify-end gap-1.5 flex-wrap">
         <button
           type="button"
@@ -429,7 +429,7 @@ export default function TeamMembersTable({
         </button>
       </div>
 
-      <div className="flex items-center justify-between w-full sm:contents">
+      <div className="hidden sm:contents">
         <div className="flex items-center gap-2 text-[12px] text-gray-500 dark:text-gray-400">
           <span className="whitespace-nowrap">Rows per page</span>
           <Select
@@ -482,8 +482,6 @@ export default function TeamMembersTable({
 
   return (
     <div className="w-full mt-[12px] overflow-hidden">
-      {paginationControls}
-
       <div className="relative">
         <div
           ref={scrollContainerRef}
@@ -550,6 +548,8 @@ export default function TeamMembersTable({
           <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10 md:hidden" />
         )}
       </div>
+
+      {paginationControls}
 
       <Dialog
         open={roleDialogOpen}
