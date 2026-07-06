@@ -17,13 +17,13 @@ export default function ChatbotWidget({ agentId }: ChatbotWidgetProps) {
 
       // Remove any widget elements the script may have injected
       const widgetElements = document.querySelectorAll(
-        '[id*="sg-widget"], [id*="sgdevstudio"], [class*="sg-widget"], [class*="sgdevstudio"], iframe[src*="sgdevstudio"]'
+        '[id*="sg-widget"], [id*="sgdevstudio"], [class*="sg-widget"], [class*="sgdevstudio"], iframe[src*="sgdevstudio"]',
       );
       widgetElements.forEach((el) => el.remove());
 
       // Also try to remove by common chat widget container patterns
       const chatContainers = document.querySelectorAll(
-        '[id*="chat-widget"], [id*="chatbot"], [class*="chat-widget"], [class*="chatbot-container"]'
+        '[id*="chat-widget"], [id*="chatbot"], [class*="chat-widget"], [class*="chatbot-container"]',
       );
       chatContainers.forEach((el) => el.remove());
     };
@@ -33,7 +33,7 @@ export default function ChatbotWidget({ agentId }: ChatbotWidgetProps) {
 
   return (
     <Script
-      src={`https://cdn.sgdevstudio.in/widget/v0.0.4/widget.js?agent_id=${agentId}`}
+      src={`https://cdn.sgdevstudio.in/widget/v0.0.5/widget.js?agent_id=${agentId}`}
       strategy="afterInteractive"
     />
   );
