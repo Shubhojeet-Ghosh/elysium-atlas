@@ -79,6 +79,8 @@ function ConversationChatHeader({
   onClose,
   onRelease,
   onResolve,
+  onLeads,
+  showLeadsOption = false,
   canRelease = false,
   canMarkResolved = false,
   isReleasePending = false,
@@ -90,6 +92,8 @@ function ConversationChatHeader({
   onClose: () => void;
   onRelease?: () => void;
   onResolve?: () => void;
+  onLeads?: () => void;
+  showLeadsOption?: boolean;
   canRelease?: boolean;
   canMarkResolved?: boolean;
   isReleasePending?: boolean;
@@ -359,6 +363,17 @@ function ConversationChatHeader({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="z-[1100] w-[160px]">
+            {showLeadsOption ? (
+              <DropdownMenuItem
+                className="cursor-pointer text-[13px]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLeads?.();
+                }}
+              >
+                Lead details
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem
               className="cursor-pointer text-[13px]"
               disabled={!releaseEnabled}

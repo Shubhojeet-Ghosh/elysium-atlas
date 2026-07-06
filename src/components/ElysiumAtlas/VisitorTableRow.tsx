@@ -18,6 +18,8 @@ import {
   truncateMiddle,
   truncateVisitorAt,
 } from "@/utils/visitorListDisplayUtils";
+import { getSessionLeadListStatus } from "@/utils/leadCollectionSessionUtils";
+import LeadStatusBadge from "@/components/ElysiumAtlas/LeadStatusBadge";
 
 interface VisitorTableRowProps {
   visitor: ActiveVisitor;
@@ -44,6 +46,10 @@ function VisitorTableRow({
     visitor.in_conversation_with_name,
     userID ?? "",
   );
+  const leadListStatus = getSessionLeadListStatus(
+    visitor.lead_collection,
+    visitor.lead_status,
+  );
 
   return (
     <TableRow
@@ -51,7 +57,7 @@ function VisitorTableRow({
       className="cursor-pointer border-b border-gray-100 dark:border-deep-onyx hover:bg-serene-purple/10 dark:hover:bg-serene-purple/20 hover:text-serene-purple dark:hover:text-serene-purple"
     >
       <TableCell className="font-medium py-4 px-[10px] text-[14px] whitespace-nowrap text-deep-onyx dark:text-pure-mist w-[260px] min-w-[320px] max-w-[260px]">
-        <span className="flex items-center gap-6">
+        <span className="flex items-center gap-6 min-w-0">
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="shrink-0 w-[34px] h-[34px] rounded-full overflow-hidden block cursor-pointer shadow-sm">
@@ -75,16 +81,21 @@ function VisitorTableRow({
               </TooltipContent>
             )}
           </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="truncate max-w-[220px] overflow-hidden text-ellipsis">
-                {matchesName
-                  ? highlightTruncated(displayName, trimmedQuery)
-                  : truncateMiddle(displayName)}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="top">{displayName}</TooltipContent>
-          </Tooltip>
+          <span className="flex items-center gap-2 min-w-0">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="truncate max-w-[180px] overflow-hidden text-ellipsis">
+                  {matchesName
+                    ? highlightTruncated(displayName, trimmedQuery)
+                    : truncateMiddle(displayName)}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">{displayName}</TooltipContent>
+            </Tooltip>
+            {leadListStatus ? (
+              <LeadStatusBadge status={leadListStatus} />
+            ) : null}
+          </span>
         </span>
       </TableCell>
 
@@ -160,6 +171,8 @@ function areVisitorRowPropsEqual(
     a.last_connected_at === b.last_connected_at &&
     a.in_conversation_with === b.in_conversation_with &&
     a.in_conversation_with_name === b.in_conversation_with_name &&
+    a.lead_status === b.lead_status &&
+    a.lead_collection?.list_status === b.lead_collection?.list_status &&
     a.geo_data?.country_flag === b.geo_data?.country_flag &&
     a.geo_data?.country_name === b.geo_data?.country_name
   );

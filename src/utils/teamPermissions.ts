@@ -51,3 +51,18 @@ export function canResolveChatSession(
   if (!in_conversation_with) return true;
   return in_conversation_with === user_id;
 }
+
+/** Who may update session lead fields (see live-visitor-chat.md). */
+export function canUpdateSessionLead(
+  role: TeamRole | null | undefined,
+  {
+    in_conversation_with,
+    user_id,
+  }: {
+    in_conversation_with: string | null | undefined;
+    user_id: string;
+  },
+): boolean {
+  if (canManageTeamMembers(role)) return true;
+  return Boolean(in_conversation_with && in_conversation_with === user_id);
+}

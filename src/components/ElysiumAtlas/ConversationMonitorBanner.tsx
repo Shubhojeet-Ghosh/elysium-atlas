@@ -1,6 +1,7 @@
 "use client";
 
 import { formatPeerTakeoverBannerMessage } from "@/utils/chatSessionListUtils";
+import { conversationBannerShellClass } from "@/components/ElysiumAtlas/conversationBannerStyles";
 
 type ConversationMonitorBannerProps = {
   variant?: "self" | "peer";
@@ -11,8 +12,7 @@ type ConversationMonitorBannerProps = {
   canTakeOver?: boolean;
 };
 
-const bannerClassName =
-  "flex px-3 py-3 bg-serene-purple/10 dark:bg-serene-purple/20 shrink-0";
+const bannerClassName = `${conversationBannerShellClass} w-full bg-serene-purple/10 dark:bg-serene-purple/20`;
 
 const messageClassName =
   "text-[12px] font-semibold text-deep-onyx dark:text-pure-mist truncate";

@@ -10,6 +10,11 @@ import {
   deriveVisitorDisplayStatus,
   normalizeChatSessionRow,
 } from "@/utils/chatSessionListUtils";
+import type {
+  SessionLeadCollection,
+  SessionLeadListStatus,
+} from "@/types/leadCollection";
+import { leadCollectionListStatusChanged, withDerivedSessionLeadStatus } from "@/utils/leadCollectionSessionUtils";
 
 export interface GeoData {
   country_name: string | null;
@@ -50,6 +55,10 @@ export interface ActiveVisitor {
   geo_data: GeoData | null;
   visitor_at: string | null;
   color: string;
+  lead_status?: SessionLeadListStatus;
+  lead_email?: string | null;
+  lead_name?: string | null;
+  lead_collection?: SessionLeadCollection | null;
 }
 
 export type CapturedSessionMode = "monitor" | "takeover";
@@ -553,9 +562,45 @@ const agentSlice = createSlice({
           existing.visitor_at = row.visitor_at;
           changed = true;
         }
+        if (
+          row.lead_collection !== undefined &&
+          leadCollectionListStatusChanged(
+            existing.lead_collection,
+            row.lead_collection,
+          )
+        ) {
+          existing.lead_collection = row.lead_collection;
+          existing.lead_status =
+            row.lead_status ?? row.lead_collection?.list_status ?? existing.lead_status;
+          if (row.lead_email !== undefined) {
+            existing.lead_email = row.lead_email;
+          }
+          if (row.lead_name !== undefined) {
+            existing.lead_name = row.lead_name;
+          }
+          changed = true;
+        } else if (row.lead_status !== undefined && row.lead_status !== existing.lead_status) {
+          existing.lead_status = row.lead_status;
+          changed = true;
+        }
 
         if (changed) {
           applyDerivedStatus(state, existing);
+        }
+
+        const captured = state.captured_sessions.find(
+          (s) => s.chat_session_id === row.chat_session_id,
+        );
+        if (captured && row.lead_collection !== undefined) {
+          captured.lead_collection = row.lead_collection;
+          captured.lead_status =
+            row.lead_status ?? row.lead_collection?.list_status ?? captured.lead_status;
+          if (row.lead_email !== undefined) {
+            captured.lead_email = row.lead_email;
+          }
+          if (row.lead_name !== undefined) {
+            captured.lead_name = row.lead_name;
+          }
         }
       }
     },
@@ -699,6 +744,51 @@ const agentSlice = createSlice({
         if (sid !== undefined) {
           captured.sid = sid;
         }
+      }
+    },
+    applySessionLeadUpdated: (
+      state,
+      action: PayloadAction<{
+        chat_session_id: string;
+        lead_collection: SessionLeadCollection;
+        lead_status?: SessionLeadListStatus;
+        lead_email?: string | null;
+        lead_name?: string | null;
+      }>,
+    ) => {
+      const {
+        chat_session_id,
+        lead_collection: rawLeadCollection,
+        lead_status,
+        lead_email,
+        lead_name,
+      } = action.payload;
+      const lead_collection = withDerivedSessionLeadStatus(rawLeadCollection);
+
+      const patchLeadFields = (target: ActiveVisitor) => {
+        target.lead_collection = lead_collection;
+        target.lead_status =
+          lead_status ?? lead_collection.list_status ?? target.lead_status ?? null;
+        if (lead_email !== undefined) {
+          target.lead_email = lead_email;
+        }
+        if (lead_name !== undefined) {
+          target.lead_name = lead_name;
+        }
+      };
+
+      const activeVisitor = state.active_visitors.find(
+        (v) => v.chat_session_id === chat_session_id,
+      );
+      if (activeVisitor) {
+        patchLeadFields(activeVisitor);
+      }
+
+      const captured = state.captured_sessions.find(
+        (s) => s.chat_session_id === chat_session_id,
+      );
+      if (captured) {
+        patchLeadFields(captured);
       }
     },
     removeActiveVisitor: (state, action: PayloadAction<string>) => {
@@ -1123,6 +1213,7 @@ export const {
   updateActiveVisitorStatus,
   updateChatSessionPresence,
   applyChatSessionTakeoverUpdated,
+  applySessionLeadUpdated,
   removeActiveVisitor,
   addCapturedSession,
   removeCapturedSession,

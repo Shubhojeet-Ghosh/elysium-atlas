@@ -5,13 +5,22 @@ export const AGENT_SECTION_LABELS: Record<string, string> = {
   personalize: "Personalize",
   "data-source": "Data Source",
   "live-visitors": "Chat Sessions",
+  "lead-collection": "Lead Collection",
 };
+
+export const LEAD_COLLECTION_INSET_CLASS =
+  "px-8 sm:px-12 md:px-20 lg:px-28 xl:px-36 2xl:px-44";
 
 export function getSectionLabel(section: string) {
   return AGENT_SECTION_LABELS[section] ?? "General";
 }
 
-const NO_TAB_SECTIONS = ["general", "personalize", "live-visitors"];
+const NO_TAB_SECTIONS = [
+  "general",
+  "personalize",
+  "live-visitors",
+  "lead-collection",
+];
 
 export function isNoTabSection(section: string) {
   return NO_TAB_SECTIONS.includes(section);
@@ -25,7 +34,8 @@ export function resolveSection(searchParams: URLSearchParams) {
     section === "data-source" ||
     section === "general" ||
     section === "personalize" ||
-    section === "live-visitors"
+    section === "live-visitors" ||
+    section === "lead-collection"
   ) {
     return section;
   }

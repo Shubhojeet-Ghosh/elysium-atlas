@@ -3,6 +3,7 @@ import type {
   GeoData,
   CapturedSessionMode,
 } from "@/store/reducers/agentSlice";
+import type { SessionLeadCollection, SessionLeadListStatus } from "@/types/leadCollection";
 import type { AppDispatch } from "@/store";
 import { addCapturedSession } from "@/store/reducers/agentSlice";
 import { emitStartMonitorConversation } from "@/utils/chatMonitorUtils";
@@ -13,6 +14,7 @@ import {
   canMonitorDuringActiveTakeover,
   isPeerTakeoverMonitorBlocked,
 } from "@/utils/teamPermissions";
+import { leadCollectionListStatusChanged } from "@/utils/leadCollectionSessionUtils";
 
 /** Raw row shape from `agent_visitors_list`. */
 export type ChatSessionListRow = {
@@ -31,6 +33,10 @@ export type ChatSessionListRow = {
   color?: string;
   newly_joined?: boolean;
   status?: string;
+  lead_status?: SessionLeadListStatus;
+  lead_email?: string | null;
+  lead_name?: string | null;
+  lead_collection?: SessionLeadCollection | null;
 };
 
 export type VisitorDisplayStatus =
@@ -75,6 +81,18 @@ export function normalizeChatSessionRow(
     geo_data: row.geo_data,
     visitor_at: row.visitor_at,
     color: row.color || "",
+    ...(row.lead_status !== undefined ||
+    row.lead_collection !== undefined
+      ? {
+          lead_status:
+            row.lead_status ?? row.lead_collection?.list_status ?? null,
+        }
+      : {}),
+    ...(row.lead_email !== undefined ? { lead_email: row.lead_email ?? null } : {}),
+    ...(row.lead_name !== undefined ? { lead_name: row.lead_name ?? null } : {}),
+    ...(row.lead_collection !== undefined
+      ? { lead_collection: row.lead_collection }
+      : {}),
   };
 }
 
@@ -143,6 +161,21 @@ export function hasRefreshRowChanges(
   if (
     incoming.geo_data !== undefined &&
     !geoDataEqual(existing.geo_data, incoming.geo_data)
+  ) {
+    return true;
+  }
+  if (
+    incoming.lead_collection !== undefined &&
+    leadCollectionListStatusChanged(
+      existing.lead_collection,
+      incoming.lead_collection,
+    )
+  ) {
+    return true;
+  }
+  if (
+    incoming.lead_status !== undefined &&
+    incoming.lead_status !== existing.lead_status
   ) {
     return true;
   }

@@ -10,12 +10,14 @@ import {
   UserPlus,
   Shield,
   Users,
+  Bot,
 } from "lucide-react";
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
+import { useAppSelector } from "@/store";
 import { resolveSection } from "@/utils/agentSectionUtils";
 
 interface AgentNavItem {
@@ -55,8 +57,7 @@ const agentNavItems: AgentNavItem[] = [
     name: "Lead Collection",
     slug: "lead-collection",
     icon: UserRoundCheck,
-    disabled: true,
-    hrefSuffix: "",
+    hrefSuffix: "?section=lead-collection",
   },
   {
     name: "Human Handover",
@@ -103,9 +104,30 @@ export default function AgentNavItems({
   const searchParams = useSearchParams();
   const agentID = params.agentID as string;
   const section = resolveSection(searchParams);
+  const agentName = useAppSelector((state) => state.agent.agentName);
+  const reduxAgentID = useAppSelector((state) => state.agent.agentID);
+  const displayName = reduxAgentID === agentID ? agentName : "";
 
   return (
     <nav className="flex flex-col gap-2 w-full mt-6">
+      {displayName &&
+        (isCollapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center justify-center px-3 py-2.5">
+                <Bot className="w-5 h-5 flex-shrink-0 text-serene-purple" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right">{displayName}</TooltipContent>
+          </Tooltip>
+        ) : (
+          <p
+            className="px-3 pb-3 mb-1 text-sm font-semibold text-gray-900 dark:text-gray-100 truncate text-center border-b border-gray-200 dark:border-gray-700"
+            title={displayName}
+          >
+            {displayName}
+          </p>
+        ))}
       {agentNavItems.map((item) => {
         const Icon = item.icon;
         const isActive = !item.disabled && section === item.slug;

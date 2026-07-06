@@ -20,10 +20,12 @@ import ConversationChatHeader, {
   type CapturedSession,
 } from "@/components/ElysiumAtlas/ConversationChatHeader";
 import ConversationChatBody from "@/components/ElysiumAtlas/ConversationChatBody";
-import ConversationMonitorBanner from "@/components/ElysiumAtlas/ConversationMonitorBanner";
+import ConversationChatBanners from "@/components/ElysiumAtlas/ConversationChatBanners";
+import SessionLeadDialog from "@/components/ElysiumAtlas/SessionLeadDialog";
+import { sessionRowHasLeadCollection } from "@/utils/leadCollectionSessionUtils";
 import { useCapturedSessionTakeover } from "@/hooks/useCapturedSessionTakeover";
 import { useActiveTeamRole } from "@/hooks/useActiveTeamRole";
-import { canResolveChatSession } from "@/utils/teamPermissions";
+import { canResolveChatSession, canUpdateSessionLead } from "@/utils/teamPermissions";
 
 const MAX_VISIBLE = 2;
 
@@ -46,6 +48,7 @@ const ChatBox = memo(function ChatBox({
   // Always start collapsed so the CSS transition fires on first mount too
   const [visuallyExpanded, setVisuallyExpanded] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [leadsDialogOpen, setLeadsDialogOpen] = useState(false);
 
   const dispatch = useAppDispatch();
   const userID = useAppSelector((state) => state.userProfile.userID);
@@ -70,6 +73,17 @@ const ChatBox = memo(function ChatBox({
     return (
       visitor?.in_conversation_with_name ?? session.in_conversation_with_name
     );
+  });
+  const { leadCollection, showLeadsOption, leadStatus } = useAppSelector((state) => {
+    const visitor = state.agent.active_visitors.find(
+      (v) => v.chat_session_id === session.chat_session_id,
+    );
+    const source = visitor ?? session;
+    return {
+      leadCollection: source.lead_collection ?? null,
+      showLeadsOption: sessionRowHasLeadCollection(source),
+      leadStatus: source.lead_status ?? null,
+    };
   });
 
   const isPeerTakeover = Boolean(
@@ -96,6 +110,10 @@ const ChatBox = memo(function ChatBox({
     in_conversation_with: inConversationWith,
     user_id: userID,
   });
+  const canSaveLeadDetails = canUpdateSessionLead(teamRole, {
+    in_conversation_with: inConversationWith,
+    user_id: userID ?? "",
+  });
 
   const {
     requestTakeover,
@@ -114,8 +132,7 @@ const ChatBox = memo(function ChatBox({
     onResolved: handleClose,
   });
 
-  const showMonitorBanner =
-    visuallyExpanded && conversationMode === "monitor" && !isClosing;
+  const showChatBanners = visuallyExpanded && !isClosing;
 
   const headerSession = useMemo(
     () => ({ ...session, conversation_mode: conversationMode }),
@@ -141,7 +158,7 @@ const ChatBox = memo(function ChatBox({
   );
 
   const headerWithBanner = (
-    <>
+    <div className="shrink-0 flex flex-col">
       <ConversationChatHeader
         session={headerSession}
         isExpanded={visuallyExpanded}
@@ -149,21 +166,26 @@ const ChatBox = memo(function ChatBox({
         onClose={handleClose}
         onRelease={requestRelease}
         onResolve={requestResolve}
+        onLeads={() => setLeadsDialogOpen(true)}
+        showLeadsOption={showLeadsOption}
         canRelease={canManageTakeover}
         canMarkResolved={canMarkResolved}
         isReleasePending={isReleasePending}
         isResolvePending={isResolvePending}
       />
-      {showMonitorBanner && (
-        <ConversationMonitorBanner
-          variant={isPeerTakeover ? "peer" : "self"}
-          handlerName={handlerName}
-          onTakeOver={requestTakeover}
-          isTakeoverPending={isTakeoverPending}
-          canTakeOver={canTakeOver}
-        />
-      )}
-    </>
+      <ConversationChatBanners
+        visible={showChatBanners}
+        conversationMode={conversationMode}
+        isPeerTakeover={isPeerTakeover}
+        handlerName={handlerName}
+        leadCollection={leadCollection}
+        legacyLeadStatus={leadStatus}
+        onTakeOver={requestTakeover}
+        isTakeoverPending={isTakeoverPending}
+        canTakeOver={canTakeOver}
+        onOpenLeadDetails={() => setLeadsDialogOpen(true)}
+      />
+    </div>
   );
 
   // Fetch conversation history when the panel expands (not on every capture).
@@ -226,16 +248,26 @@ const ChatBox = memo(function ChatBox({
   // ── Desktop: inline animated box, no Dialog ──
   if (isDesktop) {
     return (
-      <div
-        className={`pointer-events-auto bg-white dark:bg-deep-onyx border border-gray-100 dark:border-deep-onyx rounded-t-xl shadow-xl flex flex-col overflow-hidden transition-[height,width] duration-300 ease-in-out ${
-          visuallyExpanded
-            ? "w-[540px] h-[580px] xl:w-[600px] xl:h-[660px]"
-            : "w-72 h-16"
-        }`}
-      >
-        {headerWithBanner}
-        {visuallyExpanded ? chatPanelBody : null}
-      </div>
+      <>
+        <div
+          className={`pointer-events-auto bg-white dark:bg-deep-onyx border border-gray-100 dark:border-deep-onyx rounded-t-xl shadow-xl flex flex-col overflow-hidden transition-[height,width] duration-300 ease-in-out ${
+            visuallyExpanded
+              ? "w-[540px] h-[580px] xl:w-[600px] xl:h-[660px]"
+              : "w-72 h-16"
+          }`}
+        >
+          {headerWithBanner}
+          {visuallyExpanded ? chatPanelBody : null}
+        </div>
+        <SessionLeadDialog
+          open={leadsDialogOpen}
+          onOpenChange={setLeadsDialogOpen}
+          agentId={agentID}
+          chatSessionId={session.chat_session_id}
+          leadCollection={leadCollection}
+          canSave={canSaveLeadDetails}
+        />
+      </>
     );
   }
 
@@ -272,20 +304,25 @@ const ChatBox = memo(function ChatBox({
               onClose={handleClose}
               onRelease={requestRelease}
               onResolve={requestResolve}
+              onLeads={() => setLeadsDialogOpen(true)}
+              showLeadsOption={showLeadsOption}
               canRelease={canManageTakeover}
               canMarkResolved={canMarkResolved}
               isReleasePending={isReleasePending}
               isResolvePending={isResolvePending}
             />
-            {conversationMode === "monitor" && (
-              <ConversationMonitorBanner
-                variant={isPeerTakeover ? "peer" : "self"}
-                handlerName={handlerName}
-                onTakeOver={requestTakeover}
-                isTakeoverPending={isTakeoverPending}
-                canTakeOver={canTakeOver}
-              />
-            )}
+            <ConversationChatBanners
+              visible
+              conversationMode={conversationMode}
+              isPeerTakeover={isPeerTakeover}
+              handlerName={handlerName}
+              leadCollection={leadCollection}
+              legacyLeadStatus={leadStatus}
+              onTakeOver={requestTakeover}
+              isTakeoverPending={isTakeoverPending}
+              canTakeOver={canTakeOver}
+              onOpenLeadDetails={() => setLeadsDialogOpen(true)}
+            />
           </div>
           <ConversationChatBody
             chat_session_id={session.chat_session_id}
@@ -299,6 +336,15 @@ const ChatBox = memo(function ChatBox({
 
       {/* Collapsed bar hidden on mobile/tablet */}
       {!isExpanded && <></>}
+
+      <SessionLeadDialog
+        open={leadsDialogOpen}
+        onOpenChange={setLeadsDialogOpen}
+        agentId={agentID}
+        chatSessionId={session.chat_session_id}
+        leadCollection={leadCollection}
+        canSave={canSaveLeadDetails}
+      />
     </>
   );
 });

@@ -6,6 +6,7 @@ import { CustomTabs } from "@/components/ui/CustomTabs";
 import AgentDataSource, { AgentDataSourceTabs } from "./AgentDataSource";
 import AgentPersonalize from "./AgentPersonalize";
 import AgentLiveVisitors from "./AgentLiveVisitors";
+import AgentLeadCollection from "./AgentLeadCollection";
 import AgentBackButton from "./AgentBackButton";
 import AgentMainContent from "./AgentMainContent";
 import UnsavedChangesBar from "./UnsavedChangesBar";
@@ -765,7 +766,7 @@ export default function MyAgent({
   return (
     <>
       <div className="sticky top-[65px] z-50 bg-white dark:bg-[#0a0a0a]">
-        <div className="w-full flex flex-row items-center justify-between gap-[8px]">
+        <div className="w-full flex flex-row items-start justify-between gap-[8px]">
           <div className="flex flex-row items-center gap-5 min-w-0">
             <div className="mt-[10px] shrink-0">
               <AgentBackButton onBack={handleBack} />
@@ -819,7 +820,8 @@ export default function MyAgent({
         />
       )}
       {section === "live-visitors" && <AgentLiveVisitors />}
-      {mappedInitial && !readOnly && (
+      {section === "lead-collection" && <AgentLeadCollection />}
+      {mappedInitial && !readOnly && section !== "lead-collection" && (
         <UnsavedChangesBar
           initial={mappedInitial}
           current={currentAgentDetails}
