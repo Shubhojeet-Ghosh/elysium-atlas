@@ -14,11 +14,16 @@ export default function ChatHeader() {
     agent_status,
     isFetching,
     primary_color,
-    secondary_color,
     text_color,
+    in_conversation_with,
+    in_conversation_with_name,
   } = useAppSelector((state) => state.agentChat);
   const dispatch = useAppDispatch();
   const isOffline = isAgentDisabled(agent_status);
+  const isLiveHuman = Boolean(in_conversation_with);
+  const headerTitle = isLiveHuman
+    ? in_conversation_with_name?.trim() || "Team member"
+    : agent_name || "Agent";
 
   const handleClose = () => {
     dispatch(setIsAgentOpen(false));
@@ -57,16 +62,23 @@ export default function ChatHeader() {
               className="font-semibold text-gray-700 text-sm truncate"
               style={{ color: text_color }}
             >
-              {agent_name || "Agent"}
+              {headerTitle}
             </span>
-            {isOffline && (
+            {isLiveHuman ? (
+              <span
+                className="text-[10px] font-medium opacity-80"
+                style={{ color: text_color }}
+              >
+                Live agent
+              </span>
+            ) : isOffline ? (
               <span
                 className="text-[10px] font-medium opacity-80"
                 style={{ color: text_color }}
               >
                 Offline
               </span>
-            )}
+            ) : null}
           </div>
         )}
       </div>

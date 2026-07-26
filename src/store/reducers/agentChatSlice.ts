@@ -4,7 +4,7 @@ interface Message {
   message_id: string;
   /** MongoDB _id- used for mark-chat-message-read API */
   _id?: string;
-  role: "user" | "agent" | "human";
+  role: "user" | "agent" | "human" | "system";
   content: string;
   created_at: string;
   read_at?: string | null;
@@ -38,6 +38,7 @@ interface AgentChatState {
   chatMode: "human" | "ai";
   isTyping: boolean;
   in_conversation_with: string | null;
+  in_conversation_with_name: string | null;
   geoData: GeoData | null;
 }
 
@@ -61,6 +62,7 @@ const initialState: AgentChatState = {
   chatMode: "ai",
   isTyping: false,
   in_conversation_with: null,
+  in_conversation_with_name: null,
   geoData: null,
 };
 
@@ -141,6 +143,30 @@ const agentChatSlice = createSlice({
     },
     setInConversationWith: (state, action: PayloadAction<string | null>) => {
       state.in_conversation_with = action.payload;
+      if (!action.payload) {
+        state.in_conversation_with_name = null;
+      }
+    },
+    setInConversationWithName: (state, action: PayloadAction<string | null>) => {
+      state.in_conversation_with_name = action.payload;
+    },
+    setHumanConversationStarted: (
+      state,
+      action: PayloadAction<{
+        in_conversation_with: string;
+        in_conversation_with_name?: string | null;
+      }>,
+    ) => {
+      state.in_conversation_with = action.payload.in_conversation_with;
+      state.in_conversation_with_name =
+        action.payload.in_conversation_with_name ?? null;
+      state.chatMode = "human";
+      state.isTyping = false;
+    },
+    clearHumanConversation: (state) => {
+      state.in_conversation_with = null;
+      state.in_conversation_with_name = null;
+      state.chatMode = "ai";
     },
     setGeoData: (state, action: PayloadAction<GeoData | null>) => {
       state.geoData = action.payload;
@@ -165,6 +191,7 @@ const agentChatSlice = createSlice({
       state.chatMode = "ai";
       state.isTyping = false;
       state.in_conversation_with = null;
+      state.in_conversation_with_name = null;
       state.geoData = null;
     },
   },
@@ -184,6 +211,9 @@ export const {
   setChatMode,
   setIsTyping,
   setInConversationWith,
+  setInConversationWithName,
+  setHumanConversationStarted,
+  clearHumanConversation,
   setGeoData,
   resetAgentChat,
 } = agentChatSlice.actions;

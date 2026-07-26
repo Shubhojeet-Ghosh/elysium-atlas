@@ -9,7 +9,7 @@ import { markdownComponents } from "@/utils/markdownComponents";
 interface ChatMessageProps {
   message: {
     message_id: string;
-    role: "user" | "agent" | "human";
+    role: "user" | "agent" | "human" | "system";
     content: string;
     created_at: string;
   };

@@ -20,6 +20,7 @@ import {
 } from "@/utils/visitorListDisplayUtils";
 import { getSessionLeadListStatus } from "@/utils/leadCollectionSessionUtils";
 import LeadStatusBadge from "@/components/ElysiumAtlas/LeadStatusBadge";
+import HandoverRequestedBadge from "@/components/ElysiumAtlas/HandoverRequestedBadge";
 
 interface VisitorTableRowProps {
   visitor: ActiveVisitor;
@@ -94,6 +95,10 @@ function VisitorTableRow({
             </Tooltip>
             {leadListStatus ? (
               <LeadStatusBadge status={leadListStatus} />
+            ) : null}
+            {visitor.handover_status === "requested" &&
+            !visitor.in_conversation_with ? (
+              <HandoverRequestedBadge />
             ) : null}
           </span>
         </span>
@@ -171,6 +176,7 @@ function areVisitorRowPropsEqual(
     a.last_connected_at === b.last_connected_at &&
     a.in_conversation_with === b.in_conversation_with &&
     a.in_conversation_with_name === b.in_conversation_with_name &&
+    a.handover_status === b.handover_status &&
     a.lead_status === b.lead_status &&
     a.lead_collection?.list_status === b.lead_collection?.list_status &&
     a.geo_data?.country_flag === b.geo_data?.country_flag &&

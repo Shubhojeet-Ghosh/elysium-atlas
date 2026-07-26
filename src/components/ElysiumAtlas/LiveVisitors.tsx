@@ -9,6 +9,7 @@ import {
   setActiveVisitors,
   triggerFetchTeamMemberChatSessions,
   applyChatSessionTakeoverUpdated,
+  applyChatSessionHandoverUpdated,
   removeCapturedSession,
   clearCapturedSessions,
 } from "@/store/reducers/agentSlice";
@@ -449,6 +450,45 @@ export default function LiveVisitors() {
     aiSocket.on("session_takeover_ended", handleSessionTakeoverEnded);
     aiSocket.on("chat_session_takeover_updated", handleChatSessionTakeoverUpdated);
 
+    const handleChatSessionHandoverUpdated = (data: {
+      agent_id: string;
+      chat_session_id: string;
+      handover_status?: string | null;
+      handover_requested_at?: string | null;
+      handover_reason?: string | null;
+      handover_contact_name?: string | null;
+      handover_contact_email?: string | null;
+      handover_contact_status?: string | null;
+      visitor?: ChatSessionListRow;
+    }) => {
+      if (data.agent_id !== agentID) return;
+
+      dispatch(
+        applyChatSessionHandoverUpdated({
+          chat_session_id: data.chat_session_id,
+          handover_status: data.handover_status as
+            | "requested"
+            | "assigned"
+            | "resolved"
+            | null
+            | undefined,
+          handover_requested_at: data.handover_requested_at,
+          handover_reason: data.handover_reason,
+          handover_contact_name: data.handover_contact_name,
+          handover_contact_email: data.handover_contact_email,
+          handover_contact_status: data.handover_contact_status as
+            | "pending"
+            | "provided"
+            | "declined"
+            | null
+            | undefined,
+          visitor: data.visitor ?? null,
+        }),
+      );
+    };
+
+    aiSocket.on("chat_session_handover_updated", handleChatSessionHandoverUpdated);
+
     const handleBeforeUnload = () => {
       stopAllMonitorConversations();
     };
@@ -470,6 +510,7 @@ export default function LiveVisitors() {
       aiSocket.off("session_takeover_started", handleSessionTakeoverStarted);
       aiSocket.off("session_takeover_ended", handleSessionTakeoverEnded);
       aiSocket.off("chat_session_takeover_updated", handleChatSessionTakeoverUpdated);
+      aiSocket.off("chat_session_handover_updated", handleChatSessionHandoverUpdated);
       dispatch(setActiveVisitors([]));
       setSocket(null);
     };

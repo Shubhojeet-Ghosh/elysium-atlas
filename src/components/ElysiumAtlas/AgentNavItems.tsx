@@ -63,8 +63,7 @@ const agentNavItems: AgentNavItem[] = [
     name: "Human Handover",
     slug: "human-handover",
     icon: UserPlus,
-    disabled: true,
-    hrefSuffix: "",
+    hrefSuffix: "?section=human-handover",
   },
   {
     name: "Security",

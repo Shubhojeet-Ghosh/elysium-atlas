@@ -14,6 +14,7 @@ import type {
   SessionLeadCollection,
   SessionLeadListStatus,
 } from "@/types/leadCollection";
+import type { SessionHandoverFields } from "@/types/humanHandover";
 import { leadCollectionListStatusChanged, withDerivedSessionLeadStatus } from "@/utils/leadCollectionSessionUtils";
 
 export interface GeoData {
@@ -36,7 +37,7 @@ export interface ConversationMessage {
   read_at?: string | null;
 }
 
-export interface ActiveVisitor {
+export interface ActiveVisitor extends SessionHandoverFields {
   agent_id: string;
   chat_session_id: string;
   created_at: string;
@@ -190,6 +191,13 @@ function applyDerivedStatus(
     },
     capturedSessionMode(state, visitor.chat_session_id),
   );
+}
+
+/** Handover is fulfilled once a team member takes the chat. */
+function assignHandoverWhenTakenOver(target: ActiveVisitor): void {
+  if (target.in_conversation_with && target.handover_status === "requested") {
+    target.handover_status = "assigned";
+  }
 }
 
 function buildConversationLogFromSources(
@@ -726,6 +734,7 @@ const agentSlice = createSlice({
             activeVisitor.sid = sid;
           }
         }
+        assignHandoverWhenTakenOver(activeVisitor);
         applyDerivedStatus(state, activeVisitor);
       }
 
@@ -744,6 +753,7 @@ const agentSlice = createSlice({
         if (sid !== undefined) {
           captured.sid = sid;
         }
+        assignHandoverWhenTakenOver(captured);
       }
     },
     applySessionLeadUpdated: (
@@ -789,6 +799,75 @@ const agentSlice = createSlice({
       );
       if (captured) {
         patchLeadFields(captured);
+      }
+    },
+    applyChatSessionHandoverUpdated: (
+      state,
+      action: PayloadAction<
+        {
+          chat_session_id: string;
+          visitor?: ChatSessionListRow | null;
+        } & SessionHandoverFields
+      >,
+    ) => {
+      const { chat_session_id, visitor: visitorRow, ...handoverPatch } =
+        action.payload;
+
+      const patchHandoverFields = (target: ActiveVisitor) => {
+        if (handoverPatch.handover_status !== undefined) {
+          target.handover_status = handoverPatch.handover_status ?? null;
+        }
+        if (handoverPatch.handover_requested_at !== undefined) {
+          target.handover_requested_at =
+            handoverPatch.handover_requested_at ?? null;
+        }
+        if (handoverPatch.handover_reason !== undefined) {
+          target.handover_reason = handoverPatch.handover_reason ?? null;
+        }
+        if (handoverPatch.handover_contact_name !== undefined) {
+          target.handover_contact_name =
+            handoverPatch.handover_contact_name ?? null;
+        }
+        if (handoverPatch.handover_contact_email !== undefined) {
+          target.handover_contact_email =
+            handoverPatch.handover_contact_email ?? null;
+        }
+        if (handoverPatch.handover_contact_status !== undefined) {
+          target.handover_contact_status =
+            handoverPatch.handover_contact_status ?? null;
+        }
+      };
+
+      const activeVisitor = state.active_visitors.find(
+        (v) => v.chat_session_id === chat_session_id,
+      );
+
+      if (activeVisitor) {
+        if (visitorRow) {
+          const normalized = normalizeSessionForState(state, {
+            ...visitorRow,
+            chat_session_id,
+          });
+          Object.assign(activeVisitor, normalized, { newly_joined: false });
+        } else {
+          patchHandoverFields(activeVisitor);
+        }
+        applyDerivedStatus(state, activeVisitor);
+      }
+
+      const captured = state.captured_sessions.find(
+        (s) => s.chat_session_id === chat_session_id,
+      );
+      if (captured) {
+        if (visitorRow) {
+          const normalized = normalizeSessionForState(state, {
+            ...visitorRow,
+            chat_session_id,
+          });
+          Object.assign(captured, normalized);
+        } else {
+          patchHandoverFields(captured);
+        }
       }
     },
     removeActiveVisitor: (state, action: PayloadAction<string>) => {
@@ -1213,6 +1292,7 @@ export const {
   updateActiveVisitorStatus,
   updateChatSessionPresence,
   applyChatSessionTakeoverUpdated,
+  applyChatSessionHandoverUpdated,
   applySessionLeadUpdated,
   removeActiveVisitor,
   addCapturedSession,

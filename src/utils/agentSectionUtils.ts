@@ -6,6 +6,7 @@ export const AGENT_SECTION_LABELS: Record<string, string> = {
   "data-source": "Data Source",
   "live-visitors": "Chat Sessions",
   "lead-collection": "Lead Collection",
+  "human-handover": "Human Handover",
 };
 
 export const LEAD_COLLECTION_INSET_CLASS =
@@ -20,6 +21,7 @@ const NO_TAB_SECTIONS = [
   "personalize",
   "live-visitors",
   "lead-collection",
+  "human-handover",
 ];
 
 export function isNoTabSection(section: string) {
@@ -35,7 +37,8 @@ export function resolveSection(searchParams: URLSearchParams) {
     section === "general" ||
     section === "personalize" ||
     section === "live-visitors" ||
-    section === "lead-collection"
+    section === "lead-collection" ||
+    section === "human-handover"
   ) {
     return section;
   }

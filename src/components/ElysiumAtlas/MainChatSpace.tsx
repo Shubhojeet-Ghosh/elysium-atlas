@@ -9,6 +9,8 @@ import {
   markChatMessageAsRead,
   setIsTyping,
   setInConversationWith,
+  setHumanConversationStarted,
+  clearHumanConversation,
   setGeoData,
 } from "@/store/reducers/agentChatSlice";
 import { useAiSocket, useAiSocketEvent } from "@/hooks/useAiSocket";
@@ -26,13 +28,24 @@ import ChatWelcomeMessage from "./ChatWelcomeMessage";
 import SkeletonMessages from "./SkeletonMessages";
 import Thinking from "./Thinking";
 import ChatMessage from "./ChatMessage";
+import ChatSystemNotice from "./ChatSystemNotice";
+import VisitorHandoverWaitingBanner from "./VisitorHandoverWaitingBanner";
 import MessageActions from "./MessageActions";
 import { formatChatTimestamp } from "@/utils/formatDate";
 import { markdownComponents } from "@/utils/markdownComponents";
 import { getUserGeoLocationDetails } from "@/utils/geoLocationUtils";
 import { isAgentDisabled, AGENT_OFFLINE_MESSAGE } from "@/utils/agentStatus";
+import { shouldShowHandoverWaitingBanner } from "@/utils/humanHandoverVisitorUtils";
+import type {
+  ConversationStartedPayload,
+  VisitorHandoverState,
+} from "@/types/humanHandover";
 
-export default function MainChatSpace() {
+interface MainChatSpaceProps {
+  handover: VisitorHandoverState;
+}
+
+export default function MainChatSpace({ handover }: MainChatSpaceProps) {
   const {
     agent_id,
     chat_session_id,
@@ -187,7 +200,7 @@ export default function MainChatSpace() {
   // Connect to the socket and (re)join the visitor session on every connect.
   // This is the ONLY place that emits atlas-visitor-connected, and it runs
   // again automatically after every reconnect- no manual race handling.
-  const { emit, status } = useAiSocket({
+  const { emit } = useAiSocket({
     autoConnect: !isFetching,
     onConnect: (socket) => {
       const { agent_id, chat_session_id, geo_data } = joinPayloadRef.current;
@@ -278,13 +291,48 @@ export default function MainChatSpace() {
     }
   });
 
-  useAiSocketEvent<{ in_conversation_with: string }>(
+  useAiSocketEvent<ConversationStartedPayload>(
     "conversation_started",
-    (data) => dispatch(setInConversationWith(data.in_conversation_with)),
+    (data) => {
+      if (data.agent_id && data.agent_id !== agent_id) return;
+      if (data.chat_session_id && data.chat_session_id !== chat_session_id) {
+        return;
+      }
+      if (!data.in_conversation_with) return;
+
+      dispatch(
+        setHumanConversationStarted({
+          in_conversation_with: data.in_conversation_with,
+          in_conversation_with_name: data.in_conversation_with_name ?? null,
+        }),
+      );
+
+      const notice = data.message?.trim();
+      if (notice) {
+        dispatch(
+          addMessage({
+            message_id: uuidv4(),
+            role: "system",
+            content: notice,
+            created_at: new Date().toISOString(),
+          }),
+        );
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        });
+      }
+    },
   );
 
-  useAiSocketEvent("conversation_ended", () =>
-    dispatch(setInConversationWith(null)),
+  useAiSocketEvent<{ agent_id?: string; chat_session_id?: string }>(
+    "conversation_ended",
+    (data) => {
+      if (data.agent_id && data.agent_id !== agent_id) return;
+      if (data.chat_session_id && data.chat_session_id !== chat_session_id) {
+        return;
+      }
+      dispatch(clearHumanConversation());
+    },
   );
 
   useEffect(() => {
@@ -437,13 +485,22 @@ export default function MainChatSpace() {
     [],
   );
 
+  const showHandoverWaitingBanner = shouldShowHandoverWaitingBanner(
+    handover,
+    in_conversation_with,
+  );
+
   return (
     <div className="flex-1 flex flex-col min-h-0 relative">
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto custom-scrollbar"
+        className="relative isolate flex-1 overflow-y-auto custom-scrollbar"
         onScroll={handleScroll}
       >
+        <VisitorHandoverWaitingBanner
+          handover={handover}
+          inConversationWith={in_conversation_with}
+        />
         <div className="flex flex-col min-h-full">
           <div className="flex-grow"></div>
           {isFetching ? (
@@ -454,7 +511,11 @@ export default function MainChatSpace() {
               setInputValue={setInputValue}
             />
           ) : (
-            <div className="pl-[18px] pr-[16px] font-[600] py-4 space-y-6">
+            <div
+              className={`pl-[18px] pr-[16px] font-[600] py-4 space-y-6 ${
+                showHandoverWaitingBanner ? "-mt-10" : ""
+              }`}
+            >
               {conversation_chain.map((message, index) => (
                 <Fragment key={message.message_id}>
                   {index === separatorIndex && (
@@ -469,7 +530,12 @@ export default function MainChatSpace() {
                       <div className="flex-1 h-px bg-gray-300" />
                     </div>
                   )}
-                  {isIncomingMessageUnread(message) && message.message_id ? (
+                  {message.role === "system" ? (
+                    <ChatSystemNotice
+                      content={message.content}
+                      created_at={message.created_at}
+                    />
+                  ) : isIncomingMessageUnread(message) && message.message_id ? (
                     <ReadReceiptMarker
                       messageId={message.message_id}
                       mongoId={message._id ?? null}

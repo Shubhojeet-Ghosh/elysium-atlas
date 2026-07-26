@@ -7,6 +7,7 @@ import AgentDataSource, { AgentDataSourceTabs } from "./AgentDataSource";
 import AgentPersonalize from "./AgentPersonalize";
 import AgentLiveVisitors from "./AgentLiveVisitors";
 import AgentLeadCollection from "./AgentLeadCollection";
+import AgentHumanHandover from "./AgentHumanHandover";
 import AgentBackButton from "./AgentBackButton";
 import AgentMainContent from "./AgentMainContent";
 import UnsavedChangesBar from "./UnsavedChangesBar";
@@ -821,7 +822,11 @@ export default function MyAgent({
       )}
       {section === "live-visitors" && <AgentLiveVisitors />}
       {section === "lead-collection" && <AgentLeadCollection />}
-      {mappedInitial && !readOnly && section !== "lead-collection" && (
+      {section === "human-handover" && <AgentHumanHandover />}
+      {mappedInitial &&
+        !readOnly &&
+        section !== "lead-collection" &&
+        section !== "human-handover" && (
         <UnsavedChangesBar
           initial={mappedInitial}
           current={currentAgentDetails}

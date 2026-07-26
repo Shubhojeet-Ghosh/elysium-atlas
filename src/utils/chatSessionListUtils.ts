@@ -4,6 +4,7 @@ import type {
   CapturedSessionMode,
 } from "@/store/reducers/agentSlice";
 import type { SessionLeadCollection, SessionLeadListStatus } from "@/types/leadCollection";
+import type { SessionHandoverFields } from "@/types/humanHandover";
 import type { AppDispatch } from "@/store";
 import { addCapturedSession } from "@/store/reducers/agentSlice";
 import { emitStartMonitorConversation } from "@/utils/chatMonitorUtils";
@@ -37,7 +38,7 @@ export type ChatSessionListRow = {
   lead_email?: string | null;
   lead_name?: string | null;
   lead_collection?: SessionLeadCollection | null;
-};
+} & SessionHandoverFields;
 
 export type VisitorDisplayStatus =
   | "online"
@@ -92,6 +93,24 @@ export function normalizeChatSessionRow(
     ...(row.lead_name !== undefined ? { lead_name: row.lead_name ?? null } : {}),
     ...(row.lead_collection !== undefined
       ? { lead_collection: row.lead_collection }
+      : {}),
+    ...(row.handover_status !== undefined
+      ? { handover_status: row.handover_status ?? null }
+      : {}),
+    ...(row.handover_requested_at !== undefined
+      ? { handover_requested_at: row.handover_requested_at ?? null }
+      : {}),
+    ...(row.handover_reason !== undefined
+      ? { handover_reason: row.handover_reason ?? null }
+      : {}),
+    ...(row.handover_contact_name !== undefined
+      ? { handover_contact_name: row.handover_contact_name ?? null }
+      : {}),
+    ...(row.handover_contact_email !== undefined
+      ? { handover_contact_email: row.handover_contact_email ?? null }
+      : {}),
+    ...(row.handover_contact_status !== undefined
+      ? { handover_contact_status: row.handover_contact_status ?? null }
       : {}),
   };
 }
@@ -176,6 +195,12 @@ export function hasRefreshRowChanges(
   if (
     incoming.lead_status !== undefined &&
     incoming.lead_status !== existing.lead_status
+  ) {
+    return true;
+  }
+  if (
+    incoming.handover_status !== undefined &&
+    incoming.handover_status !== existing.handover_status
   ) {
     return true;
   }

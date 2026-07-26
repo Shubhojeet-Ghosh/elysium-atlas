@@ -1,20 +1,52 @@
 import { useAppSelector, useAppDispatch } from "@/store";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ChatHeader from "./ChatHeader";
 import MainChatSpace from "./MainChatSpace";
 import ChatFooter from "./ChatFooter";
+import VisitorHandoverDialog from "./VisitorHandoverDialog";
 import fastApiAxios from "@/utils/fastapi_axios";
 import {
   setAgentFields,
   setIsFetching,
   setConversationChain,
+  setHumanConversationStarted,
 } from "@/store/reducers/agentChatSlice";
 import { normalizeVisitorChatMessage } from "@/utils/conversationMessageUtils";
+import type { VisitorHandoverState } from "@/types/humanHandover";
+import { parseVisitorHandoverFromSessionData } from "@/utils/humanHandoverVisitorUtils";
+import { parseVisitorTakeoverFromSessionData } from "@/utils/visitorTakeoverUtils";
+import { useAiSocket } from "@/hooks/useAiSocket";
+import { useVisitorHandover } from "@/hooks/useVisitorHandover";
 
 export default function AgentChatSpace() {
-  const { agent_id, chat_session_id, visitor_at, isAgentOpen } = useAppSelector(
-    (state) => state.agentChat,
-  );
+  const {
+    agent_id,
+    chat_session_id,
+    visitor_at,
+    isAgentOpen,
+    isFetching,
+    primary_color,
+    text_color,
+  } = useAppSelector((state) => state.agentChat);
+
+  const [initialHandoverState, setInitialHandoverState] =
+    useState<VisitorHandoverState | null>(null);
+
+  const { emit, status } = useAiSocket({ autoConnect: false });
+
+  const {
+    handover,
+    isSubmitting: isHandoverSubmitting,
+    isDeclining: isHandoverDeclining,
+    submitContact,
+    declineContact,
+  } = useVisitorHandover({
+    agentId: agent_id,
+    chatSessionId: chat_session_id,
+    emit,
+    socketConnected: status === "connected",
+    initialState: initialHandoverState,
+  });
 
   const dispatch = useAppDispatch();
 
@@ -56,6 +88,16 @@ export default function AgentChatSpace() {
           const agentFields = agentData.agent_fields || {};
           const chat_session_data = agentData.chat_session_data || {};
           const sessionMessages = chat_session_data.messages;
+
+          setInitialHandoverState(
+            parseVisitorHandoverFromSessionData(chat_session_data),
+          );
+
+          const activeTakeover =
+            parseVisitorTakeoverFromSessionData(chat_session_data);
+          if (activeTakeover) {
+            dispatch(setHumanConversationStarted(activeTakeover));
+          }
 
           dispatch(
             setAgentFields({
@@ -118,12 +160,23 @@ export default function AgentChatSpace() {
   return (
     <>
       <div className="h-[100dvh] w-full flex items-center justify-center bg-indigo-50">
-        <div className="lg:w-[440px] lg:h-[580px] md:w-full md:h-[100dvh] w-full h-[100dvh] shadow-lg lg:rounded-[16px] md:rounded-none rounded-none  bg-white">
+        <div className="lg:w-[440px] lg:h-[580px] md:w-full md:h-[100dvh] w-full h-[100dvh] shadow-lg lg:rounded-[16px] md:rounded-none rounded-none bg-white relative overflow-hidden">
           <div className="flex flex-col h-full w-full">
             <ChatHeader />
-            <MainChatSpace />
+            <MainChatSpace handover={handover} />
             <ChatFooter />
           </div>
+          {!isFetching && (
+            <VisitorHandoverDialog
+              handover={handover}
+              primaryColor={primary_color}
+              textColor={text_color}
+              isSubmitting={isHandoverSubmitting}
+              isDeclining={isHandoverDeclining}
+              onSubmit={submitContact}
+              onDecline={declineContact}
+            />
+          )}
         </div>
       </div>
     </>
