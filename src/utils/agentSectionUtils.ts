@@ -9,7 +9,7 @@ export const AGENT_SECTION_LABELS: Record<string, string> = {
 };
 
 export const LEAD_COLLECTION_INSET_CLASS =
-  "px-8 sm:px-12 md:px-20 lg:px-28 xl:px-36 2xl:px-44";
+  "px-0 sm:px-4 md:px-12 lg:px-28 xl:px-36 2xl:px-44";
 
 export function getSectionLabel(section: string) {
   return AGENT_SECTION_LABELS[section] ?? "General";

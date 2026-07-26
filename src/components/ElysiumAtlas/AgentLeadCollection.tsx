@@ -115,7 +115,7 @@ function LeadCollectionFieldEditor({
 
   return (
     <div className="group py-5 border-b border-gray-100 dark:border-white/10 last:border-b-0">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 min-w-0">
         <div className="flex items-center gap-3 min-w-0">
           <span
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-serene-purple/10 text-[13px] font-semibold leading-none text-serene-purple"
@@ -123,14 +123,14 @@ function LeadCollectionFieldEditor({
           >
             {index + 1}
           </span>
-          <span className="shrink-0 font-bold text-[14px] leading-none text-deep-onyx dark:text-pure-mist">
+          <span className="min-w-0 truncate font-bold text-[14px] leading-none text-deep-onyx dark:text-pure-mist">
             {fieldLabel}
           </span>
         </div>
 
-        <div className="flex shrink-0 items-center gap-3 ml-auto">
+        <div className="flex items-center justify-between gap-3 sm:justify-end sm:shrink-0 pl-12 sm:pl-0">
           <label
-            className="inline-flex items-center gap-2 text-[12px] font-medium leading-none text-deep-onyx dark:text-pure-mist cursor-pointer"
+            className="inline-flex items-center gap-2 text-[12px] font-medium leading-none text-deep-onyx dark:text-pure-mist cursor-pointer shrink-0"
             title="The visitor must fill this in before the lead is marked complete"
           >
             <Checkbox
@@ -144,7 +144,7 @@ function LeadCollectionFieldEditor({
             Required
           </label>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
             onClick={onMoveUp}
@@ -436,7 +436,7 @@ export default function AgentLeadCollection() {
 
   return (
     <>
-      <div className={`w-full lg:mt-8 mt-5 pb-28 ${LEAD_COLLECTION_INSET_CLASS}`}>
+      <div className={`w-full min-w-0 max-w-full lg:mt-8 mt-5 pb-28 overflow-x-hidden ${LEAD_COLLECTION_INSET_CLASS}`}>
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Spinner />
@@ -527,8 +527,8 @@ export default function AgentLeadCollection() {
                 <p className="text-[18px] font-bold text-deep-onyx dark:text-pure-mist">
                   Timing
                 </p>
-                <div className="flex items-center justify-between gap-6">
-                  <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
                     <p className="font-bold text-[14px]">
                       How many visitor messages first?
                     </p>
@@ -572,7 +572,7 @@ export default function AgentLeadCollection() {
                   </p>
                 </div>
 
-                <div className="rounded-2xl bg-gray-50/70 dark:bg-white/[0.03] px-5 sm:px-6">
+                <div className="rounded-2xl bg-gray-50/70 dark:bg-white/[0.03] px-3 sm:px-6 min-w-0 overflow-hidden">
                   {fieldRows.map((row, index) => (
                     <LeadCollectionFieldEditor
                       key={row.id}
@@ -708,9 +708,9 @@ export default function AgentLeadCollection() {
             isLeftNavOpen ? "left-0 lg:left-[280px]" : "left-0 lg:left-20",
           )}
         >
-          <div className="px-4 lg:px-[50px]">
+          <div className="px-4 lg:px-[50px] min-w-0">
             <div
-              className={`${LEAD_COLLECTION_INSET_CLASS} flex flex-wrap items-center justify-end gap-2`}
+              className={`${LEAD_COLLECTION_INSET_CLASS} flex flex-wrap items-center justify-center sm:justify-end gap-2`}
             >
               <OutlineButton
                 className={`${actionButtonClassName} !py-0 border-[2px] shrink-0 bg-white dark:bg-[#0a0a0a]`}
