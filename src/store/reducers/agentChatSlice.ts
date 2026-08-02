@@ -1,4 +1,8 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import {
+  dedupeSystemNotices,
+  hasSystemNotice,
+} from "@/utils/conversationMessageUtils";
 
 interface Message {
   message_id: string;
@@ -113,10 +117,17 @@ const agentChatSlice = createSlice({
       state.visitor_at = action.payload;
     },
     setConversationChain: (state, action: PayloadAction<Message[]>) => {
-      state.conversation_chain = action.payload;
+      state.conversation_chain = dedupeSystemNotices(action.payload);
     },
     addMessage: (state, action: PayloadAction<Message>) => {
-      state.conversation_chain.push(action.payload);
+      const message = action.payload;
+      if (
+        message.role === "system" &&
+        hasSystemNotice(state.conversation_chain, message.content)
+      ) {
+        return;
+      }
+      state.conversation_chain.push(message);
     },
     markChatMessageAsRead: (
       state,

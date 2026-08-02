@@ -710,7 +710,7 @@ export default function AgentLeadCollection() {
         >
           <div className="px-4 lg:px-[50px] min-w-0">
             <div
-              className={`${LEAD_COLLECTION_INSET_CLASS} flex flex-wrap items-center justify-center sm:justify-end gap-2`}
+              className={`${LEAD_COLLECTION_INSET_CLASS} flex flex-wrap items-center justify-end gap-2`}
             >
               <OutlineButton
                 className={`${actionButtonClassName} !py-0 border-[2px] shrink-0 bg-white dark:bg-[#0a0a0a]`}

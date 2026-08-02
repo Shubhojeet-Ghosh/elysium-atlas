@@ -21,11 +21,42 @@ export function normalizeVisitorChatMessage(raw: Record<string, unknown>) {
   return {
     message_id: String(raw.message_id ?? raw._id ?? ""),
     _id: mongoId,
-    role: raw.role as "user" | "agent" | "human",
+    role: raw.role as "user" | "agent" | "human" | "system",
     content: String(raw.content ?? raw.message ?? ""),
     created_at: String(raw.created_at ?? ""),
     read_at: readAt,
   };
+}
+
+/** True when the chain already contains the same system notice text. */
+export function hasSystemNotice(
+  chain: Array<{ role: string; content: string }>,
+  content: string,
+): boolean {
+  const normalized = content.trim();
+  if (!normalized) return false;
+
+  return chain.some(
+    (message) =>
+      message.role === "system" && message.content.trim() === normalized,
+  );
+}
+
+/** Keep the first occurrence of each system notice (e.g. takeover banner). */
+export function dedupeSystemNotices<T extends { role: string; content: string }>(
+  chain: T[],
+): T[] {
+  const seen = new Set<string>();
+
+  return chain.filter((message) => {
+    if (message.role !== "system") return true;
+
+    const key = message.content.trim();
+    if (seen.has(key)) return false;
+
+    seen.add(key);
+    return true;
+  });
 }
 
 export function isVisitorMessageUnread(msg: ConversationMessage): boolean {
