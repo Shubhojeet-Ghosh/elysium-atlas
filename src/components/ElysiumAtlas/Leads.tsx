@@ -5,13 +5,7 @@ import { useRouter } from "next/navigation";
 import NProgress from "nprogress";
 import { toast } from "sonner";
 import Cookies from "js-cookie";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import AutoComplete from "@/components/ui/AutoComplete";
 import LeadsTable from "@/components/ElysiumAtlas/LeadsTable";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { useActiveTeamRole } from "@/hooks/useActiveTeamRole";
@@ -59,6 +53,17 @@ export default function Leads() {
     }
     return map;
   }, [agentOptions]);
+
+  const agentFilterItems = useMemo(
+    () => [
+      { value: ALL_AGENTS_VALUE, label: "All agents" },
+      ...agentOptions.map((agent) => ({
+        value: agent.agent_id,
+        label: agent.agent_name,
+      })),
+    ],
+    [agentOptions],
+  );
 
   const loadAgentOptions = useCallback(async () => {
     const token = Cookies.get("elysium_atlas_session_token");
@@ -205,22 +210,17 @@ export default function Leads() {
       </div>
 
       <div className="flex items-center justify-end gap-2 mt-4">
-        <Select value={selectedAgentId} onValueChange={handleAgentFilterChange}>
-          <SelectTrigger
-            aria-label="Filter by agent"
-            className="h-[41px] min-h-[41px] w-full max-w-[220px] lg:max-w-[260px] border-[2px] border-gray-300 dark:border-deep-onyx rounded-[10px] bg-white dark:bg-deep-onyx text-[13px] font-[600] text-deep-onyx dark:text-pure-mist shadow-none focus-visible:border-serene-purple focus-visible:ring-serene-purple/30"
-          >
-            <SelectValue placeholder="All agents" />
-          </SelectTrigger>
-          <SelectContent align="end">
-            <SelectItem value={ALL_AGENTS_VALUE}>All agents</SelectItem>
-            {agentOptions.map((agent) => (
-              <SelectItem key={agent.agent_id} value={agent.agent_id}>
-                {agent.agent_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="w-full max-w-[220px] lg:max-w-[260px]">
+          <AutoComplete
+            items={agentFilterItems}
+            value={selectedAgentId}
+            placeholder="All agents"
+            searchPlaceholder="Search agent..."
+            emptyMessage="No agent found."
+            onChange={handleAgentFilterChange}
+            className="text-[13px] font-[500]"
+          />
+        </div>
       </div>
 
       <LeadsTable

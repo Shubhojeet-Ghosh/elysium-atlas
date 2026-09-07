@@ -9,7 +9,6 @@ import {
   UserRoundCheck,
   UserPlus,
   Shield,
-  Users,
   Bot,
 } from "lucide-react";
 import {
@@ -69,13 +68,6 @@ const agentNavItems: AgentNavItem[] = [
     name: "Security",
     slug: "security",
     icon: Shield,
-    disabled: true,
-    hrefSuffix: "",
-  },
-  {
-    name: "Team",
-    slug: "team",
-    icon: Users,
     disabled: true,
     hrefSuffix: "",
   },

@@ -201,22 +201,13 @@ function FieldCell({
 
 function getSessionColumnDisplay(lead: TeamLeadListItem) {
   const alias = lead.alias_name?.trim();
-  if (alias) {
-    return {
-      display: alias,
-      tooltip: `${alias} | ${lead.chat_session_id}`,
-      mono: false,
-      useMiddleTruncate: false,
-      className: "text-deep-onyx dark:text-pure-mist",
-    };
-  }
+  const sessionId = lead.chat_session_id;
+  const hasDistinctAlias = Boolean(alias && alias !== sessionId);
 
   return {
-    display: lead.chat_session_id,
-    tooltip: lead.chat_session_id,
-    mono: true,
-    useMiddleTruncate: true,
-    className: "text-gray-500 dark:text-gray-400",
+    display: hasDistinctAlias ? alias! : sessionId,
+    tooltip: hasDistinctAlias ? `${alias} | ${sessionId}` : sessionId,
+    useMiddleTruncate: !hasDistinctAlias,
   };
 }
 
@@ -240,16 +231,11 @@ function LeadTableRow({
         minWidth={FROZEN_SESSION_WIDTH}
         maxWidth={FROZEN_SESSION_WIDTH}
         stickyVariant="session"
-        className={sessionColumn.className}
+        className="text-deep-onyx dark:text-pure-mist"
       >
         <Tooltip>
           <TooltipTrigger asChild>
-            <span
-              className={cn(
-                "block w-full truncate",
-                sessionColumn.mono && "font-mono text-[12px]",
-              )}
-            >
+            <span className="block w-full truncate text-[14px]">
               {sessionColumn.useMiddleTruncate
                 ? truncateMiddle(sessionColumn.display)
                 : sessionColumn.display}
