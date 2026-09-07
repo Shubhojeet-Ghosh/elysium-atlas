@@ -26,6 +26,7 @@ import {
   setLlmModel,
   setRetrievalStrategy,
   setToolIds,
+  setToolCallingConfig,
   setKnowledgeBaseLinks,
   setKnowledgeBaseFiles,
   setKnowledgeBaseText,
@@ -63,6 +64,7 @@ import {
   parseKbPresignedUrls,
 } from "@/utils/kbItemsApi";
 import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
+import { DEFAULT_TOOL_CALLING_CONFIG } from "@/types/tools";
 import {
   getSectionLabel,
   isNoTabSection,
@@ -371,6 +373,14 @@ export default function MyAgent({
     const currentToolIds = [...(current.toolIds ?? [])].sort().join(",");
     if (initialToolIds !== currentToolIds) {
       payload.tool_ids = current.toolIds ?? [];
+    }
+
+    const initialToolConfig = JSON.stringify(
+      mappedInitial.toolCallingConfig ?? {},
+    );
+    const currentToolConfig = JSON.stringify(current.toolCallingConfig ?? {});
+    if (initialToolConfig !== currentToolConfig) {
+      payload.tool_calling_config = current.toolCallingConfig;
     }
 
     if (mappedInitial.temperature !== current.temperature) {
@@ -687,6 +697,9 @@ export default function MyAgent({
     if (dataToUse.retrievalStrategy !== undefined)
       dispatch(setRetrievalStrategy(dataToUse.retrievalStrategy || "simple"));
     dispatch(setToolIds(dataToUse.toolIds ?? []));
+    dispatch(setToolCallingConfig(
+      dataToUse.toolCallingConfig ?? DEFAULT_TOOL_CALLING_CONFIG,
+    ));
     dispatch(setAgentIcon(dataToUse.agent_icon ?? null));
     dispatch(setPrimaryColor(dataToUse.primary_color || "#fff"));
     dispatch(setSecondaryColor(dataToUse.secondary_color || "#fff"));

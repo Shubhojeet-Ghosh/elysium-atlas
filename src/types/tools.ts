@@ -132,3 +132,33 @@ export interface ToolParameterRow {
   items_type?: ToolArrayItemType;
   properties?: ToolNestedParameterRow[];
 }
+
+export interface ToolCallingConfig {
+  enabled: boolean;
+  max_rounds: number;
+  max_executions_per_turn: number;
+  parallel_calls_per_round: boolean;
+  stop_on_error?: boolean;
+}
+
+export const DEFAULT_TOOL_CALLING_CONFIG: ToolCallingConfig = {
+  enabled: true,
+  max_rounds: 5,
+  max_executions_per_turn: 10,
+  parallel_calls_per_round: true,
+};
+
+export function normalizeToolCallingConfig(
+  config?: Partial<ToolCallingConfig> | null,
+): ToolCallingConfig {
+  return {
+    enabled: config?.enabled ?? DEFAULT_TOOL_CALLING_CONFIG.enabled,
+    max_rounds: config?.max_rounds ?? DEFAULT_TOOL_CALLING_CONFIG.max_rounds,
+    max_executions_per_turn:
+      config?.max_executions_per_turn ??
+      DEFAULT_TOOL_CALLING_CONFIG.max_executions_per_turn,
+    parallel_calls_per_round:
+      config?.parallel_calls_per_round ??
+      DEFAULT_TOOL_CALLING_CONFIG.parallel_calls_per_round,
+  };
+}

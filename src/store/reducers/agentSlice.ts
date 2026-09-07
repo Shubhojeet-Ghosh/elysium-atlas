@@ -14,6 +14,10 @@ import type {
   SessionLeadCollection,
   SessionLeadListStatus,
 } from "@/types/leadCollection";
+import {
+  DEFAULT_TOOL_CALLING_CONFIG,
+  type ToolCallingConfig,
+} from "@/types/tools";
 import type { SessionHandoverFields } from "@/types/humanHandover";
 import { leadCollectionListStatusChanged, withDerivedSessionLeadStatus } from "@/utils/leadCollectionSessionUtils";
 
@@ -99,6 +103,7 @@ interface UserAgentState {
   llmModel: string;
   retrievalStrategy: string;
   toolIds: string[];
+  toolCallingConfig: ToolCallingConfig;
   triggerGetAgentDetails: number;
   triggerFetchAgentUrls: number;
   triggerFetchAgentFiles: number;
@@ -138,6 +143,7 @@ const initialState: UserAgentState = {
   llmModel: "",
   retrievalStrategy: "simple",
   toolIds: [],
+  toolCallingConfig: DEFAULT_TOOL_CALLING_CONFIG,
   triggerGetAgentDetails: 0,
   triggerFetchAgentUrls: 0,
   triggerFetchAgentFiles: 0,
@@ -408,6 +414,18 @@ const agentSlice = createSlice({
     },
     setToolIds: (state, action: PayloadAction<string[]>) => {
       state.toolIds = action.payload;
+    },
+    setToolCallingConfig: (state, action: PayloadAction<ToolCallingConfig>) => {
+      state.toolCallingConfig = action.payload;
+    },
+    updateToolCallingConfig: (
+      state,
+      action: PayloadAction<Partial<ToolCallingConfig>>,
+    ) => {
+      state.toolCallingConfig = {
+        ...state.toolCallingConfig,
+        ...action.payload,
+      };
     },
     setTriggerGetAgentDetails: (state, action: PayloadAction<number>) => {
       state.triggerGetAgentDetails = action.payload;
@@ -1222,6 +1240,7 @@ const agentSlice = createSlice({
       state.llmModel = "";
       state.retrievalStrategy = "simple";
       state.toolIds = [];
+      state.toolCallingConfig = DEFAULT_TOOL_CALLING_CONFIG;
       state.triggerGetAgentDetails = 0;
       state.triggerFetchAgentUrls = 0;
       state.triggerFetchAgentFiles = 0;
@@ -1273,6 +1292,8 @@ export const {
   setLlmModel,
   setRetrievalStrategy,
   setToolIds,
+  setToolCallingConfig,
+  updateToolCallingConfig,
   setTriggerGetAgentDetails,
   setTriggerFetchAgentUrls,
   setTriggerFetchAgentFiles,

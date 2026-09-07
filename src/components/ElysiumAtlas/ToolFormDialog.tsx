@@ -242,7 +242,11 @@ export default function ToolFormDialog({
   const handleSubmit = async () => {
     const validationError = validateForm();
     if (validationError) {
-      setInlineError(validationError);
+      if (validationError === "API URL must start with http:// or https://") {
+        toast.error(validationError);
+      } else {
+        setInlineError(validationError);
+      }
       return;
     }
     setInlineError(null);

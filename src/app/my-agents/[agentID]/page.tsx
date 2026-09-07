@@ -28,6 +28,7 @@ import {
   setLlmModel,
   setRetrievalStrategy,
   setToolIds,
+  setToolCallingConfig,
   setTriggerGetAgentDetails,
   setWidgetScript,
   setAgentIcon,
@@ -37,6 +38,7 @@ import {
 } from "@/store/reducers/agentSlice";
 import { isSettledAgentStatus } from "@/utils/agentStatus";
 import { mapKbAttachmentsToState } from "@/utils/agentKbUtils";
+import { normalizeToolCallingConfig } from "@/types/tools";
 
 export default function AgentPage() {
   const params = useParams();
@@ -87,6 +89,11 @@ export default function AgentPage() {
           dispatch(
             setToolIds(
               Array.isArray(agentDetails.tool_ids) ? agentDetails.tool_ids : [],
+            ),
+          );
+          dispatch(
+            setToolCallingConfig(
+              normalizeToolCallingConfig(agentDetails.tool_calling_config),
             ),
           );
           dispatch(setWidgetScript(agentDetails.widget_script || null));
