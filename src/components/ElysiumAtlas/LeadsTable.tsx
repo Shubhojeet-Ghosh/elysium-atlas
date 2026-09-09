@@ -34,9 +34,9 @@ const LAST_UPDATED_WIDTH = { minWidth: 150, maxWidth: 170 };
 const COLUMN_COUNT = 3 + LEAD_FIELD_COLUMNS.length;
 
 const CELL_SURFACE_CLASS =
-  "bg-white dark:bg-black group-hover/lead-row:bg-[#f7f5f9] dark:group-hover/lead-row:bg-[#15121c]";
+  "bg-background group-hover/lead-row:bg-[#f7f5f9] dark:group-hover/lead-row:bg-[color-mix(in_oklab,var(--background),white_8%)]";
 
-const HEAD_SURFACE_CLASS = "bg-white dark:bg-black";
+const HEAD_SURFACE_CLASS = "bg-background";
 
 const ROW_HOVER_CLASS =
   "group/lead-row cursor-pointer border-b border-gray-100 dark:border-deep-onyx transition-colors duration-200 hover:text-serene-purple dark:hover:text-serene-purple";
@@ -188,7 +188,9 @@ function FieldCell({
     <DataCell
       minWidth={minWidth}
       maxWidth={maxWidth}
-      className={trimmed ? "text-deep-onyx dark:text-pure-mist" : "text-gray-400"}
+      className={
+        trimmed ? "text-deep-onyx dark:text-pure-mist" : "text-gray-400"
+      }
     >
       {trimmed ? (
         <EllipsisText value={trimmed} />
@@ -223,10 +225,7 @@ function LeadTableRow({
   const sessionColumn = getSessionColumnDisplay(lead);
 
   return (
-    <tr
-      onClick={() => onLeadClick(lead)}
-      className={ROW_HOVER_CLASS}
-    >
+    <tr onClick={() => onLeadClick(lead)} className={ROW_HOVER_CLASS}>
       <DataCell
         minWidth={FROZEN_SESSION_WIDTH}
         maxWidth={FROZEN_SESSION_WIDTH}
@@ -366,14 +365,16 @@ export default function LeadsTable({
                   minWidth={LAST_UPDATED_WIDTH.minWidth}
                   maxWidth={LAST_UPDATED_WIDTH.maxWidth}
                 />
-                {LEAD_FIELD_COLUMNS.map(({ key, label, minWidth, maxWidth }) => (
-                  <HeaderCell
-                    key={key}
-                    label={label}
-                    minWidth={minWidth}
-                    maxWidth={maxWidth}
-                  />
-                ))}
+                {LEAD_FIELD_COLUMNS.map(
+                  ({ key, label, minWidth, maxWidth }) => (
+                    <HeaderCell
+                      key={key}
+                      label={label}
+                      minWidth={minWidth}
+                      maxWidth={maxWidth}
+                    />
+                  ),
+                )}
               </tr>
             </thead>
             <tbody className="[&_tr:last-child]:border-0">
@@ -397,9 +398,7 @@ export default function LeadsTable({
                   <LeadTableRow
                     key={lead.lead_id}
                     lead={lead}
-                    agentName={
-                      agentNameById[lead.agent_id] ?? lead.agent_id
-                    }
+                    agentName={agentNameById[lead.agent_id] ?? lead.agent_id}
                     onLeadClick={onLeadClick}
                   />
                 ))
@@ -409,7 +408,7 @@ export default function LeadsTable({
         </div>
 
         {showRightGradient && leads.length > 0 && (
-          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-black dark:via-black/80 to-transparent pointer-events-none z-10" />
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background dark:via-background/80 to-transparent pointer-events-none z-10" />
         )}
       </div>
 
