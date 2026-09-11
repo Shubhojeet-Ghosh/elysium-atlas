@@ -1,6 +1,10 @@
 import fastApiAxios from "@/utils/fastapi_axios";
 import type { ConversationMessage } from "@/store/reducers/agentSlice";
 
+export function isToolCallMessage(msg: { role?: string }): boolean {
+  return msg.role === "tool";
+}
+
 /** Messages from team member / agent that the visitor has not read yet */
 export function isIncomingMessageUnread(msg: {
   role: string;
@@ -65,7 +69,52 @@ export function isVisitorMessageUnread(msg: ConversationMessage): boolean {
 
 /** Monitor UI: message still needs mark-read (visitor or agent mirror). */
 export function isMonitorMessageUnread(msg: ConversationMessage): boolean {
+  if (isToolCallMessage(msg)) return false;
   return !msg.read_at && !!(msg._id || msg.message_id);
+}
+
+export function isSameConversationMessage(
+  a: Pick<ConversationMessage, "_id" | "message_id">,
+  b: Pick<ConversationMessage, "_id" | "message_id">,
+): boolean {
+  if (a._id && b._id) return a._id === b._id;
+  if (a.message_id && b.message_id) return a.message_id === b.message_id;
+  return false;
+}
+
+/** Insert by created_at; skip duplicates. Tool rows sit between visitor and agent replies. */
+export function upsertConversationMessage(
+  chain: ConversationMessage[],
+  message: ConversationMessage,
+): ConversationMessage[] {
+  if (chain.some((existing) => isSameConversationMessage(existing, message))) {
+    return chain;
+  }
+
+  const insertTime = Date.parse(message.created_at);
+  if (Number.isNaN(insertTime)) {
+    return [...chain, message];
+  }
+
+  const index = chain.findIndex((existing) => {
+    const existingTime = Date.parse(existing.created_at);
+    return !Number.isNaN(existingTime) && existingTime > insertTime;
+  });
+
+  if (index === -1) return [...chain, message];
+  return [...chain.slice(0, index), message, ...chain.slice(index)];
+}
+
+export function sortConversationMessages(
+  chain: ConversationMessage[],
+): ConversationMessage[] {
+  return [...chain].sort((a, b) => {
+    const aTime = Date.parse(a.created_at);
+    const bTime = Date.parse(b.created_at);
+    const safeA = Number.isNaN(aTime) ? 0 : aTime;
+    const safeB = Number.isNaN(bTime) ? 0 : bTime;
+    return safeA - safeB;
+  });
 }
 
 /**
@@ -128,14 +177,30 @@ export function normalizeConversationMessage(
 ): ConversationMessage {
   const readAt = raw.read_at ? String(raw.read_at) : null;
   const mongoId = raw._id ? String(raw._id) : undefined;
-  return {
+  const role = (raw.role as ConversationMessage["role"]) ?? "agent";
+  const message: ConversationMessage = {
     message_id: String(raw.message_id ?? raw._id ?? ""),
     _id: mongoId,
-    role: raw.role as ConversationMessage["role"],
-    content: String(raw.content ?? raw.message ?? ""),
+    role,
+    content: String(raw.content ?? raw.message ?? raw.tool_name ?? ""),
     created_at: String(raw.created_at ?? ""),
     read_at: readAt,
     is_read: readAt ? true : undefined,
+  };
+
+  if (role !== "tool") return message;
+
+  return {
+    ...message,
+    tool_name: String(raw.tool_name ?? raw.content ?? ""),
+    request_payload: raw.request_payload,
+    response_payload: raw.response_payload,
+    request_payload_truncated: Boolean(raw.request_payload_truncated),
+    response_payload_truncated: Boolean(raw.response_payload_truncated),
+    status: raw.status === "error" ? "error" : "success",
+    parent_user_message_id: raw.parent_user_message_id
+      ? String(raw.parent_user_message_id)
+      : undefined,
   };
 }
 

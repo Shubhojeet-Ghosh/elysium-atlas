@@ -12,7 +12,10 @@ import {
   incrementConversationLogUnread,
 } from "@/store/reducers/agentSlice";
 import fastApiAxios from "@/utils/fastapi_axios";
-import { normalizeConversationMessage } from "@/utils/conversationMessageUtils";
+import {
+  normalizeConversationMessage,
+  sortConversationMessages,
+} from "@/utils/conversationMessageUtils";
 import aiSocket from "@/lib/aiSocket";
 import { emitStopMonitorConversation } from "@/utils/chatMonitorUtils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -49,6 +52,7 @@ const ChatBox = memo(function ChatBox({
   const [visuallyExpanded, setVisuallyExpanded] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [leadsDialogOpen, setLeadsDialogOpen] = useState(false);
+  const [showToolCalls, setShowToolCalls] = useState(false);
 
   const dispatch = useAppDispatch();
   const userID = useAppSelector((state) => state.userProfile.userID);
@@ -153,6 +157,7 @@ const ChatBox = memo(function ChatBox({
         conversationMode={conversationMode}
         isVisible={visuallyExpanded}
         pauseAgentMirror={pauseAgentMirror}
+        showToolCalls={showToolCalls}
       />
     </div>
   );
@@ -172,6 +177,8 @@ const ChatBox = memo(function ChatBox({
         canMarkResolved={canMarkResolved}
         isReleasePending={isReleasePending}
         isResolvePending={isResolvePending}
+        showToolCalls={showToolCalls}
+        onShowToolCallsChange={setShowToolCalls}
       />
       <ConversationChatBanners
         visible={showChatBanners}
@@ -201,6 +208,7 @@ const ChatBox = memo(function ChatBox({
             agent_id: agentID,
             fields: ["agent_name"],
             chat_session_id: session.chat_session_id,
+            include_tool_calls: true,
           },
         );
         const data = response.data;
@@ -208,8 +216,10 @@ const ChatBox = memo(function ChatBox({
         if (data.success === true) {
           const rawMessages = data.chat_session_data?.messages ?? [];
           const messages = Array.isArray(rawMessages)
-            ? rawMessages.map((m: Record<string, unknown>) =>
-                normalizeConversationMessage(m),
+            ? sortConversationMessages(
+                rawMessages.map((m: Record<string, unknown>) =>
+                  normalizeConversationMessage(m),
+                ),
               )
             : [];
           dispatch(
@@ -465,6 +475,7 @@ export default function TeamMemberConversationsPanel({
         (s) => s.chat_session_id === data.chat_session_id,
       );
       if (!session || session.is_expanded) return;
+      if (data.role === "tool") return;
 
       if (session.conversation_mode === "monitor") {
         const visitor = store
@@ -555,13 +566,48 @@ export default function TeamMemberConversationsPanel({
       );
     };
 
+    const handleToolCallFromAgent = (data: Record<string, unknown>) => {
+      const chatSessionId = String(data.chat_session_id ?? "");
+      const session = capturedSessionsRef.current.find(
+        (s) => s.chat_session_id === chatSessionId,
+      );
+      if (
+        !session ||
+        session.is_expanded ||
+        session.conversation_mode !== "monitor"
+      ) {
+        return;
+      }
+
+      const visitor = store
+        .getState()
+        .agent.active_visitors.find(
+          (v) => v.chat_session_id === chatSessionId,
+        );
+      const handlerId = visitor?.in_conversation_with;
+      const userID = store.getState().userProfile.userID;
+      if (handlerId && handlerId !== userID) return;
+
+      dispatch(
+        addMessageToCapturedSession({
+          chat_session_id: chatSessionId,
+          message: normalizeConversationMessage({
+            ...data,
+            role: "tool",
+          }),
+        }),
+      );
+    };
+
     aiSocket.on("message_from_visitor", handleMessageFromVisitor);
     aiSocket.on("message_from_agent", handleMessageFromAgent);
     aiSocket.on("message_from_team_member", handleMessageFromTeamMember);
+    aiSocket.on("tool_call_from_agent", handleToolCallFromAgent);
     return () => {
       aiSocket.off("message_from_visitor", handleMessageFromVisitor);
       aiSocket.off("message_from_agent", handleMessageFromAgent);
       aiSocket.off("message_from_team_member", handleMessageFromTeamMember);
+      aiSocket.off("tool_call_from_agent", handleToolCallFromAgent);
     };
   }, [dispatch]);
 

@@ -19,9 +19,12 @@ import {
   isMonitorMessageUnread,
   findFirstUnreadSeparatorIndex,
   resolveMarkReadMessageId,
+  isToolCallMessage,
+  normalizeConversationMessage,
 } from "@/utils/conversationMessageUtils";
 import { useMarkMessagesReadWhenVisible } from "@/hooks/useMarkMessagesReadWhenVisible";
 import ConversationMessageBubble from "@/components/ElysiumAtlas/ConversationMessageBubble";
+import ConversationToolCallCard from "@/components/ElysiumAtlas/ConversationToolCallCard";
 import {
   useChatScrollToUnreadOrBottom,
   AGENT_UNREAD_SEPARATOR_VIEWPORT_RATIO,
@@ -34,12 +37,14 @@ export default function ConversationChatBody({
   conversationMode = "monitor",
   isVisible = true,
   pauseAgentMirror = false,
+  showToolCalls = false,
 }: {
   chat_session_id: string;
   agent_id: string;
   conversationMode?: CapturedSessionMode;
   isVisible?: boolean;
   pauseAgentMirror?: boolean;
+  showToolCalls?: boolean;
 }) {
   const isMonitorMode = conversationMode === "monitor";
   const dispatch = useAppDispatch();
@@ -315,6 +320,7 @@ export default function ConversationChatBody({
     }) => {
       if (data.chat_session_id !== chat_session_id) return;
       if (pauseAgentMirror) return;
+      if (data.role === "tool") return;
 
       const agentMsgAt = data.created_at ?? new Date().toISOString();
       const content = data.content ?? data.message ?? "";
@@ -381,13 +387,30 @@ export default function ConversationChatBody({
       }
     };
 
+    const handleToolCallFromAgent = (data: Record<string, unknown>) => {
+      if (String(data.chat_session_id ?? "") !== chat_session_id) return;
+      if (!isMonitorMode || pauseAgentMirror) return;
+
+      dispatch(
+        addMessageToCapturedSession({
+          chat_session_id,
+          message: normalizeConversationMessage({
+            ...data,
+            role: "tool",
+          }),
+        }),
+      );
+    };
+
     aiSocket.on("message_from_visitor", handleMessageFromVisitor);
     aiSocket.on("message_from_agent", handleMessageFromAgent);
     aiSocket.on("message_from_team_member", handleMessageFromTeamMember);
+    aiSocket.on("tool_call_from_agent", handleToolCallFromAgent);
     return () => {
       aiSocket.off("message_from_visitor", handleMessageFromVisitor);
       aiSocket.off("message_from_agent", handleMessageFromAgent);
       aiSocket.off("message_from_team_member", handleMessageFromTeamMember);
+      aiSocket.off("tool_call_from_agent", handleToolCallFromAgent);
     };
   }, [chat_session_id, dispatch, isMonitorMode, pauseAgentMirror]);
 
@@ -484,11 +507,35 @@ export default function ConversationChatBody({
           ) : (
             <div className="flex flex-col gap-2">
               {conversation_chain.map((msg, index) => {
+                if (isToolCallMessage(msg) && !showToolCalls) return null;
+
                 const isTeamMember =
                   msg.role === "human" || msg.role === "agent";
                 const needsReadReceipt = isMonitorMode
                   ? isMonitorMessageUnread(msg)
                   : isVisitorMessageUnread(msg);
+
+                let isFirstToolInGroup = false;
+                let isLastToolInGroup = false;
+                if (isToolCallMessage(msg)) {
+                  const previousVisible = conversation_chain
+                    .slice(0, index)
+                    .reverse()
+                    .find(
+                      (item) =>
+                        !isToolCallMessage(item) || showToolCalls,
+                    );
+                  const nextVisible = conversation_chain
+                    .slice(index + 1)
+                    .find(
+                      (item) =>
+                        !isToolCallMessage(item) || showToolCalls,
+                    );
+                  isFirstToolInGroup =
+                    !previousVisible || !isToolCallMessage(previousVisible);
+                  isLastToolInGroup =
+                    !nextVisible || !isToolCallMessage(nextVisible);
+                }
 
                 return (
                   <Fragment key={msg._id ?? msg.message_id}>
@@ -504,19 +551,28 @@ export default function ConversationChatBody({
                         <div className="flex-1 h-px bg-serene-purple/40" />
                       </div>
                     )}
-                    <ConversationMessageBubble
-                      message={msg}
-                      isTeamMember={isTeamMember}
-                      needsReadReceipt={needsReadReceipt}
-                      isVisible={isVisible}
-                      scrollContainerRef={scrollContainerRef}
-                      onMarkVisible={markMessageVisible}
-                    />
+                    {isToolCallMessage(msg) ? (
+                      <ConversationToolCallCard
+                        message={msg}
+                        isFirstInGroup={isFirstToolInGroup}
+                        isLastInGroup={isLastToolInGroup}
+                      />
+                    ) : (
+                      <ConversationMessageBubble
+                        message={msg}
+                        isTeamMember={isTeamMember}
+                        needsReadReceipt={needsReadReceipt}
+                        isVisible={isVisible}
+                        scrollContainerRef={scrollContainerRef}
+                        onMarkVisible={markMessageVisible}
+                      />
+                    )}
                   </Fragment>
                 );
               })}
               <div ref={messagesEndRef} />
-            </div>          )}
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, memo, type MouseEvent } from "react";
-import { SquarePen, Save, MoreHorizontal } from "lucide-react";
+import { SquarePen, Save, MoreHorizontal, Check } from "lucide-react";
 import aiSocket from "@/lib/aiSocket";
 import {
   DropdownMenu,
@@ -85,6 +85,8 @@ function ConversationChatHeader({
   canMarkResolved = false,
   isReleasePending = false,
   isResolvePending = false,
+  showToolCalls = false,
+  onShowToolCallsChange,
 }: {
   session: CapturedSession;
   isExpanded: boolean;
@@ -98,6 +100,8 @@ function ConversationChatHeader({
   canMarkResolved?: boolean;
   isReleasePending?: boolean;
   isResolvePending?: boolean;
+  showToolCalls?: boolean;
+  onShowToolCallsChange?: (show: boolean) => void;
 }) {
   const truncateMiddle = (s?: string) => {
     if (!s) return "";
@@ -362,7 +366,20 @@ function ConversationChatHeader({
               <MoreHorizontal className={headerActionIconClass} />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="z-[1100] w-[160px]">
+          <DropdownMenuContent align="end" className="z-[1100] w-[210px]">
+            <DropdownMenuItem
+              className="cursor-pointer text-[13px]"
+              onSelect={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onShowToolCallsChange?.(!showToolCalls);
+              }}
+            >
+              Show System Activity
+              {showToolCalls ? (
+                <Check className="ml-auto size-4 text-serene-purple" />
+              ) : null}
+            </DropdownMenuItem>
             {showLeadsOption ? (
               <DropdownMenuItem
                 className="cursor-pointer text-[13px]"

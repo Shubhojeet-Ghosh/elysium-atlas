@@ -20,6 +20,7 @@ import {
 } from "@/types/tools";
 import type { SessionHandoverFields } from "@/types/humanHandover";
 import { leadCollectionListStatusChanged, withDerivedSessionLeadStatus } from "@/utils/leadCollectionSessionUtils";
+import { upsertConversationMessage } from "@/utils/conversationMessageUtils";
 
 export interface GeoData {
   country_name: string | null;
@@ -29,16 +30,26 @@ export interface GeoData {
   time_zone: string | null;
 }
 
+export type ConversationMessageRole = "user" | "agent" | "human" | "tool";
+export type ToolCallStatus = "success" | "error";
+
 export interface ConversationMessage {
   message_id: string;
   /** MongoDB _id — used for mark-chat-message-read when available */
   _id?: string;
-  role: "user" | "agent" | "human";
+  role: ConversationMessageRole;
   content: string;
   created_at: string;
   /** @deprecated Prefer read_at- kept for backwards compatibility */
   is_read?: boolean;
   read_at?: string | null;
+  tool_name?: string;
+  request_payload?: unknown;
+  response_payload?: unknown;
+  request_payload_truncated?: boolean;
+  response_payload_truncated?: boolean;
+  status?: ToolCallStatus;
+  parent_user_message_id?: string;
 }
 
 export interface ActiveVisitor extends SessionHandoverFields {
@@ -1048,7 +1059,10 @@ const agentSlice = createSlice({
         (s) => s.chat_session_id === action.payload.chat_session_id,
       );
       if (session) {
-        session.conversation_chain.push(action.payload.message);
+        session.conversation_chain = upsertConversationMessage(
+          session.conversation_chain,
+          action.payload.message,
+        );
       }
     },
     markSessionMessagesAsRead: (state, action: PayloadAction<string>) => {
