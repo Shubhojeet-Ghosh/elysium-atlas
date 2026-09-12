@@ -37,17 +37,18 @@ export default function ConversationChatBody({
   conversationMode = "monitor",
   isVisible = true,
   pauseAgentMirror = false,
-  showToolCalls = false,
 }: {
   chat_session_id: string;
   agent_id: string;
   conversationMode?: CapturedSessionMode;
   isVisible?: boolean;
   pauseAgentMirror?: boolean;
-  showToolCalls?: boolean;
 }) {
   const isMonitorMode = conversationMode === "monitor";
   const dispatch = useAppDispatch();
+  const showSystemActivity = useAppSelector(
+    (state) => state.settings.showSystemActivity ?? false,
+  );
   const userID = useAppSelector((state) => state.userProfile.userID);
   const [inputValue, setInputValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -507,7 +508,7 @@ export default function ConversationChatBody({
           ) : (
             <div className="flex flex-col gap-2">
               {conversation_chain.map((msg, index) => {
-                if (isToolCallMessage(msg) && !showToolCalls) return null;
+                if (isToolCallMessage(msg) && !showSystemActivity) return null;
 
                 const isTeamMember =
                   msg.role === "human" || msg.role === "agent";
@@ -523,13 +524,13 @@ export default function ConversationChatBody({
                     .reverse()
                     .find(
                       (item) =>
-                        !isToolCallMessage(item) || showToolCalls,
+                        !isToolCallMessage(item) || showSystemActivity,
                     );
                   const nextVisible = conversation_chain
                     .slice(index + 1)
                     .find(
                       (item) =>
-                        !isToolCallMessage(item) || showToolCalls,
+                        !isToolCallMessage(item) || showSystemActivity,
                     );
                   isFirstToolInGroup =
                     !previousVisible || !isToolCallMessage(previousVisible);

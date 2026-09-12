@@ -22,6 +22,7 @@ import {
 import { isVisitorMessageUnread } from "@/utils/conversationMessageUtils";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { setCapturedSessionAlias } from "@/store/reducers/agentSlice";
+import { toggleShowSystemActivity } from "@/store/reducers/settingsSlice";
 
 export type CapturedSession = ActiveVisitor & {
   captured_at: string;
@@ -85,8 +86,6 @@ function ConversationChatHeader({
   canMarkResolved = false,
   isReleasePending = false,
   isResolvePending = false,
-  showToolCalls = false,
-  onShowToolCallsChange,
 }: {
   session: CapturedSession;
   isExpanded: boolean;
@@ -100,8 +99,6 @@ function ConversationChatHeader({
   canMarkResolved?: boolean;
   isReleasePending?: boolean;
   isResolvePending?: boolean;
-  showToolCalls?: boolean;
-  onShowToolCallsChange?: (show: boolean) => void;
 }) {
   const truncateMiddle = (s?: string) => {
     if (!s) return "";
@@ -113,6 +110,9 @@ function ConversationChatHeader({
 
   const displayName = session.alias_name ?? session.chat_session_id;
   const dispatch = useAppDispatch();
+  const showSystemActivity = useAppSelector(
+    (state) => state.settings.showSystemActivity ?? false,
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState<string>(
     session.alias_name ?? session.chat_session_id,
@@ -369,24 +369,20 @@ function ConversationChatHeader({
           <DropdownMenuContent align="end" className="z-[1100] w-[210px]">
             <DropdownMenuItem
               className="cursor-pointer text-[13px]"
-              onSelect={(e) => e.preventDefault()}
-              onClick={(e) => {
-                e.stopPropagation();
-                onShowToolCallsChange?.(!showToolCalls);
+              onSelect={(e) => {
+                e.preventDefault();
+                dispatch(toggleShowSystemActivity());
               }}
             >
               Show System Activity
-              {showToolCalls ? (
+              {showSystemActivity ? (
                 <Check className="ml-auto size-4 text-serene-purple" />
               ) : null}
             </DropdownMenuItem>
             {showLeadsOption ? (
               <DropdownMenuItem
                 className="cursor-pointer text-[13px]"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onLeads?.();
-                }}
+                onSelect={() => onLeads?.()}
               >
                 Lead details
               </DropdownMenuItem>
@@ -394,8 +390,7 @@ function ConversationChatHeader({
             <DropdownMenuItem
               className="cursor-pointer text-[13px]"
               disabled={!releaseEnabled}
-              onClick={(e) => {
-                e.stopPropagation();
+              onSelect={() => {
                 if (!releaseEnabled || !onRelease) return;
                 onRelease();
               }}
@@ -405,8 +400,7 @@ function ConversationChatHeader({
             <DropdownMenuItem
               className="cursor-pointer text-[13px]"
               disabled={!resolveEnabled}
-              onClick={(e) => {
-                e.stopPropagation();
+              onSelect={() => {
                 if (!resolveEnabled || !onResolve) return;
                 onResolve();
               }}

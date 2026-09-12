@@ -14,6 +14,7 @@ const publicRoutes = [
 const privateRoutes = [
   "/my-agents",
   "/leads",
+  "/knowledge-base",
   "/team",
   "/tools",
   "/account-settings",
@@ -41,12 +42,9 @@ function isAuthenticatedPublicException(pathname: string): boolean {
 function isPrivateRoute(pathname: string): boolean {
   if (isPublicRoute(pathname)) return false;
 
-  return privateRoutes.some((route) => {
-    if (route === "/team" || route === "/tools" || route === "/leads") {
-      return pathname === route;
-    }
-    return pathname === route || pathname.startsWith(route + "/");
-  });
+  return privateRoutes.some(
+    (route) => pathname === route || pathname.startsWith(route + "/"),
+  );
 }
 
 export function middleware(request: NextRequest) {

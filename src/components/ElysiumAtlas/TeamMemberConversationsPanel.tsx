@@ -52,7 +52,6 @@ const ChatBox = memo(function ChatBox({
   const [visuallyExpanded, setVisuallyExpanded] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [leadsDialogOpen, setLeadsDialogOpen] = useState(false);
-  const [showToolCalls, setShowToolCalls] = useState(false);
 
   const dispatch = useAppDispatch();
   const userID = useAppSelector((state) => state.userProfile.userID);
@@ -157,7 +156,6 @@ const ChatBox = memo(function ChatBox({
         conversationMode={conversationMode}
         isVisible={visuallyExpanded}
         pauseAgentMirror={pauseAgentMirror}
-        showToolCalls={showToolCalls}
       />
     </div>
   );
@@ -177,8 +175,6 @@ const ChatBox = memo(function ChatBox({
         canMarkResolved={canMarkResolved}
         isReleasePending={isReleasePending}
         isResolvePending={isResolvePending}
-        showToolCalls={showToolCalls}
-        onShowToolCallsChange={setShowToolCalls}
       />
       <ConversationChatBanners
         visible={showChatBanners}
