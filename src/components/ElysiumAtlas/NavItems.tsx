@@ -5,6 +5,7 @@ import {
   BookOpen,
   Bot,
   Home,
+  Puzzle,
   Settings,
   UserRoundCheck,
   Users,
@@ -54,6 +55,11 @@ const navItems: NavItem[] = [
     name: "Tools",
     href: "/tools",
     icon: Wrench,
+  },
+  {
+    name: "Plugins",
+    href: "/plugins",
+    icon: Puzzle,
   },
   {
     name: "Settings",

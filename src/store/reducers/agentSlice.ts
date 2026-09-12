@@ -114,6 +114,7 @@ interface UserAgentState {
   llmModel: string;
   retrievalStrategy: string;
   toolIds: string[];
+  pluginIds: string[];
   toolCallingConfig: ToolCallingConfig;
   triggerGetAgentDetails: number;
   triggerFetchAgentUrls: number;
@@ -154,6 +155,7 @@ const initialState: UserAgentState = {
   llmModel: "",
   retrievalStrategy: "simple",
   toolIds: [],
+  pluginIds: [],
   toolCallingConfig: DEFAULT_TOOL_CALLING_CONFIG,
   triggerGetAgentDetails: 0,
   triggerFetchAgentUrls: 0,
@@ -425,6 +427,9 @@ const agentSlice = createSlice({
     },
     setToolIds: (state, action: PayloadAction<string[]>) => {
       state.toolIds = action.payload;
+    },
+    setPluginIds: (state, action: PayloadAction<string[]>) => {
+      state.pluginIds = action.payload;
     },
     setToolCallingConfig: (state, action: PayloadAction<ToolCallingConfig>) => {
       state.toolCallingConfig = action.payload;
@@ -1254,6 +1259,7 @@ const agentSlice = createSlice({
       state.llmModel = "";
       state.retrievalStrategy = "simple";
       state.toolIds = [];
+      state.pluginIds = [];
       state.toolCallingConfig = DEFAULT_TOOL_CALLING_CONFIG;
       state.triggerGetAgentDetails = 0;
       state.triggerFetchAgentUrls = 0;
@@ -1306,6 +1312,7 @@ export const {
   setLlmModel,
   setRetrievalStrategy,
   setToolIds,
+  setPluginIds,
   setToolCallingConfig,
   updateToolCallingConfig,
   setTriggerGetAgentDetails,

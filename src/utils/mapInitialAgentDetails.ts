@@ -19,6 +19,7 @@ export function mapInitialAgentDetails(details: any) {
     llmModel: details.llm_model,
     retrievalStrategy: details.retrieval_strategy || "simple",
     toolIds: Array.isArray(details.tool_ids) ? details.tool_ids : [],
+    pluginIds: Array.isArray(details.plugin_ids) ? details.plugin_ids : [],
     toolCallingConfig: normalizeToolCallingConfig(details.tool_calling_config),
     knowledgeBaseLinks: kbState.knowledgeBaseLinks,
     knowledgeBaseFiles: kbState.knowledgeBaseFiles,

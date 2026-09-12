@@ -26,6 +26,7 @@ import {
   setLlmModel,
   setRetrievalStrategy,
   setToolIds,
+  setPluginIds,
   setToolCallingConfig,
   setKnowledgeBaseLinks,
   setKnowledgeBaseFiles,
@@ -375,6 +376,12 @@ export default function MyAgent({
       payload.tool_ids = current.toolIds ?? [];
     }
 
+    const initialPluginIds = [...(mappedInitial.pluginIds ?? [])].sort().join(",");
+    const currentPluginIds = [...(current.pluginIds ?? [])].sort().join(",");
+    if (initialPluginIds !== currentPluginIds) {
+      payload.plugin_ids = current.pluginIds ?? [];
+    }
+
     const initialToolConfig = JSON.stringify(
       mappedInitial.toolCallingConfig ?? {},
     );
@@ -697,6 +704,7 @@ export default function MyAgent({
     if (dataToUse.retrievalStrategy !== undefined)
       dispatch(setRetrievalStrategy(dataToUse.retrievalStrategy || "simple"));
     dispatch(setToolIds(dataToUse.toolIds ?? []));
+    dispatch(setPluginIds(dataToUse.pluginIds ?? []));
     dispatch(setToolCallingConfig(
       dataToUse.toolCallingConfig ?? DEFAULT_TOOL_CALLING_CONFIG,
     ));

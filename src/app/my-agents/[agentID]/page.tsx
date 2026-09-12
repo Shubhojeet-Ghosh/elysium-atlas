@@ -28,6 +28,7 @@ import {
   setLlmModel,
   setRetrievalStrategy,
   setToolIds,
+  setPluginIds,
   setToolCallingConfig,
   setTriggerGetAgentDetails,
   setWidgetScript,
@@ -89,6 +90,13 @@ export default function AgentPage() {
           dispatch(
             setToolIds(
               Array.isArray(agentDetails.tool_ids) ? agentDetails.tool_ids : [],
+            ),
+          );
+          dispatch(
+            setPluginIds(
+              Array.isArray(agentDetails.plugin_ids)
+                ? agentDetails.plugin_ids
+                : [],
             ),
           );
           dispatch(

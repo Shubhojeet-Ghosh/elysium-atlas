@@ -17,6 +17,7 @@ const privateRoutes = [
   "/knowledge-base",
   "/team",
   "/tools",
+  "/plugins",
   "/account-settings",
 ];
 

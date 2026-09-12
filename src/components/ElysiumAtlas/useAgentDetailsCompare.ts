@@ -19,6 +19,7 @@ export function useCurrentAgentDetails() {
     (state) => state.agent.retrievalStrategy,
   );
   const toolIds = useAppSelector((state) => state.agent.toolIds);
+  const pluginIds = useAppSelector((state) => state.agent.pluginIds ?? []);
   const toolCallingConfig = useAppSelector(
     (state) => state.agent.toolCallingConfig,
   );
@@ -55,6 +56,7 @@ export function useCurrentAgentDetails() {
       llmModel,
       retrievalStrategy,
       toolIds,
+      pluginIds,
       toolCallingConfig,
       knowledgeBaseLinks,
       knowledgeBaseFiles,
@@ -78,6 +80,7 @@ export function useCurrentAgentDetails() {
       llmModel,
       retrievalStrategy,
       toolIds,
+      pluginIds,
       toolCallingConfig,
       knowledgeBaseLinks,
       knowledgeBaseFiles,
