@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import CustomInput from "@/components/inputs/CustomInput";
 import PrimaryButton from "@/components/ui/PrimaryButton";
@@ -19,7 +20,17 @@ import { extractApiErrorMessage } from "@/utils/toolsFormUtils";
 import type { Plugin } from "@/types/plugins";
 
 const FIELD_CLASS =
-  "!h-10 !min-h-10 !max-h-10 w-full box-border !rounded-[10px] !border-2 border-gray-300 bg-white !px-[12px] !py-0 !text-[13px] !font-semibold !leading-none text-deep-onyx dark:border-deep-onyx dark:bg-deep-onyx dark:text-pure-mist";
+  "!h-10 !min-h-10 !max-h-10 w-full box-border !rounded-[10px] !border-2 border-gray-300 bg-white !pl-[12px] !pr-10 !py-0 !text-[13px] !font-semibold !leading-none text-deep-onyx dark:border-deep-onyx dark:bg-deep-onyx dark:text-pure-mist";
+
+const SECRET_MASK = "********";
+
+function nextSecretValue(previous: string, next: string): string {
+  if (previous !== SECRET_MASK) return next;
+  if (!next || next === SECRET_MASK) return "";
+  if (next.startsWith(SECRET_MASK)) return next.slice(SECRET_MASK.length);
+  if (SECRET_MASK.startsWith(next)) return "";
+  return next;
+}
 
 interface PluginSecretsDialogProps {
   pluginId: string;
@@ -38,10 +49,12 @@ export default function PluginSecretsDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [plugin, setPlugin] = useState<Plugin | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
+  const [visible, setVisible] = useState<Record<string, boolean>>({});
 
   const reset = () => {
     setPlugin(null);
     setValues({});
+    setVisible({});
   };
 
   const loadPlugin = async (id: string) => {
@@ -52,7 +65,15 @@ export default function PluginSecretsDialog({
         const loaded = response.plugin;
         const names = loaded.secret_names ?? [];
         setPlugin(loaded);
-        setValues(Object.fromEntries(names.map((name) => [name, ""])));
+        setValues(
+          Object.fromEntries(
+            names.map((name) => [
+              name,
+              loaded.secrets_configured?.[name] ? SECRET_MASK : "",
+            ]),
+          ),
+        );
+        setVisible(Object.fromEntries(names.map((name) => [name, false])));
         return;
       }
       toast.error(response.message || "Failed to load plugin secrets.");
@@ -85,11 +106,12 @@ export default function PluginSecretsDialog({
     const secrets: Record<string, string> = {};
     for (const name of secretNames) {
       const value = (values[name] ?? "").trim();
-      if (value) secrets[name] = value;
+      if (!value || value === SECRET_MASK) continue;
+      secrets[name] = value;
     }
 
     if (Object.keys(secrets).length === 0) {
-      toast.error("Enter a value to update. Leave a field blank to keep it.");
+      onOpenChange(false);
       return;
     }
 
@@ -141,37 +163,50 @@ export default function PluginSecretsDialog({
               </p>
             ) : (
               secretNames.map((name) => {
-                const configured = plugin?.secrets_configured?.[name] === true;
+                const isVisible = visible[name] === true;
                 return (
                   <div key={name} className="grid gap-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-bold text-[13px] font-mono">{name}</p>
-                      <span
-                        className={`text-[11px] font-semibold ${
-                          configured
-                            ? "text-serene-purple"
-                            : "text-gray-500 dark:text-gray-400"
-                        }`}
+                    <p className="font-bold text-[13px] font-mono">{name}</p>
+                    <div className="relative">
+                      <CustomInput
+                        type={isVisible ? "text" : "password"}
+                        autoComplete="new-password"
+                        value={values[name] ?? ""}
+                        onChange={(event) =>
+                          setValues((prev) => ({
+                            ...prev,
+                            [name]: nextSecretValue(
+                              prev[name] ?? "",
+                              event.target.value,
+                            ),
+                          }))
+                        }
+                        onFocus={(event) => {
+                          if ((values[name] ?? "") === SECRET_MASK) {
+                            event.target.select();
+                          }
+                        }}
+                        placeholder="Enter value"
+                        disabled={isSubmitting}
+                        className={FIELD_CLASS}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setVisible((prev) => ({
+                            ...prev,
+                            [name]: !prev[name],
+                          }))
+                        }
+                        disabled={isSubmitting}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-serene-purple transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        aria-label={
+                          isVisible ? `Hide ${name}` : `Show ${name}`
+                        }
                       >
-                        {configured ? "Configured" : "Not set"}
-                      </span>
+                        {isVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
-                    <CustomInput
-                      type="password"
-                      autoComplete="new-password"
-                      value={values[name] ?? ""}
-                      onChange={(event) =>
-                        setValues((prev) => ({
-                          ...prev,
-                          [name]: event.target.value,
-                        }))
-                      }
-                      placeholder={
-                        configured ? "Leave blank to keep" : "Enter value"
-                      }
-                      disabled={isSubmitting}
-                      className={FIELD_CLASS}
-                    />
                   </div>
                 );
               })
