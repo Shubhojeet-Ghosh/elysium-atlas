@@ -14,6 +14,7 @@ const publicRoutes = [
 const privateRoutes = [
   "/my-agents",
   "/leads",
+  "/dashboard",
   "/knowledge-base",
   "/team",
   "/tools",

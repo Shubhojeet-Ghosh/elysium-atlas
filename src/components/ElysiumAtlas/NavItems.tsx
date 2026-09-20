@@ -39,7 +39,6 @@ const navItems: NavItem[] = [
     name: "Dashboard",
     href: "/dashboard",
     icon: Home,
-    disabled: true,
   },
   {
     name: "Knowledge Base",
