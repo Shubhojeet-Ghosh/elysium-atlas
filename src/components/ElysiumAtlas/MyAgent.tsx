@@ -25,6 +25,7 @@ import {
   setWelcomeMessage,
   setLlmModel,
   setRetrievalStrategy,
+  setLlmContextConfig,
   setToolIds,
   setPluginIds,
   setToolCallingConfig,
@@ -66,6 +67,7 @@ import {
 } from "@/utils/kbItemsApi";
 import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 import { DEFAULT_TOOL_CALLING_CONFIG } from "@/types/tools";
+import { DEFAULT_LLM_CONTEXT_CONFIG } from "@/lib/llmContextConfig";
 import {
   getSectionLabel,
   isNoTabSection,
@@ -368,6 +370,16 @@ export default function MyAgent({
       !isEquivalent(mappedInitial.retrievalStrategy, current.retrievalStrategy)
     ) {
       payload.retrieval_strategy = current.retrievalStrategy;
+    }
+
+    const initialLlmContextConfig = JSON.stringify(
+      mappedInitial.llmContextConfig ?? {},
+    );
+    const currentLlmContextConfig = JSON.stringify(
+      current.llmContextConfig ?? {},
+    );
+    if (initialLlmContextConfig !== currentLlmContextConfig) {
+      payload.llm_context_config = current.llmContextConfig;
     }
 
     const initialToolIds = [...(mappedInitial.toolIds ?? [])].sort().join(",");
@@ -703,6 +715,11 @@ export default function MyAgent({
       dispatch(setLlmModel(dataToUse.llmModel || ""));
     if (dataToUse.retrievalStrategy !== undefined)
       dispatch(setRetrievalStrategy(dataToUse.retrievalStrategy || "simple"));
+    dispatch(
+      setLlmContextConfig(
+        dataToUse.llmContextConfig ?? DEFAULT_LLM_CONTEXT_CONFIG,
+      ),
+    );
     dispatch(setToolIds(dataToUse.toolIds ?? []));
     dispatch(setPluginIds(dataToUse.pluginIds ?? []));
     dispatch(setToolCallingConfig(

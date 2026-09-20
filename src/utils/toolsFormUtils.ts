@@ -19,8 +19,6 @@ export const PARAMETER_TYPE_OPTIONS: ToolParameterType[] = [
   "integer",
   "boolean",
   "enum",
-  "array",
-  "object",
 ];
 
 export const NESTED_PARAMETER_TYPE_OPTIONS: ToolLeafParameterType[] = [
@@ -29,7 +27,6 @@ export const NESTED_PARAMETER_TYPE_OPTIONS: ToolLeafParameterType[] = [
   "integer",
   "boolean",
   "enum",
-  "array",
 ];
 
 export const ARRAY_ITEM_TYPE_OPTIONS: ToolArrayItemType[] = [

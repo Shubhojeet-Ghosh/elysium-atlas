@@ -18,6 +18,10 @@ import {
   DEFAULT_TOOL_CALLING_CONFIG,
   type ToolCallingConfig,
 } from "@/types/tools";
+import {
+  DEFAULT_LLM_CONTEXT_CONFIG,
+  type LlmContextConfig,
+} from "@/lib/llmContextConfig";
 import type { SessionHandoverFields } from "@/types/humanHandover";
 import { leadCollectionListStatusChanged, withDerivedSessionLeadStatus } from "@/utils/leadCollectionSessionUtils";
 import { upsertConversationMessage } from "@/utils/conversationMessageUtils";
@@ -113,6 +117,7 @@ interface UserAgentState {
   welcomeMessage: string;
   llmModel: string;
   retrievalStrategy: string;
+  llmContextConfig: LlmContextConfig;
   toolIds: string[];
   pluginIds: string[];
   toolCallingConfig: ToolCallingConfig;
@@ -154,6 +159,7 @@ const initialState: UserAgentState = {
   welcomeMessage: "",
   llmModel: "",
   retrievalStrategy: "simple",
+  llmContextConfig: DEFAULT_LLM_CONTEXT_CONFIG,
   toolIds: [],
   pluginIds: [],
   toolCallingConfig: DEFAULT_TOOL_CALLING_CONFIG,
@@ -424,6 +430,18 @@ const agentSlice = createSlice({
     },
     setRetrievalStrategy: (state, action: PayloadAction<string>) => {
       state.retrievalStrategy = action.payload;
+    },
+    setLlmContextConfig: (state, action: PayloadAction<LlmContextConfig>) => {
+      state.llmContextConfig = action.payload;
+    },
+    updateLlmContextConfig: (
+      state,
+      action: PayloadAction<Partial<LlmContextConfig>>,
+    ) => {
+      state.llmContextConfig = {
+        ...state.llmContextConfig,
+        ...action.payload,
+      };
     },
     setToolIds: (state, action: PayloadAction<string[]>) => {
       state.toolIds = action.payload;
@@ -1258,6 +1276,7 @@ const agentSlice = createSlice({
       state.welcomeMessage = "";
       state.llmModel = "";
       state.retrievalStrategy = "simple";
+      state.llmContextConfig = DEFAULT_LLM_CONTEXT_CONFIG;
       state.toolIds = [];
       state.pluginIds = [];
       state.toolCallingConfig = DEFAULT_TOOL_CALLING_CONFIG;
@@ -1311,6 +1330,8 @@ export const {
   setWelcomeMessage,
   setLlmModel,
   setRetrievalStrategy,
+  setLlmContextConfig,
+  updateLlmContextConfig,
   setToolIds,
   setPluginIds,
   setToolCallingConfig,

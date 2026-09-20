@@ -27,6 +27,7 @@ import {
   setWelcomeMessage,
   setLlmModel,
   setRetrievalStrategy,
+  setLlmContextConfig,
   setToolIds,
   setPluginIds,
   setToolCallingConfig,
@@ -40,6 +41,7 @@ import {
 import { isSettledAgentStatus } from "@/utils/agentStatus";
 import { mapKbAttachmentsToState } from "@/utils/agentKbUtils";
 import { normalizeToolCallingConfig } from "@/types/tools";
+import { normalizeLlmContextConfig } from "@/lib/llmContextConfig";
 
 export default function AgentPage() {
   const params = useParams();
@@ -86,6 +88,11 @@ export default function AgentPage() {
           dispatch(setLlmModel(agentDetails.llm_model));
           dispatch(
             setRetrievalStrategy(agentDetails.retrieval_strategy || "simple"),
+          );
+          dispatch(
+            setLlmContextConfig(
+              normalizeLlmContextConfig(agentDetails.llm_context_config),
+            ),
           );
           dispatch(
             setToolIds(

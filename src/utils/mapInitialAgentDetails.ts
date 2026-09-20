@@ -1,5 +1,6 @@
 import { mapKbAttachmentsToState } from "@/utils/agentKbUtils";
 import { normalizeToolCallingConfig } from "@/types/tools";
+import { normalizeLlmContextConfig } from "@/lib/llmContextConfig";
 
 export function mapInitialAgentDetails(details: any) {
   if (!details) return null;
@@ -18,6 +19,7 @@ export function mapInitialAgentDetails(details: any) {
     welcomeMessage: details.welcome_message,
     llmModel: details.llm_model,
     retrievalStrategy: details.retrieval_strategy || "simple",
+    llmContextConfig: normalizeLlmContextConfig(details.llm_context_config),
     toolIds: Array.isArray(details.tool_ids) ? details.tool_ids : [],
     pluginIds: Array.isArray(details.plugin_ids) ? details.plugin_ids : [],
     toolCallingConfig: normalizeToolCallingConfig(details.tool_calling_config),

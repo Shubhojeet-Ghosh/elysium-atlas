@@ -169,17 +169,21 @@ export function useChatScrollToUnreadOrBottom({
     separatorViewportRatio,
   ]);
 
-  // After initial scroll: follow new messages only when already near the bottom
+  // After initial scroll: follow new messages only when already near the bottom.
+  // User sends always scroll to bottom, even if the initial unread/bottom scroll
+  // has not finished yet (e.g. first message from welcome or pending separator).
   useLayoutEffect(() => {
     if (!active || !ready || conversationLength === 0) return;
-    if (!initialScrollDoneRef.current) return;
+
+    const scrollFromSend = scrollOnSendRef.current;
+    if (!initialScrollDoneRef.current && !scrollFromSend) return;
 
     const grew = conversationLength > prevLengthRef.current;
     if (!grew) return;
 
-    const scrollFromSend = scrollOnSendRef.current;
     if (scrollFromSend) {
       scrollOnSendRef.current = false;
+      initialScrollDoneRef.current = true;
     }
 
     prevLengthRef.current = conversationLength;

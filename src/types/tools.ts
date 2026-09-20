@@ -139,6 +139,8 @@ export interface ToolCallingConfig {
   max_executions_per_turn: number;
   parallel_calls_per_round: boolean;
   stop_on_error?: boolean;
+  include_tool_history_in_llm: boolean;
+  max_tool_history_in_llm: number;
 }
 
 export const DEFAULT_TOOL_CALLING_CONFIG: ToolCallingConfig = {
@@ -146,6 +148,8 @@ export const DEFAULT_TOOL_CALLING_CONFIG: ToolCallingConfig = {
   max_rounds: 5,
   max_executions_per_turn: 10,
   parallel_calls_per_round: true,
+  include_tool_history_in_llm: false,
+  max_tool_history_in_llm: 10,
 };
 
 export function normalizeToolCallingConfig(
@@ -160,5 +164,11 @@ export function normalizeToolCallingConfig(
     parallel_calls_per_round:
       config?.parallel_calls_per_round ??
       DEFAULT_TOOL_CALLING_CONFIG.parallel_calls_per_round,
+    include_tool_history_in_llm:
+      config?.include_tool_history_in_llm ??
+      DEFAULT_TOOL_CALLING_CONFIG.include_tool_history_in_llm,
+    max_tool_history_in_llm:
+      config?.max_tool_history_in_llm ??
+      DEFAULT_TOOL_CALLING_CONFIG.max_tool_history_in_llm,
   };
 }

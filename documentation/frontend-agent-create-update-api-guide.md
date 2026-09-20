@@ -1,4 +1,4 @@
-# Agent create & update APIs- frontend guide
+# Agent create & update APIs — frontend guide
 
 Reference for the **Elysium Agents** agent create and update request bodies. Covers what each endpoint accepts today, validation rules, and async vs synchronous behavior.
 
@@ -8,11 +8,11 @@ Reference for the **Elysium Agents** agent create and update request bodies. Cov
 
 **RBAC:** Create and update require **owner** or **admin**. See [frontend-agents-rbac-guide.md](./frontend-agents-rbac-guide.md).
 
-**Tool linking:** See [frontend-tools-api-guide.md](./frontend-tools-api-guide.md#agent-linking-tool_ids) for `tool_ids` validation rules.
+**Tool linking:** See [frontend-tools-api-guide.md](./frontend-tools-api-guide.md#agent-linking-tool_ids) for `tool_ids` validation rules. **Plugin linking:** See [frontend-plugins-api-guide.md](./frontend-plugins-api-guide.md) and [atlas-plugins-plan.md](./atlas-plugins-plan.md) for `plugin_ids`.
 
 ---
 
-## Overview- create vs update flow
+## Overview — create vs update flow
 
 Agent creation is typically a **two-step** flow:
 
@@ -27,7 +27,7 @@ sequenceDiagram
     Note over FE: Optional: POST /v1/generate-presigned-urls (file uploads)
 
     FE->>API: POST /v1/build-agent (agent_id + knowledge sources)
-    API-->>FE: 200- indexing started (async)
+    API-->>FE: 200 — indexing started (async)
 
     Note over API: Background: index links, files, custom knowledge
 ```
@@ -57,9 +57,11 @@ Creates the `atlas_agents` document with defaults and returns `agent_id`. Does *
 | `retrieval_strategy`     | `string`   | No       | `"simple"` \| `"orchestrated"`. Default `"simple"`                   |
 | `llm_model`              | `string`   | No       | Must be a supported model ID. Default `"gpt-4o-mini"`                |
 | `lead_collection_config` | `object`   | No       | See [Lead collection config](#lead-collection-config)                |
+| `llm_context_config`     | `object`   | No       | See [LLM context config](#llm-context-config)                        |
 | `tool_ids`               | `string[]` | No       | Team tool Mongo `_id`s. Default `[]`. Max 50                         |
+| `plugin_ids`             | `string[]` | No       | Team plugin Mongo `_id`s. Default `[]`. Max 20                       |
 
-`owner_user_id` and `team_id` are set from the JWT- do not send them.
+`owner_user_id` and `team_id` are set from the JWT — do not send them.
 
 ### Supported `llm_model` values
 
@@ -150,7 +152,7 @@ Each item in `files`:
 }
 ```
 
-Response includes presigned upload URLs keyed by file- use returned `file_key` values in `build-agent` `files` array.
+Response includes presigned upload URLs keyed by file — use returned `file_key` values in `build-agent` `files` array.
 
 ---
 
@@ -164,15 +166,15 @@ If `agent_id` is omitted, a minimal agent document is created first (prefer `pre
 
 ### Request body
 
-| Field          | Type       | Required | Notes                                                       |
-| -------------- | ---------- | -------- | ----------------------------------------------------------- |
-| `agent_id`     | `string`   | No\*     | From pre-build step. \*Required in normal flow              |
-| `base_url`     | `string`   | No       | Normalized and stored on agent                              |
-| `tool_ids`     | `string[]` | No       | Replaces attached tools when sent                           |
-| `links`        | `string[]` | No       | URLs to crawl and index                                     |
-| `files`        | `array`    | No       | Uploaded files to index- see [Files](#files-array)          |
-| `custom_texts` | `array`    | No       | Custom text chunks- see [Custom texts](#custom-texts-array) |
-| `qa_pairs`     | `array`    | No       | Q&A pairs- see [QA pairs](#qa-pairs-array)                  |
+| Field          | Type       | Required | Notes                                                        |
+| -------------- | ---------- | -------- | ------------------------------------------------------------ |
+| `agent_id`     | `string`   | No\*     | From pre-build step. \*Required in normal flow               |
+| `tool_ids`     | `string[]` | No       | Replaces attached tools when sent                            |
+| `plugin_ids`   | `string[]` | No       | Replaces attached plugins when sent                          |
+| `links`        | `string[]` | No       | URLs to crawl and index                                      |
+| `files`        | `array`    | No       | Uploaded files to index — see [Files](#files-array)          |
+| `custom_texts` | `array`    | No       | Custom text chunks — see [Custom texts](#custom-texts-array) |
+| `qa_pairs`     | `array`    | No       | Q&A pairs — see [QA pairs](#qa-pairs-array)                  |
 
 ### Files array
 
@@ -224,7 +226,6 @@ Each item:
 ```json
 {
   "agent_id": "674a1b2c3d4e5f6789012345",
-  "base_url": "https://example.com",
   "tool_ids": ["674a1b2c3d4e5f6789012346"],
   "links": ["https://example.com/about", "https://example.com/pricing"],
   "files": [
@@ -271,10 +272,10 @@ Agent status becomes `"indexing"` while the background job runs, then `"active"`
 
 Behavior splits into two paths:
 
-| Path                    | When                                                                | Response                                             |
-| ----------------------- | ------------------------------------------------------------------- | ---------------------------------------------------- |
-| **Immediate**           | Payload has **no re-index fields** (or only empty knowledge arrays) | `200`- `"Agent updated successfully."`               |
-| **Background re-index** | Payload includes any [re-index field](#re-index-fields)             | `200`- `"Your agent is being updated."`- poll status |
+| Path                    | When                                                                | Response                                               |
+| ----------------------- | ------------------------------------------------------------------- | ------------------------------------------------------ |
+| **Immediate**           | Payload has **no re-index fields** (or only empty knowledge arrays) | `200` — `"Agent updated successfully."`                |
+| **Background re-index** | Payload includes any [re-index field](#re-index-fields)             | `200` — `"Your agent is being updated."` — poll status |
 
 Both paths run validation and apply [basic attributes](#basic-attributes-immediate-always-applied-when-present) first.
 
@@ -284,38 +285,39 @@ Both paths run validation and apply [basic attributes](#basic-attributes-immedia
 
 Sending **any** of these (with a non-empty value, for arrays) triggers background re-indexing:
 
-| Field           | Type       | Notes                                                  |
-| --------------- | ---------- | ------------------------------------------------------ |
-| `links`         | `string[]` | Empty array `[]` is ignored- does not trigger re-index |
-| `files`         | `array`    | Same format as build. Empty `[]` ignored               |
-| `custom_texts`  | `array`    | Same format as build. Empty `[]` ignored               |
-| `qa_pairs`      | `array`    | Same format as build. Empty `[]` ignored               |
-| `base_url`      | `string`   |                                                        |
-| `agent_name`    | `string`   |                                                        |
-| `system_prompt` | `string`   |                                                        |
-| `llm_model`     | `string`   | Supported model IDs only                               |
-| `temperature`   | `number`   |                                                        |
+| Field           | Type       | Notes                                                   |
+| --------------- | ---------- | ------------------------------------------------------- |
+| `links`         | `string[]` | Empty array `[]` is ignored — does not trigger re-index |
+| `files`         | `array`    | Same format as build. Empty `[]` ignored                |
+| `custom_texts`  | `array`    | Same format as build. Empty `[]` ignored                |
+| `qa_pairs`      | `array`    | Same format as build. Empty `[]` ignored                |
+| `agent_name`    | `string`   |                                                         |
+| `system_prompt` | `string`   |                                                         |
+| `llm_model`     | `string`   | Supported model IDs only                                |
+| `temperature`   | `number`   |                                                         |
 
 During re-index, `agent_status` becomes `"updating"` then returns to the requested status (or prior user-settable status).
 
 ---
 
-### Basic attributes (immediate- always applied when present)
+### Basic attributes (immediate — always applied when present)
 
 Applied synchronously on every update call (even when re-index is also triggered):
 
-| Field                    | Type       | Notes                                                                                                                              |
-| ------------------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `agent_icon`             | `string`   | URL or path                                                                                                                        |
-| `primary_color`          | `string`   | Hex color                                                                                                                          |
-| `secondary_color`        | `string`   | Hex color                                                                                                                          |
-| `text_color`             | `string`   | Hex color                                                                                                                          |
-| `welcome_message`        | `string`   | Widget welcome text                                                                                                                |
-| `placeholder_text`       | `string`   | Chat input placeholder                                                                                                             |
-| `retrieval_strategy`     | `string`   | `"simple"` \| `"orchestrated"`                                                                                                     |
-| `lead_collection_config` | `object`   | Partial merge- see below                                                                                                           |
-| `tool_ids`               | `string[]` | Team tool IDs. Max 50                                                                                                              |
-| `agent_status`           | `string`   | `"active"` \| `"inactive"` \| `"disabled"`- applied immediately on non-re-index path; on re-index path applied after job completes |
+| Field                    | Type       | Notes                                                                                                                               |
+| ------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `agent_icon`             | `string`   | URL or path                                                                                                                         |
+| `primary_color`          | `string`   | Hex color                                                                                                                           |
+| `secondary_color`        | `string`   | Hex color                                                                                                                           |
+| `text_color`             | `string`   | Hex color                                                                                                                           |
+| `welcome_message`        | `string`   | Widget welcome text                                                                                                                 |
+| `placeholder_text`       | `string`   | Chat input placeholder                                                                                                              |
+| `retrieval_strategy`     | `string`   | `"simple"` \| `"orchestrated"`                                                                                                      |
+| `lead_collection_config` | `object`   | Partial merge — see below                                                                                                           |
+| `llm_context_config`     | `object`   | Partial merge — see [LLM context config](#llm-context-config)                                                                       |
+| `tool_ids`               | `string[]` | Team tool IDs. Max 50                                                                                                               |
+| `plugin_ids`             | `string[]` | Team plugin IDs. Max 20                                                                                                             |
+| `agent_status`           | `string`   | `"active"` \| `"inactive"` \| `"disabled"` — applied immediately on non-re-index path; on re-index path applied after job completes |
 
 ---
 
@@ -323,25 +325,64 @@ Applied synchronously on every update call (even when re-index is also triggered
 
 Object with allowed keys only:
 
-| Key                     | Type      | Default |
-| ----------------------- | --------- | ------- |
-| `enable_lead_capturing` | `boolean` | `false` |
+| Key                         | Type      | Default |
+| --------------------------- | --------- | ------- |
+| `enable_lead_capturing`     | `boolean` | `false` |
+| `collection_trigger_prompt` | `string`  | `""`    |
+| `min_messages_before_ask`   | `integer` | `2`     |
+| `fields`                    | `array`   | `[]`    |
+
+When `enable_lead_capturing` is `true`, `collection_trigger_prompt` (10–500 chars) and at least one `fields` item are required after merge.
 
 **Create:** full object replaces defaults.
 
 **Update:** partial object merged into stored config (only sent keys change).
 
+**Dedicated CRUD APIs:** see [frontend-lead-collection-api-guide.md](./frontend-lead-collection-api-guide.md).
+
+---
+
+### LLM context config
+
+Controls how many past **user/agent** messages are sent to the main agent LLM (orchestration + reply). See [frontend-tools-api-guide.md](./frontend-tools-api-guide.md#llm-context-config-llm_context_config) for full runtime behavior.
+
+| Key                         | Type      | Default | Max   |
+| --------------------------- | --------- | ------- | ----- |
+| `max_chat_history_messages` | `integer` | `10`    | `100` |
+
+**Create:** full object replaces defaults.
+
+**Update:** partial object merged into stored config.
+
+```json
+{
+  "llm_context_config": {
+    "max_chat_history_messages": 25
+  }
+}
+```
+
+Does **not** change lead collection, human handover, or visitor widget history restore limits.
+
+---
+
 ```json
 {
   "lead_collection_config": {
-    "enable_lead_capturing": true
+    "enable_lead_capturing": true,
+    "collection_trigger_prompt": "Start when the visitor asks about pricing or wants a demo.",
+    "min_messages_before_ask": 2,
+    "fields": [
+      { "key": "email", "required": true, "order": 1 },
+      { "key": "name", "required": true, "order": 2 }
+    ]
   }
 }
 ```
 
 ---
 
-### Example- metadata-only update (immediate)
+### Example — metadata-only update (immediate)
 
 ```json
 {
@@ -366,7 +407,7 @@ Object with allowed keys only:
 
 ---
 
-### Example- update with re-index (async)
+### Example — update with re-index (async)
 
 ```json
 {
@@ -392,29 +433,28 @@ Object with allowed keys only:
 
 ---
 
-## Field reference- quick lookup
+## Field reference — quick lookup
 
 ### Create (`pre-build` + `build`)
 
 | Field                                              | pre-build | build |    update     |
 | -------------------------------------------------- | :-------: | :---: | :-----------: |
-| `agent_id`                                         |     -     |   ✓   | ✓ (required)  |
-| `agent_name`                                       |     ✓     |   -   | ✓ (re-index)  |
-| `retrieval_strategy`                               |     ✓     |   -   | ✓ (immediate) |
-| `llm_model`                                        |     ✓     |   -   | ✓ (re-index)  |
-| `lead_collection_config`                           |     ✓     |   -   | ✓ (immediate) |
+| `agent_id`                                         |     —     |   ✓   | ✓ (required)  |
+| `agent_name`                                       |     ✓     |   —   | ✓ (re-index)  |
+| `retrieval_strategy`                               |     ✓     |   —   | ✓ (immediate) |
+| `llm_model`                                        |     ✓     |   —   | ✓ (re-index)  |
+| `lead_collection_config`                           |     ✓     |   —   | ✓ (immediate) |
 | `tool_ids`                                         |     ✓     |   ✓   | ✓ (immediate) |
-| `base_url`                                         |     -     |   ✓   | ✓ (re-index)  |
-| `links`                                            |     -     |   ✓   | ✓ (re-index)  |
-| `files`                                            |     -     |   ✓   | ✓ (re-index)  |
-| `custom_texts`                                     |     -     |   ✓   | ✓ (re-index)  |
-| `qa_pairs`                                         |     -     |   ✓   | ✓ (re-index)  |
-| `system_prompt`                                    |     -     |   -   | ✓ (re-index)  |
-| `temperature`                                      |     -     |   -   | ✓ (re-index)  |
-| `agent_icon`                                       |     -     |   -   | ✓ (immediate) |
-| `primary_color` / `secondary_color` / `text_color` |     -     |   -   | ✓ (immediate) |
-| `welcome_message` / `placeholder_text`             |     -     |   -   | ✓ (immediate) |
-| `agent_status`                                     |     -     |   -   | ✓ (immediate) |
+| `links`                                            |     —     |   ✓   | ✓ (re-index)  |
+| `files`                                            |     —     |   ✓   | ✓ (re-index)  |
+| `custom_texts`                                     |     —     |   ✓   | ✓ (re-index)  |
+| `qa_pairs`                                         |     —     |   ✓   | ✓ (re-index)  |
+| `system_prompt`                                    |     —     |   —   | ✓ (re-index)  |
+| `temperature`                                      |     —     |   —   | ✓ (re-index)  |
+| `agent_icon`                                       |     —     |   —   | ✓ (immediate) |
+| `primary_color` / `secondary_color` / `text_color` |     —     |   —   | ✓ (immediate) |
+| `welcome_message` / `placeholder_text`             |     —     |   —   | ✓ (immediate) |
+| `agent_status`                                     |     —     |   —   | ✓ (immediate) |
 
 ---
 
@@ -452,8 +492,8 @@ Object with allowed keys only:
 1. Always send `agent_id`.
 2. Decide sync vs async: if payload includes re-index fields, show loading/progress UI.
 3. **`tool_ids`**, colors, welcome message, etc. can be updated without re-index.
-4. Empty `links: []` does **not** clear indexed links- use `remove-agent-links` for that.
-5. Gate create/update UI on JWT `role`- members get `403`.
+4. Empty `links: []` does **not** clear indexed links — use `remove-agent-links` for that.
+5. Gate create/update UI on JWT `role` — members get `403`.
 
 ---
 
@@ -463,8 +503,17 @@ Object with allowed keys only:
 type RetrievalStrategy = "simple" | "orchestrated";
 type AgentStatus = "active" | "inactive" | "disabled";
 
+interface LeadCollectionFieldConfig {
+  key: "email" | "name" | "phone" | "company" | "interest";
+  required: boolean;
+  order: number;
+}
+
 interface LeadCollectionConfig {
   enable_lead_capturing?: boolean;
+  collection_trigger_prompt?: string;
+  min_messages_before_ask?: number;
+  fields?: LeadCollectionFieldConfig[];
 }
 
 interface PreBuildAgentRequest {
@@ -473,6 +522,7 @@ interface PreBuildAgentRequest {
   llm_model?: string;
   lead_collection_config?: LeadCollectionConfig;
   tool_ids?: string[];
+  plugin_ids?: string[];
 }
 
 interface AgentFileInput {
@@ -493,8 +543,8 @@ interface QaPairInput {
 
 interface BuildAgentRequest {
   agent_id?: string;
-  base_url?: string;
   tool_ids?: string[];
+  plugin_ids?: string[];
   links?: string[];
   files?: AgentFileInput[];
   custom_texts?: CustomTextInput[];
@@ -508,7 +558,6 @@ interface UpdateAgentRequest {
   files?: AgentFileInput[];
   custom_texts?: CustomTextInput[];
   qa_pairs?: QaPairInput[];
-  base_url?: string;
   agent_name?: string;
   system_prompt?: string;
   llm_model?: string;
@@ -523,6 +572,7 @@ interface UpdateAgentRequest {
   retrieval_strategy?: RetrievalStrategy;
   lead_collection_config?: LeadCollectionConfig;
   tool_ids?: string[];
+  plugin_ids?: string[];
   agent_status?: AgentStatus;
 }
 ```
@@ -531,6 +581,8 @@ interface UpdateAgentRequest {
 
 ## Related docs
 
-- [frontend-agents-rbac-guide.md](./frontend-agents-rbac-guide.md)- roles and permissions
-- [frontend-tools-api-guide.md](./frontend-tools-api-guide.md)- custom tools CRUD and `tool_ids`
-- [backend-team-rbac-guide.md](./backend-team-rbac-guide.md)- JWT and team context
+- [frontend-agents-rbac-guide.md](./frontend-agents-rbac-guide.md) — roles and permissions
+- [frontend-tools-api-guide.md](./frontend-tools-api-guide.md) — custom tools CRUD and `tool_ids`
+- [frontend-plugins-api-guide.md](./frontend-plugins-api-guide.md) — custom plugins CRUD and `plugin_ids`
+- [atlas-plugins-plan.md](./atlas-plugins-plan.md) — plugin architecture
+- [backend-team-rbac-guide.md](./backend-team-rbac-guide.md) — JWT and team context

@@ -135,11 +135,19 @@ export default function AgentToolsSelector() {
   const [maxExecutionsInput, setMaxExecutionsInput] = useState(
     String(toolCallingConfig.max_executions_per_turn),
   );
+  const [maxToolHistoryInput, setMaxToolHistoryInput] = useState(
+    String(toolCallingConfig.max_tool_history_in_llm),
+  );
 
   useEffect(() => {
     setMaxRoundsInput(String(toolCallingConfig.max_rounds));
     setMaxExecutionsInput(String(toolCallingConfig.max_executions_per_turn));
-  }, [toolCallingConfig.max_rounds, toolCallingConfig.max_executions_per_turn]);
+    setMaxToolHistoryInput(String(toolCallingConfig.max_tool_history_in_llm));
+  }, [
+    toolCallingConfig.max_rounds,
+    toolCallingConfig.max_executions_per_turn,
+    toolCallingConfig.max_tool_history_in_llm,
+  ]);
 
   useEffect(() => {
     let mounted = true;
@@ -339,6 +347,36 @@ export default function AgentToolsSelector() {
     dispatch(
       updateToolCallingConfig({
         max_executions_per_turn: clamped,
+      }),
+    );
+  };
+
+  const handleMaxToolHistoryChange = (value: string) => {
+    if (value !== "" && !/^\d+$/.test(value)) return;
+
+    setMaxToolHistoryInput(value);
+
+    const parsed = parseNumericInput(value);
+    if (parsed === null) return;
+
+    dispatch(
+      updateToolCallingConfig({
+        max_tool_history_in_llm: clampNumber(parsed, 1, 20),
+      }),
+    );
+  };
+
+  const handleMaxToolHistoryBlur = () => {
+    const parsed = parseNumericInput(maxToolHistoryInput);
+    const clamped = clampNumber(
+      parsed ?? toolCallingConfig.max_tool_history_in_llm,
+      1,
+      20,
+    );
+    setMaxToolHistoryInput(String(clamped));
+    dispatch(
+      updateToolCallingConfig({
+        max_tool_history_in_llm: clamped,
       }),
     );
   };
@@ -664,6 +702,51 @@ export default function AgentToolsSelector() {
                     />
                   }
                 />
+
+                <SettingRow
+                  title="Include tool history in LLM"
+                  description="Replay past tool and plugin request/response rows in later turns. Turn on for multi-step flows; off by default to save tokens."
+                  control={
+                    <SettingSwitch
+                      checked={toolCallingConfig.include_tool_history_in_llm}
+                      disabled={readOnly}
+                      ariaLabel={
+                        toolCallingConfig.include_tool_history_in_llm
+                          ? "Turn off tool history in LLM"
+                          : "Turn on tool history in LLM"
+                      }
+                      onToggle={() =>
+                        dispatch(
+                          updateToolCallingConfig({
+                            include_tool_history_in_llm:
+                              !toolCallingConfig.include_tool_history_in_llm,
+                          }),
+                        )
+                      }
+                    />
+                  }
+                />
+
+                {toolCallingConfig.include_tool_history_in_llm && (
+                  <SettingField
+                    title="Max tool history"
+                    description="How many past tool and plugin rows to include in LLM prompts (1–20). Current-turn results are always included."
+                  >
+                    <CustomInput
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={maxToolHistoryInput}
+                      disabled={readOnly}
+                      onChange={(e) =>
+                        handleMaxToolHistoryChange(e.target.value)
+                      }
+                      onBlur={handleMaxToolHistoryBlur}
+                      className={TIMING_INPUT_CLASS}
+                      aria-label="Max tool history in LLM"
+                    />
+                  </SettingField>
+                )}
               </div>
             )}
           </div>

@@ -93,28 +93,33 @@ export function createMarkdownComponents(
       <hr className="my-4 border-gray-300" {...props} />
     ),
     table: ({ node, ...props }) => (
-      <div className="relative my-2 max-w-full">
-        <div className="overflow-x-auto custom-scrollbar">
-          <table className="min-w-full border border-gray-300" {...props} />
-        </div>
-        <div
-          className="absolute top-0 right-0 bottom-0 w-12 pointer-events-none"
-          style={{
-            background:
-              "linear-gradient(to left, white 0%, white 30%, transparent 100%)",
-          }}
+      <div className="my-3 max-w-full overflow-x-auto rounded-lg border border-gray-200 bg-white custom-scrollbar">
+        <table
+          className="w-full min-w-max border-collapse text-[13px] text-gray-700"
+          {...props}
         />
       </div>
     ),
-    thead: ({ node, ...props }) => <thead className="bg-gray-100" {...props} />,
+    thead: ({ node, ...props }) => (
+      <thead className="bg-gray-50" {...props} />
+    ),
+    tbody: ({ node, ...props }) => (
+      <tbody className="[&_tr:last-child_td]:border-b-0" {...props} />
+    ),
+    tr: ({ node, ...props }) => (
+      <tr className="hover:bg-gray-50/60 transition-colors" {...props} />
+    ),
     th: ({ node, ...props }) => (
       <th
-        className="border border-gray-300 px-3 py-2 text-left font-semibold"
+        className="border-b border-gray-200 px-3 py-2.5 text-left text-[12px] font-semibold text-gray-600 whitespace-nowrap"
         {...props}
       />
     ),
     td: ({ node, ...props }) => (
-      <td className="border border-gray-300 px-3 py-2" {...props} />
+      <td
+        className="border-b border-gray-100 px-3 py-2.5 align-top text-gray-700"
+        {...props}
+      />
     ),
   };
 }

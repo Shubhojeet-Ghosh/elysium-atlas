@@ -397,6 +397,17 @@ export default function MainChatSpace({ handover }: MainChatSpaceProps) {
     messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
+  const scrollToBottomAfterLayout = useCallback(
+    (behavior: ScrollBehavior = "smooth") => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior });
+        });
+      });
+    },
+    [],
+  );
+
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } =
@@ -423,6 +434,7 @@ export default function MainChatSpace({ handover }: MainChatSpaceProps) {
       );
 
       scrollToBottomOnSend();
+      scrollToBottomAfterLayout();
 
       // `emit` is connection-safe: if the socket isn't connected yet, it
       // queues the payload until the next connect. No reconnect dance needed.
@@ -455,8 +467,16 @@ export default function MainChatSpace({ handover }: MainChatSpaceProps) {
       dispatch,
       in_conversation_with,
       scrollToBottomOnSend,
+      scrollToBottomAfterLayout,
     ],
   );
+
+  // Keep the view pinned to the bottom while the agent typing indicator is shown
+  // after the visitor sends a message (does not change conversation length).
+  useEffect(() => {
+    if (!isTyping || in_conversation_with) return;
+    scrollToBottomAfterLayout();
+  }, [isTyping, in_conversation_with, scrollToBottomAfterLayout]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

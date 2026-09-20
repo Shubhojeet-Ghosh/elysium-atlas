@@ -18,6 +18,9 @@ export function useCurrentAgentDetails() {
   const retrievalStrategy = useAppSelector(
     (state) => state.agent.retrievalStrategy,
   );
+  const llmContextConfig = useAppSelector(
+    (state) => state.agent.llmContextConfig,
+  );
   const toolIds = useAppSelector((state) => state.agent.toolIds);
   const pluginIds = useAppSelector((state) => state.agent.pluginIds ?? []);
   const toolCallingConfig = useAppSelector(
@@ -55,6 +58,7 @@ export function useCurrentAgentDetails() {
       welcomeMessage,
       llmModel,
       retrievalStrategy,
+      llmContextConfig,
       toolIds,
       pluginIds,
       toolCallingConfig,
@@ -79,6 +83,7 @@ export function useCurrentAgentDetails() {
       welcomeMessage,
       llmModel,
       retrievalStrategy,
+      llmContextConfig,
       toolIds,
       pluginIds,
       toolCallingConfig,
