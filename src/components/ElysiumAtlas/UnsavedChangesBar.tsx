@@ -53,7 +53,7 @@ export default function UnsavedChangesBar({
   return (
     <div
       className={cn(
-        "fixed bottom-[10px] left-1/2 transform -translate-x-1/2 z-[100] transition-all duration-300 ease-in-out",
+        "fixed bottom-[10px] left-1/2 transform -translate-x-1/2 z-[200] pointer-events-auto transition-all duration-300 ease-in-out",
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
       )}
     >

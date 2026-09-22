@@ -14,7 +14,7 @@ import AutoComplete from "@/components/ui/AutoComplete";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { setTemperature } from "@/store/reducers/agentSlice";
-import { AVAILABLE_MODELS } from "@/lib/llmConfig";
+import { getSelectableModels } from "@/lib/llmConfig";
 import { SHEET_CONTENT_CLASSNAME } from "@/lib/sheetConfig";
 import { useAgentReadOnly } from "@/hooks/useCanManageAgents";
 
@@ -25,7 +25,7 @@ export default function LlmModelSelector() {
   const dispatch = useAppDispatch();
   const readOnly = useAgentReadOnly();
 
-  const modelItems = AVAILABLE_MODELS.map((model) => ({
+  const modelItems = getSelectableModels(llmModel).map((model) => ({
     value: model.model_code,
     label: model.model_code,
     icon: model.model_icon,
