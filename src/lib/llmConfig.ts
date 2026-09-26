@@ -20,7 +20,42 @@ export const AVAILABLE_MODELS: LlmModelConfig[] = [
       "https://cdn.sgdevstudio.in/assets/icons/llm_icons/openai_icon.svg",
   },
   {
+    model_code: "gpt-5.4-mini",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/openai_icon.svg",
+  },
+  {
     model_code: "gpt-5-nano-2025-08-07",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/openai_icon.svg",
+  },
+  {
+    model_code: "gpt-6-astra",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/openai_icon.svg",
+  },
+  {
+    model_code: "gpt-6-sol",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/openai_icon.svg",
+  },
+  {
+    model_code: "gpt-6-luna",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/openai_icon.svg",
+  },
+  {
+    model_code: "gpt-5.6-sol",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/openai_icon.svg",
+  },
+  {
+    model_code: "gpt-5.6-terra",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/openai_icon.svg",
+  },
+  {
+    model_code: "gpt-5.6-luna",
     model_icon:
       "https://cdn.sgdevstudio.in/assets/icons/llm_icons/openai_icon.svg",
   },
@@ -58,6 +93,11 @@ export const AVAILABLE_MODELS: LlmModelConfig[] = [
   },
   {
     model_code: "claude-haiku-4-5",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/claude-icon.svg",
+  },
+  {
+    model_code: "claude-sonnet-5",
     model_icon:
       "https://cdn.sgdevstudio.in/assets/icons/llm_icons/claude-icon.svg",
   },
