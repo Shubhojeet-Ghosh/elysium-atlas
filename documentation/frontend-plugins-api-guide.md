@@ -1,6 +1,6 @@
 # Custom Plugins APIs — frontend guide
 
-Reference for building the **team custom plugins** UI in Elysium Atlas. Plugins are Python functions the LLM can call like tools. The **plugin file** is the source of truth for name, description, and typed inputs. At chat runtime, attached plugins share DeepSeek orchestration with HTTP tools, then results are passed to the agent’s main LLM.
+Reference for building the **team custom plugins** UI in Elysium Atlas. Plugins are Python functions the LLM can call like tools. The **plugin file** is the source of truth for name, description, and typed inputs. At chat runtime, attached plugins share the agent’s configured tool-calling model orchestration with HTTP tools, then results are passed to the agent’s main LLM.
 
 **Architecture plan:** [atlas-plugins-plan.md](./atlas-plugins-plan.md)
 
@@ -126,7 +126,7 @@ Same endpoints as `tool_ids`: `pre-build-agent-operations`, `build-agent`, `upda
 
 Send `"plugin_ids": []` to detach all plugins.
 
-`tool_calling_config` already covers plugins (max rounds, max executions, parallel). Show those controls when tools **or** plugins are selected.
+`tool_calling_config` already covers plugins (orchestration model, max rounds, max executions, parallel). Show those controls when tools **or** plugins are selected. Use `tool_calling_config.tool_calling_model` for the orchestration LLM (default `deepseek-v4-pro`); it is independent of the agent’s visitor-reply `llm_model`. See supported values in [frontend-tools-api-guide.md](./frontend-tools-api-guide.md#supported-tool_calling_model-values).
 
 ---
 

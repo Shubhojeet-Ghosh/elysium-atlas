@@ -1,6 +1,6 @@
 # Custom Tools APIs — frontend guide
 
-Reference for building the **team custom tools** UI in Elysium Atlas. Tools are external HTTP integrations configured like OpenAI function calling. At chat runtime, attached tools are orchestrated via DeepSeek (multi-round when configured), then results are passed to the agent’s main LLM for the visitor-facing reply.
+Reference for building the **team custom tools** UI in Elysium Atlas. Tools are external HTTP integrations configured like OpenAI function calling. At chat runtime, attached tools are orchestrated via the agent’s configured **tool-calling model** (multi-round when configured), then results are passed to the agent’s main LLM for the visitor-facing reply.
 
 **Base path:** `/elysium-agents/elysium-atlas/tools`
 
@@ -78,15 +78,16 @@ For full create/update agent request parameters, see [frontend-agent-create-upda
 
 Controls **how** attached tools run during visitor chat. Stored on each `atlas_agents` document alongside `tool_ids`.
 
-| Field                         | Type      | Default | UI                             | Description                                                                                                                                                                                                                |
-| ----------------------------- | --------- | ------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `enabled`                     | `boolean` | `true`  | Optional                       | Master switch. When `false`, tools are attached but not executed at chat time                                                                                                                                              |
-| `max_rounds`                  | `integer` | `5`     | **Yes**                        | Max plan → execute → replan cycles per visitor message (enables chained tools)                                                                                                                                             |
-| `max_executions_per_turn`     | `integer` | `10`    | **Yes**                        | Hard cap on total HTTP tool calls per visitor message                                                                                                                                                                      |
-| `parallel_calls_per_round`    | `boolean` | `true`  | **Yes**                        | When `true`, multiple independent tools may run in the same round; when `false`, only one tool runs per round                                                                                                              |
-| `stop_on_error`               | `boolean` | `false` | Hidden                         | When `true`, stop further tool rounds after a tool returns an error payload                                                                                                                                                |
-| `include_tool_history_in_llm` | `boolean` | `false` | **Yes**                        | When `true`, past tool call request/response rows are injected into both the tool orchestration LLM and the final response LLM (chronological order). When `false`, only user/agent text history is sent (current default) |
-| `max_tool_history_in_llm`     | `integer` | `10`    | **Yes** (when history enabled) | Max number of **past** persisted tool rows to include in LLM prompts. Only applies when `include_tool_history_in_llm === true`. Current-turn tool results are always included when tools run                               |
+| Field                         | Type      | Default           | UI                             | Description                                                                                                                                                                                                                |
+| ----------------------------- | --------- | ----------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`                     | `boolean` | `true`            | Optional                       | Master switch. When `false`, tools are attached but not executed at chat time                                                                                                                                              |
+| `max_rounds`                  | `integer` | `5`               | **Yes**                        | Max plan → execute → replan cycles per visitor message (enables chained tools)                                                                                                                                             |
+| `max_executions_per_turn`     | `integer` | `10`              | **Yes**                        | Hard cap on total HTTP tool calls per visitor message                                                                                                                                                                      |
+| `parallel_calls_per_round`    | `boolean` | `true`            | **Yes**                        | When `true`, multiple independent tools may run in the same round; when `false`, only one tool runs per round                                                                                                              |
+| `stop_on_error`               | `boolean` | `false`           | Hidden                         | When `true`, stop further tool rounds after a tool returns an error payload                                                                                                                                                |
+| `include_tool_history_in_llm` | `boolean` | `false`           | **Yes**                        | When `true`, past tool call request/response rows are injected into both the tool orchestration LLM and the final response LLM (chronological order). When `false`, only user/agent text history is sent (current default) |
+| `max_tool_history_in_llm`     | `integer` | `10`              | **Yes** (when history enabled) | Max number of **past** persisted tool rows to include in LLM prompts. Only applies when `include_tool_history_in_llm === true`. Current-turn tool results are always included when tools run                               |
+| `tool_calling_model`          | `string`  | `deepseek-v4-pro` | **Yes**                        | Model used for tool/plugin orchestration. Legacy agents without this field default to `deepseek-v4-pro`. See supported values below                                                                                        |
 
 ### Validation limits
 
@@ -98,13 +99,85 @@ Controls **how** attached tools run during visitor chat. Stored on each `atlas_a
 
 Partial updates merge into the stored config (same pattern as `lead_collection_config`). Unknown keys return `400`.
 
+### Supported `tool_calling_model` values
+
+| Model ID                | Provider | Notes                                                                      |
+| ----------------------- | -------- | -------------------------------------------------------------------------- |
+| `deepseek-v4-pro`       | DeepSeek | **Default** for legacy agents and new agents unless overridden             |
+| `deepseek-v4-flash`     | DeepSeek | Faster/cheaper DeepSeek option                                             |
+| `gpt-4o-mini`           | OpenAI   | Chat Completions tools API                                                 |
+| `gpt-4.1-mini`          | OpenAI   | Chat Completions tools API                                                 |
+| `gpt-5.4-mini`          | OpenAI   | Chat Completions tools API; sends agent `temperature`                      |
+| `gpt-5-nano-2025-08-07` | OpenAI   | Reasoning model; orchestration omits `temperature`                         |
+| `gpt-6-astra`           | OpenAI   | Uses OpenAI **Responses API** for tool calling (required by OpenAI)        |
+| `gpt-6-sol`             | OpenAI   | Chat Completions tools API; orchestration omits `temperature`              |
+| `gpt-6-luna`            | OpenAI   | Chat Completions tools API; orchestration omits `temperature`              |
+| `gpt-5.6-sol`           | OpenAI   | Chat Completions tools API; orchestration omits `temperature`              |
+| `gpt-5.6-terra`         | OpenAI   | Chat Completions tools API; orchestration omits `temperature`              |
+| `gpt-5.6-luna`          | OpenAI   | Chat Completions tools API; orchestration omits `temperature`              |
+| `claude-sonnet-4-5`     | Claude   | Messages API `tool_use` / `tool_result`; sends agent `temperature`         |
+| `claude-haiku-4-5`      | Claude   | Messages API `tool_use` / `tool_result`; sends agent `temperature`         |
+| `claude-sonnet-5`       | Claude   | Messages API `tool_use` / `tool_result`; orchestration omits `temperature` |
+
+**Deprecated (API-valid, hide from picker):** `claude-3-7-sonnet-latest`, `claude-sonnet-4-0`
+
+**UI guidance:** Show this picker when the agent has tools or plugins attached. It is independent of `llm_model` (the visitor reply model). Invalid model IDs return `400`. Hide rows where `deprecated === true`.
+
 ### What the settings mean (for UI copy)
 
 - **`max_rounds`** — How many times the agent can _think, call tools, see results, and think again_ before answering. Use **3–5** when tools depend on each other (e.g. lookup customer → fetch orders).
 - **`max_executions_per_turn`** — Total number of tool HTTP calls allowed in one visitor message (cost/latency guardrail).
 - **`parallel_calls_per_round`** — When on, independent tools can run together in one step. Turn off if APIs are rate-limited or must run strictly one at a time.
 - **`include_tool_history_in_llm`** — Turn on for multi-step flows where later turns depend on earlier tool outcomes (e.g. member verification before doctor lookup). Off by default to save tokens.
-- **`max_tool_history_in_llm`** — Caps how many persisted `role: "tool"` rows are replayed into LLM prompts. User/agent text history remains capped separately (last 10 messages).
+- **`max_tool_history_in_llm`** — Caps how many persisted `role: "tool"` rows are replayed into LLM prompts. User/agent text history is capped separately by `llm_context_config.max_chat_history_messages` (default `10`, max `100`).
+
+---
+
+## LLM context config (`llm_context_config`)
+
+Controls how much **user/agent conversation history** is injected into the main agent LLM prompts (tool orchestration + final reply). Applies to **all agents**, with or without tools.
+
+| Field                       | Type      | Default | UI      | Description                                                                                                                                              |
+| --------------------------- | --------- | ------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `max_chat_history_messages` | `integer` | `10`    | **Yes** | Max past user/agent text messages in LLM prompts (chronological). Does **not** affect lead collection, human handover, or visitor widget session restore |
+
+### Validation limits
+
+| Field                       | Min | Max   |
+| --------------------------- | --- | ----- |
+| `max_chat_history_messages` | `1` | `100` |
+
+Partial updates merge into the stored config (same pattern as `tool_calling_config`). Unknown keys return `400`.
+
+**Create / update endpoints:** same as `tool_ids` — `pre-build-agent-operations`, `build-agent`, `update-agent`.
+
+**Create example:**
+
+```json
+{
+  "agent_name": "Care Coordinator",
+  "llm_context_config": {
+    "max_chat_history_messages": 20
+  }
+}
+```
+
+**Partial update example:**
+
+```json
+{
+  "agent_id": "674a1b2c3d4e5f6789012345",
+  "llm_context_config": {
+    "max_chat_history_messages": 30
+  }
+}
+```
+
+**Read:** `llm_context_config` is returned on `get-agent-details`. Older agents without the field receive defaults when read.
+
+**UI copy:** Higher values improve long multi-turn conversations but increase token usage, cost, and latency.
+
+**Not affected:** Lead collection and human handover keep their own internal history limits and never receive tool rows.
 
 ### Agent APIs that accept `tool_calling_config`
 
@@ -124,6 +197,7 @@ Same endpoints as `tool_ids`:
   "tool_ids": ["674a1b2c3d4e5f6789012345"],
   "tool_calling_config": {
     "enabled": true,
+    "tool_calling_model": "gpt-4o-mini",
     "max_rounds": 5,
     "max_executions_per_turn": 10,
     "parallel_calls_per_round": true,
@@ -154,7 +228,7 @@ Same endpoints as `tool_ids`:
 When a visitor sends a message and the agent has non-empty `tool_ids` with `tool_calling_config.enabled === true`:
 
 1. Knowledge retrieval and prompt assembly run as today.
-2. **Tool orchestration** (DeepSeek `deepseek-v4-pro`):
+2. **Tool orchestration** (`tool_calling_config.tool_calling_model`, default `deepseek-v4-pro`):
    - Up to `max_rounds` cycles.
    - Each cycle: model may call zero or more tools → HTTP execution → results fed back to the orchestrator.
    - Stops when the model calls no tools, limits are hit, or `stop_on_error` triggers.
@@ -213,18 +287,18 @@ Tool rows sit **between** the visitor message that triggered them and the agent 
 }
 ```
 
-| Field                        | Type                                      | Notes                                                                                |
-| ---------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------ |
-| `role`                       | `"tool"`                                  | Filter/toggle technical rows with `role === "tool"`                                  |
-| `content`                    | `string`                                  | Same as `tool_name` (fallback for generic message renderers)                         |
-| `tool_name`                  | `string`                                  | Atlas tool `name` (LLM function name)                                                |
-| `request_payload`            | `object` or truncated `string`            | LLM function arguments (not auth tokens)                                             |
-| `response_payload`           | `object`, `string`, or truncated `string` | Parsed JSON body when possible; `{ "error": true, ... }` on timeout/4xx/unknown tool |
-| `request_payload_truncated`  | `boolean`                                 | True when request JSON exceeded 16 000 characters                                    |
-| `response_payload_truncated` | `boolean`                                 | True when response JSON exceeded 16 000 characters                                   |
-| `status`                     | `"success"` \| `"error"`                  | Error includes HTTP failures, timeouts, and unknown tool names                       |
-| `parent_user_message_id`     | `string`                                  | Visitor `message_id` for this turn                                                   |
-| `created_at`                 | `string`                                  | When the HTTP call finished — use this for ordering                                  |
+| Field                        | Type                                      | Notes                                                                   |
+| ---------------------------- | ----------------------------------------- | ----------------------------------------------------------------------- |
+| `role`                       | `"tool"`                                  | Filter/toggle technical rows with `role === "tool"`                     |
+| `content`                    | `string`                                  | Same as `tool_name` (fallback for generic message renderers)            |
+| `tool_name`                  | `string`                                  | Atlas tool `name` (LLM function name)                                   |
+| `request_payload`            | `object` or truncated `string`            | LLM function arguments (not auth tokens)                                |
+| `response_payload`           | `object`, `string`, or truncated `string` | Parsed JSON body when possible; `{ "error": true, ... }` on timeout/4xx |
+| `request_payload_truncated`  | `boolean`                                 | True when request JSON exceeded 16 000 characters                       |
+| `response_payload_truncated` | `boolean`                                 | True when response JSON exceeded 16 000 characters                      |
+| `status`                     | `"success"` \| `"error"`                  | Error includes HTTP failures and timeouts                               |
+| `parent_user_message_id`     | `string`                                  | Visitor `message_id` for this turn                                      |
+| `created_at`                 | `string`                                  | When the HTTP call finished — use this for ordering                     |
 
 **Inbox / last message:** `role: "tool"` is excluded from `last_message` and does **not** bump `last_message_at`.
 
@@ -1300,6 +1374,7 @@ interface ToolAuthInput {
 }
 interface ToolCallingConfig {
   enabled?: boolean;
+  tool_calling_model?: string;
   max_rounds?: number;
   max_executions_per_turn?: number;
   parallel_calls_per_round?: boolean;
@@ -1308,9 +1383,14 @@ interface ToolCallingConfig {
   max_tool_history_in_llm?: number;
 }
 
+interface LlmContextConfig {
+  max_chat_history_messages?: number;
+}
+
 interface AgentToolSettings {
   tool_ids?: string[];
   tool_calling_config?: ToolCallingConfig;
+  llm_context_config?: LlmContextConfig;
 }
 
 interface CreateToolRequest {

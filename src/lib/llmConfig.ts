@@ -134,3 +134,51 @@ export function getSelectableModels(currentModel?: string): LlmModelConfig[] {
     (model) => !model.deprecated || model.model_code === currentModel,
   );
 }
+
+/** Models supported for tool/plugin orchestration (`tool_calling_config.tool_calling_model`). */
+export const TOOL_CALLING_MODEL_IDS = [
+  "deepseek-v4-pro",
+  "deepseek-v4-flash",
+  "gpt-4o-mini",
+  "gpt-4.1-mini",
+  "gpt-5.4-mini",
+  "gpt-5-nano-2025-08-07",
+  "gpt-6-astra",
+  "gpt-6-sol",
+  "gpt-6-luna",
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-5.6-luna",
+  "claude-sonnet-4-5",
+  "claude-haiku-4-5",
+  "claude-sonnet-5",
+] as const;
+
+export type ToolCallingModelId = (typeof TOOL_CALLING_MODEL_IDS)[number];
+
+export const DEFAULT_TOOL_CALLING_MODEL: ToolCallingModelId = "deepseek-v4-pro";
+
+const TOOL_CALLING_MODEL_LOOKUP = new Map(
+  AVAILABLE_MODELS.map((model) => [model.model_code, model]),
+);
+
+/** Models shown in the tool/plugin orchestration picker. Deprecated models are hidden unless already selected. */
+export function getSelectableToolCallingModels(
+  currentModel?: string,
+): LlmModelConfig[] {
+  const models = TOOL_CALLING_MODEL_IDS.map(
+    (modelCode) => TOOL_CALLING_MODEL_LOOKUP.get(modelCode)!,
+  ).filter(
+    (model) => !model.deprecated || model.model_code === currentModel,
+  );
+
+  if (
+    currentModel &&
+    !TOOL_CALLING_MODEL_IDS.includes(currentModel as ToolCallingModelId) &&
+    TOOL_CALLING_MODEL_LOOKUP.has(currentModel)
+  ) {
+    models.push(TOOL_CALLING_MODEL_LOOKUP.get(currentModel)!);
+  }
+
+  return models;
+}

@@ -12,7 +12,9 @@ import {
 import { fetchTools } from "@/utils/toolsApi";
 import { fetchPlugins } from "@/utils/pluginsApi";
 import CustomSelector from "@/components/ui/CustomSelector";
+import AutoComplete from "@/components/ui/AutoComplete";
 import CustomInput from "@/components/inputs/CustomInput";
+import { getSelectableToolCallingModels } from "@/lib/llmConfig";
 import Spinner from "@/components/ui/Spinner";
 import {
   Sheet,
@@ -220,6 +222,18 @@ export default function AgentToolsSelector() {
   const selectedToolCount = selectedToolIds.length;
   const selectedPluginCount = selectedPluginIds.length;
   const showCallingSettings = selectedToolCount > 0 || selectedPluginCount > 0;
+
+  const toolCallingModelItems = useMemo(
+    () =>
+      getSelectableToolCallingModels(toolCallingConfig.tool_calling_model).map(
+        (model) => ({
+          value: model.model_code,
+          label: model.model_code,
+          icon: model.model_icon,
+        }),
+      ),
+    [toolCallingConfig.tool_calling_model],
+  );
 
   const selectorValue = useMemo(() => {
     if (isLoading) return "Loading...";
@@ -644,6 +658,28 @@ export default function AgentToolsSelector() {
                     />
                   }
                 />
+
+                <SettingField
+                  title="Tool calling model"
+                  description="Model used to plan and run tool and plugin calls. Independent of the visitor reply LLM model."
+                >
+                  <AutoComplete
+                    items={toolCallingModelItems}
+                    value={toolCallingConfig.tool_calling_model}
+                    placeholder="Select tool calling model..."
+                    searchPlaceholder="Search model..."
+                    emptyMessage="No model found."
+                    onChange={(value) =>
+                      dispatch(
+                        updateToolCallingConfig({
+                          tool_calling_model: value,
+                        }),
+                      )
+                    }
+                    className="text-[13px] font-[500]"
+                    disabled={readOnly}
+                  />
+                </SettingField>
 
                 <SettingField
                   title="Max rounds"

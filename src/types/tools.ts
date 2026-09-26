@@ -135,6 +135,7 @@ export interface ToolParameterRow {
 
 export interface ToolCallingConfig {
   enabled: boolean;
+  tool_calling_model: string;
   max_rounds: number;
   max_executions_per_turn: number;
   parallel_calls_per_round: boolean;
@@ -145,6 +146,7 @@ export interface ToolCallingConfig {
 
 export const DEFAULT_TOOL_CALLING_CONFIG: ToolCallingConfig = {
   enabled: true,
+  tool_calling_model: "deepseek-v4-pro",
   max_rounds: 5,
   max_executions_per_turn: 10,
   parallel_calls_per_round: true,
@@ -157,6 +159,9 @@ export function normalizeToolCallingConfig(
 ): ToolCallingConfig {
   return {
     enabled: config?.enabled ?? DEFAULT_TOOL_CALLING_CONFIG.enabled,
+    tool_calling_model:
+      config?.tool_calling_model ??
+      DEFAULT_TOOL_CALLING_CONFIG.tool_calling_model,
     max_rounds: config?.max_rounds ?? DEFAULT_TOOL_CALLING_CONFIG.max_rounds,
     max_executions_per_turn:
       config?.max_executions_per_turn ??
