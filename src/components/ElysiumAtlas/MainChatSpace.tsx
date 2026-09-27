@@ -17,6 +17,10 @@ import { useAiSocket, useAiSocketEvent } from "@/hooks/useAiSocket";
 import {
   isIncomingMessageUnread,
   findFirstIncomingUnreadSeparatorIndex,
+  isAgentWelcomeOnlyConversation,
+  shouldShowChatWelcomeScreen,
+  chainHasAgentMessage,
+  createWelcomeFallbackMessage,
 } from "@/utils/conversationMessageUtils";
 import { useMarkMessagesReadWhenVisible } from "@/hooks/useMarkMessagesReadWhenVisible";
 import ReadReceiptMarker from "@/components/ElysiumAtlas/ReadReceiptMarker";
@@ -54,6 +58,7 @@ export default function MainChatSpace({ handover }: MainChatSpaceProps) {
     text_color,
     placeholder_text,
     agent_status,
+    welcome_message,
     conversation_chain,
     isFetching,
     chatMode,
@@ -277,7 +282,11 @@ export default function MainChatSpace({ handover }: MainChatSpaceProps) {
     );
     dispatch(setInConversationWith(data.in_conversation_with));
 
-    if (role === "human" && !isAgentOpenRef.current && window.parent !== window) {
+    if (
+      role === "human" &&
+      !isAgentOpenRef.current &&
+      window.parent !== window
+    ) {
       window.parent.postMessage({ type: "request_open_chat" }, "*");
     }
 
@@ -424,6 +433,16 @@ export default function MainChatSpace({ handover }: MainChatSpaceProps) {
 
       const user_message_created_at = new Date().toISOString();
 
+      if (!chainHasAgentMessage(conversation_chain)) {
+        const welcomeMessage = createWelcomeFallbackMessage(
+          welcome_message,
+          chat_session_id,
+        );
+        if (welcomeMessage) {
+          dispatch(addMessage(welcomeMessage));
+        }
+      }
+
       dispatch(
         addMessage({
           message_id: uuidv4(),
@@ -463,6 +482,8 @@ export default function MainChatSpace({ handover }: MainChatSpaceProps) {
       emit,
       agent_id,
       chat_session_id,
+      welcome_message,
+      conversation_chain,
       chatMode,
       dispatch,
       in_conversation_with,
@@ -509,6 +530,12 @@ export default function MainChatSpace({ handover }: MainChatSpaceProps) {
     handover,
     in_conversation_with,
   );
+  const showWelcomeScreen = shouldShowChatWelcomeScreen(conversation_chain);
+  const persistedWelcomeMessage = isAgentWelcomeOnlyConversation(
+    conversation_chain,
+  )
+    ? conversation_chain.find((message) => message.role === "agent")?.content
+    : undefined;
 
   return (
     <div className="flex-1 flex flex-col min-h-0 relative">
@@ -525,10 +552,11 @@ export default function MainChatSpace({ handover }: MainChatSpaceProps) {
           <div className="flex-grow"></div>
           {isFetching ? (
             <SkeletonMessages />
-          ) : conversation_chain.length === 0 ? (
+          ) : showWelcomeScreen ? (
             <ChatWelcomeMessage
               handleSendMessage={handleSendMessage}
               setInputValue={setInputValue}
+              messageText={persistedWelcomeMessage}
             />
           ) : (
             <div

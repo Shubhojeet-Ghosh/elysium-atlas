@@ -8,11 +8,14 @@ import Image from "next/image";
 interface ChatWelcomeMessageProps {
   handleSendMessage: (message?: string) => void;
   setInputValue: (value: string) => void;
+  /** When welcome is persisted in the session, use that message text. */
+  messageText?: string;
 }
 
 const ChatWelcomeMessage: React.FC<ChatWelcomeMessageProps> = ({
   handleSendMessage,
   setInputValue,
+  messageText,
 }) => {
   const {
     agent_icon,
@@ -23,6 +26,8 @@ const ChatWelcomeMessage: React.FC<ChatWelcomeMessageProps> = ({
     primary_color,
     text_color,
   } = useAppSelector((state) => state.agentChat);
+
+  const displayMessage = messageText?.trim() || welcome_message;
 
   const isOffline = isAgentDisabled(agent_status);
 
@@ -58,7 +63,7 @@ const ChatWelcomeMessage: React.FC<ChatWelcomeMessageProps> = ({
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeHighlight]}
             >
-              {welcome_message}
+              {displayMessage}
             </ReactMarkdown>
           </div>
         )}

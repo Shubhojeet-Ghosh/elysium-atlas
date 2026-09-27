@@ -1,4 +1,4 @@
-import { useAppSelector, useAppDispatch } from "@/store";
+import { useAppSelector, useAppDispatch, store } from "@/store";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ChatHeader from "./ChatHeader";
 import MainChatSpace from "./MainChatSpace";
@@ -11,7 +11,10 @@ import {
   setConversationChain,
   setHumanConversationStarted,
 } from "@/store/reducers/agentChatSlice";
-import { normalizeVisitorChatMessage } from "@/utils/conversationMessageUtils";
+import {
+  buildInitialConversationChain,
+  mergeFetchedConversationChain,
+} from "@/utils/conversationMessageUtils";
 import type { VisitorHandoverState } from "@/types/humanHandover";
 import { parseVisitorHandoverFromSessionData } from "@/utils/humanHandoverVisitorUtils";
 import { parseVisitorTakeoverFromSessionData } from "@/utils/visitorTakeoverUtils";
@@ -114,20 +117,18 @@ export default function AgentChatSpace() {
             }),
           );
 
-          if (Array.isArray(sessionMessages) && sessionMessages.length > 0) {
-            dispatch(
-              setConversationChain(
-                sessionMessages.map((m: Record<string, unknown>) =>
-                  normalizeVisitorChatMessage(m),
-                ),
-              ),
-            );
-          } else {
-            const welcomeMessage = agentFields.welcome_message || "";
-            if (welcomeMessage) {
-              dispatch(setConversationChain([]));
-            }
-          }
+          const fetchedChain = buildInitialConversationChain(
+            sessionMessages,
+            agentFields.welcome_message || "",
+            chat_session_id,
+          );
+          const currentChain = store.getState().agentChat.conversation_chain;
+
+          dispatch(
+            setConversationChain(
+              mergeFetchedConversationChain(currentChain, fetchedChain),
+            ),
+          );
         } else {
           console.warn("API response indicates failure:", agentData);
         }

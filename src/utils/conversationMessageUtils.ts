@@ -19,6 +19,84 @@ export function isIncomingMessageUnread(msg: {
   );
 }
 
+/** True when the chain is only a single agent message (e.g. persisted welcome). */
+export function isAgentWelcomeOnlyConversation(
+  chain: Array<{ role: string }>,
+): boolean {
+  const conversational = chain.filter((message) => message.role !== "system");
+  return conversational.length === 1 && conversational[0].role === "agent";
+}
+
+export function chainHasAgentMessage(chain: Array<{ role: string }>): boolean {
+  return chain.some((message) => message.role === "agent");
+}
+
+export function createWelcomeFallbackMessage(
+  welcomeMessage: string,
+  chatSessionId: string,
+): ReturnType<typeof normalizeVisitorChatMessage> | null {
+  const content = welcomeMessage.trim();
+  if (!content) return null;
+
+  return {
+    message_id: `welcome-${chatSessionId}`,
+    _id: undefined,
+    role: "agent",
+    content,
+    created_at: new Date().toISOString(),
+    read_at: null,
+  };
+}
+
+export function buildInitialConversationChain(
+  sessionMessages: unknown,
+  welcomeMessage: string,
+  chatSessionId: string,
+): ReturnType<typeof normalizeVisitorChatMessage>[] {
+  const normalized = Array.isArray(sessionMessages)
+    ? sessionMessages.map((message) =>
+        normalizeVisitorChatMessage(message as Record<string, unknown>),
+      )
+    : [];
+
+  if (normalized.length > 0) {
+    return normalized;
+  }
+
+  const welcome = createWelcomeFallbackMessage(welcomeMessage, chatSessionId);
+  return welcome ? [welcome] : [];
+}
+
+/** Keep optimistic visitor messages if a stale fetch has not caught up yet. */
+export function mergeFetchedConversationChain<T extends { role: string }>(
+  currentChain: T[],
+  fetchedChain: T[],
+): T[] {
+  const hasLocalUserMessage = currentChain.some(
+    (message) => message.role === "user",
+  );
+  const fetchedHasUserMessage = fetchedChain.some(
+    (message) => message.role === "user",
+  );
+
+  if (hasLocalUserMessage && !fetchedHasUserMessage) {
+    return currentChain;
+  }
+
+  return fetchedChain;
+}
+
+/**
+ * Show the styled welcome UI when there are no real messages yet (e.g. New Chat)
+ * or when the session only contains the persisted welcome message.
+ */
+export function shouldShowChatWelcomeScreen(
+  chain: Array<{ role: string }>,
+): boolean {
+  if (isAgentWelcomeOnlyConversation(chain)) return true;
+  return chain.length === 0;
+}
+
 export function normalizeVisitorChatMessage(raw: Record<string, unknown>) {
   const mongoId = raw._id ? String(raw._id) : undefined;
   const readAt = raw.read_at ? String(raw.read_at) : null;
@@ -47,9 +125,9 @@ export function hasSystemNotice(
 }
 
 /** Keep the first occurrence of each system notice (e.g. takeover banner). */
-export function dedupeSystemNotices<T extends { role: string; content: string }>(
-  chain: T[],
-): T[] {
+export function dedupeSystemNotices<
+  T extends { role: string; content: string },
+>(chain: T[]): T[] {
   const seen = new Set<string>();
 
   return chain.filter((message) => {
