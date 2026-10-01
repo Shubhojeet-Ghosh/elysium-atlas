@@ -21,7 +21,7 @@ All routes require `Authorization: Bearer <session_jwt>`. The JWT must include `
 | Secrets               | API keys/tokens are **never returned** after save; responses include `auth.token_configured: true` |
 | Agent linking         | Agents store attached tools in `tool_ids` (array of `atlas_tools._id` strings)                     |
 | Runtime orchestration | Per-agent `tool_calling_config` controls multi-round tool execution during chat                    |
-| Chat audit            | Each tool HTTP call is stored as `role: "tool"` on `atlas_chat_mesages` and mirrored to monitors   |
+| Chat audit            | Each tool HTTP call is stored as `role: "tool"` on `atlas_chat_messages` and mirrored to monitors  |
 
 ---
 
@@ -108,13 +108,14 @@ Partial updates merge into the stored config (same pattern as `lead_collection_c
 | `gpt-4o-mini`           | OpenAI   | Chat Completions tools API                                                 |
 | `gpt-4.1-mini`          | OpenAI   | Chat Completions tools API                                                 |
 | `gpt-5.4-mini`          | OpenAI   | Chat Completions tools API; sends agent `temperature`                      |
-| `gpt-5-nano-2025-08-07` | OpenAI   | Reasoning model; orchestration omits `temperature`                         |
+| `gpt-5-nano-2025-08-07` | OpenAI   | Chat Completions tools with `reasoning_effort: "none"`                     |
 | `gpt-6-astra`           | OpenAI   | Uses OpenAI **Responses API** for tool calling (required by OpenAI)        |
-| `gpt-6-sol`             | OpenAI   | Chat Completions tools API; orchestration omits `temperature`              |
-| `gpt-6-luna`            | OpenAI   | Chat Completions tools API; orchestration omits `temperature`              |
-| `gpt-5.6-sol`           | OpenAI   | Chat Completions tools API; orchestration omits `temperature`              |
-| `gpt-5.6-terra`         | OpenAI   | Chat Completions tools API; orchestration omits `temperature`              |
-| `gpt-5.6-luna`          | OpenAI   | Chat Completions tools API; orchestration omits `temperature`              |
+| `gpt-6-sol`             | OpenAI   | Chat Completions tools with `reasoning_effort: "none"`                     |
+| `gpt-6-luna`            | OpenAI   | Chat Completions tools with `reasoning_effort: "none"`                     |
+| `gpt-6.1-sol`           | OpenAI   | Chat Completions tools with `reasoning_effort: "none"`                     |
+| `gpt-5.6-sol`           | OpenAI   | Chat Completions tools with `reasoning_effort: "none"`                     |
+| `gpt-5.6-terra`         | OpenAI   | Chat Completions tools with `reasoning_effort: "none"`                     |
+| `gpt-5.6-luna`          | OpenAI   | Chat Completions tools with `reasoning_effort: "none"`                     |
 | `claude-sonnet-4-5`     | Claude   | Messages API `tool_use` / `tool_result`; sends agent `temperature`         |
 | `claude-haiku-4-5`      | Claude   | Messages API `tool_use` / `tool_result`; sends agent `temperature`         |
 | `claude-sonnet-5`       | Claude   | Messages API `tool_use` / `tool_result`; orchestration omits `temperature` |
@@ -252,7 +253,7 @@ When enabled, persisted tool rows are formatted as plain text (tool name, reques
 
 ## Tool calls in chat (monitors + history)
 
-Each HTTP tool execution is stored as its **own** `atlas_chat_mesages` row (`role: "tool"`) and mirrored live to session monitors. Persist and socket emit run in the background and do **not** delay the visitor reply.
+Each HTTP tool execution is stored as its **own** `atlas_chat_messages` row (`role: "tool"`) and mirrored live to session monitors. Persist and socket emit run in the background and do **not** delay the visitor reply.
 
 ### Who sees them
 

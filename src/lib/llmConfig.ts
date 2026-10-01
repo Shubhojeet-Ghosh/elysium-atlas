@@ -45,6 +45,11 @@ export const AVAILABLE_MODELS: LlmModelConfig[] = [
       "https://cdn.sgdevstudio.in/assets/icons/llm_icons/openai_icon.svg",
   },
   {
+    model_code: "gpt-6.1-sol",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/openai_icon.svg",
+  },
+  {
     model_code: "gpt-5.6-sol",
     model_icon:
       "https://cdn.sgdevstudio.in/assets/icons/llm_icons/openai_icon.svg",
@@ -105,14 +110,22 @@ export const AVAILABLE_MODELS: LlmModelConfig[] = [
     model_code: "grok-4-1-fast-non-reasoning",
     model_icon:
       "https://cdn.sgdevstudio.in/assets/icons/llm_icons/grok_icon.svg",
+    deprecated: true,
   },
   {
     model_code: "grok-4-1-fast-reasoning",
     model_icon:
       "https://cdn.sgdevstudio.in/assets/icons/llm_icons/grok_icon.svg",
+    deprecated: true,
   },
   {
     model_code: "grok-code-fast-1",
+    model_icon:
+      "https://cdn.sgdevstudio.in/assets/icons/llm_icons/grok_icon.svg",
+    deprecated: true,
+  },
+  {
+    model_code: "grok-4.7",
     model_icon:
       "https://cdn.sgdevstudio.in/assets/icons/llm_icons/grok_icon.svg",
   },
@@ -146,6 +159,7 @@ export const TOOL_CALLING_MODEL_IDS = [
   "gpt-6-astra",
   "gpt-6-sol",
   "gpt-6-luna",
+  "gpt-6.1-sol",
   "gpt-5.6-sol",
   "gpt-5.6-terra",
   "gpt-5.6-luna",
