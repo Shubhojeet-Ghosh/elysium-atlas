@@ -11,7 +11,7 @@ export default function PluginsPage() {
       <TopNav />
       <LeftNav />
       <PageContent className="">
-        <div className="lg:px-[50px] px-4 mt-[80px]">
+        <div className="lg:px-[50px] px-4 mt-[80px] pb-10">
           <TeamPlugins />
         </div>
       </PageContent>
